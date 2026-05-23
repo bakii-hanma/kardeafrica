@@ -35,4 +35,43 @@ return [
         ],
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | E-Billing Payment Gateway (legacy - direct integration, deprecated)
+    |--------------------------------------------------------------------------
+    | Kept for backward compatibility with PaymentController::finalize().
+    | New flow uses payment_backend (futursowax) which wraps E-Billing.
+    */
+    'ebilling' => [
+        'user' => env('EBILLING_USER'),
+        'key' => env('EBILLING_KEY'),
+        'auth' => env('EBILLING_AUTH'),
+        'api_url' => env('EBILLING_API_URL', 'https://stg.billing-easy.com/api/v1/merchant/e_bills'),
+        'portal_url' => env('EBILLING_PORTAL_URL', 'https://staging.billing-easy.net/?invoice='),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | External Payment Backend (futursowax portal)
+    |--------------------------------------------------------------------------
+    | Single-call wrapper around E-Billing. See:
+    | https://futursowax.com/paiement/portal-docs.php
+    */
+    'payment_backend' => [
+        'init_url'     => env('PAYMENT_BACKEND_INIT_URL', 'https://futursowax.com/paiement/portal.php'),
+        'check_url'    => env('PAYMENT_BACKEND_CHECK_URL', 'https://futursowax.com/paiement/check_status.php'),
+        // Endpoint de transfert/remboursement E-Billing (renvoie l'argent au payeur)
+        'transfer_url' => env('PAYMENT_BACKEND_TRANSFER_URL', 'https://futursowax.com/paiement/transfer.php'),
+        'callback_url' => env('PAYMENT_BACKEND_CALLBACK_URL'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | External Product/Checkout API
+    |--------------------------------------------------------------------------
+    */
+    'product_api' => [
+        'base_url' => env('PRODUCT_API_URL', 'https://afrikard-api.duckdns.org/api/v1'),
+    ],
+
 ];

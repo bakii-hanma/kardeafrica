@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Card;
+use App\Models\Order;
+use App\Models\UserCard;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
@@ -12,15 +14,53 @@ use Illuminate\Support\Facades\Auth;
 class CardController extends Controller
 {
     /**
-     * Afficher la liste des cartes
+     * Afficher la liste des cartes achetees par l'utilisateur (UserCard).
+     * Filtres acceptes : search, status, sort.
      */
-    public function index(): View
+    public function index(Request $request): View
     {
-        $cards = Card::with('user')
-            ->latest()
-            ->paginate(12);
+        $query = UserCard::where('user_id', Auth::id())
+            ->with(['orderItem', 'order']);
 
-        return view('cards.index', compact('cards'));
+        if ($search = $request->get('search')) {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('brand', 'like', "%{$search}%");
+            });
+        }
+
+        if (in_array($status = $request->get('status'), ['active', 'used', 'expired'])) {
+            $query->where('status', $status);
+        }
+
+        switch ($request->get('sort', 'latest')) {
+            case 'oldest':     $query->oldest(); break;
+            case 'price_asc':  $query->orderBy('face_value', 'asc'); break;
+            case 'price_desc': $query->orderBy('face_value', 'desc'); break;
+            case 'latest':
+            default:           $query->latest(); break;
+        }
+
+        $cards = $query->paginate(12)->withQueryString();
+
+        // Stats globales (sans pagination) — utilise le vrai prix paye en FCFA via orderItem
+        $allUserCards = UserCard::where('user_id', Auth::id())->with('orderItem')->get();
+        $stats = [
+            'total'     => $allUserCards->count(),
+            'active'    => $allUserCards->where('status', 'active')->count(),
+            'used'      => $allUserCards->where('status', 'used')->count(),
+            'value_xaf' => $allUserCards->sum(fn($c) => (float) ($c->orderItem?->unit_price ?? 0)),
+        ];
+
+        // Commandes payees mais sans cartes (afrikard a echoue lors du paiement)
+        $pendingOrders = Order::where('user_id', Auth::id())
+            ->where('payment_status', Order::PAYMENT_STATUS_COMPLETED)
+            ->whereDoesntHave('userCards')
+            ->with('orderItems')
+            ->latest()
+            ->get();
+
+        return view('cards.index', compact('cards', 'stats', 'pendingOrders'));
     }
 
     /**
@@ -69,6 +109,9 @@ class CardController extends Controller
      */
     public function show(Card $card): View
     {
+        if ($card->user_id !== Auth::id()) {
+            abort(403);
+        }
         return view('cards.show', compact('card'));
     }
 
@@ -77,6 +120,9 @@ class CardController extends Controller
      */
     public function edit(Card $card): View
     {
+        if ($card->user_id !== Auth::id()) {
+            abort(403);
+        }
         return view('cards.edit', compact('card'));
     }
 
@@ -85,6 +131,9 @@ class CardController extends Controller
      */
     public function update(Request $request, Card $card): RedirectResponse
     {
+        if ($card->user_id !== Auth::id()) {
+            abort(403);
+        }
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'type' => 'required|string|max:255',
@@ -118,6 +167,9 @@ class CardController extends Controller
      */
     public function destroy(Card $card): RedirectResponse
     {
+        if ($card->user_id !== Auth::id()) {
+            abort(403);
+        }
         // Supprimer l'image associée
         if ($card->image) {
             Storage::disk('public')->delete($card->image);
@@ -137,10 +189,13 @@ class CardController extends Controller
     {
         $query = $request->get('search');
         
-        $cards = Card::where('name', 'like', "%{$query}%")
-            ->orWhere('code', 'like', "%{$query}%")
-            ->orWhere('brand', 'like', "%{$query}%")
-            ->orWhere('type', 'like', "%{$query}%")
+        $cards = Card::where('user_id', Auth::id())
+            ->where(function($q) use ($query) {
+                $q->where('name', 'like', "%{$query}%")
+                  ->orWhere('code', 'like', "%{$query}%")
+                  ->orWhere('brand', 'like', "%{$query}%")
+                  ->orWhere('type', 'like', "%{$query}%");
+            })
             ->with('user')
             ->latest()
             ->paginate(12)
@@ -154,7 +209,8 @@ class CardController extends Controller
      */
     public function byType(string $type): View
     {
-        $cards = Card::where('type', $type)
+        $cards = Card::where('user_id', Auth::id())
+            ->where('type', $type)
             ->with('user')
             ->latest()
             ->paginate(12);
@@ -167,6 +223,9 @@ class CardController extends Controller
      */
     public function toggleStatus(Card $card): RedirectResponse
     {
+        if ($card->user_id !== Auth::id()) {
+            abort(403);
+        }
         $card->status = $card->status === 'active' ? 'expired' : 'active';
         $card->save();
 

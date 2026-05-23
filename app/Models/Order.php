@@ -12,6 +12,7 @@ class Order extends Model
 
     protected $fillable = [
         'order_number',
+        'external_reference',
         'user_id',
         'status',
         'subtotal',
@@ -20,6 +21,9 @@ class Order extends Model
         'currency',
         'payment_status',
         'payment_method',
+        'cash_reseller_id',
+        'cash_lock_expires_at',
+        'cash_confirmation_code',
         'billing_details',
         'notes',
         'completed_at',
@@ -31,7 +35,10 @@ class Order extends Model
         'total_amount' => 'decimal:2',
         'billing_details' => 'array',
         'completed_at' => 'datetime',
+        'cash_lock_expires_at' => 'datetime',
     ];
+
+    const PAYMENT_METHOD_CASH_RESELLER = 'cash_at_reseller';
 
     /**
      * Statuts de commande possibles
@@ -90,6 +97,22 @@ class Order extends Model
     public function payments()
     {
         return $this->hasMany(Payment::class);
+    }
+
+    /**
+     * Relation avec les cartes utilisateur recues
+     */
+    public function userCards()
+    {
+        return $this->hasMany(UserCard::class);
+    }
+
+    /**
+     * Vendeur Kardafrica chargé d'encaisser le client (paiement cash physique).
+     */
+    public function cashReseller()
+    {
+        return $this->belongsTo(Reseller::class, 'cash_reseller_id');
     }
 
     /**
@@ -211,7 +234,7 @@ class Order extends Model
      */
     public function getFormattedTotalAttribute()
     {
-        return number_format($this->total_amount, 0, ',', ' ') . ' ' . $this->currency;
+        return number_format($this->total_amount, 0, ',', ' ') . ' FCFA';
     }
 
     /**

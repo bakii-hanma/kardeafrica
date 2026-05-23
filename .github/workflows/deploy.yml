@@ -1,0 +1,70 @@
+name: Deploy to SiteGround
+
+# ============================================================
+# Pipeline CI/CD KardAfrica
+# ----------
+# Trigger : push sur `main` (et déclenchement manuel via "Run workflow")
+# Cible   : SiteGround (ssh.kardafrica.com:18765)
+# Étapes  : SSH → git pull → composer install --no-dev → migrations → cache clear
+#
+# Prérequis (à configurer dans GitHub > Settings > Secrets and variables > Actions) :
+#   - SSH_HOST          : ssh.kardafrica.com
+#   - SSH_PORT          : 18765
+#   - SSH_USER          : u12-j8mjnyhzepvh (ou ton user SiteGround)
+#   - SSH_PRIVATE_KEY   : contenu complet de ~/.ssh/laravel-deploy (clé privée)
+#   - DEPLOY_PATH       : ~/htdocs/kardafrica.com (chemin absolu du projet sur SG)
+# ============================================================
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:  # Permet un déploiement manuel depuis l'UI GitHub
+
+# Empêche deux deploys simultanés sur le même environnement
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy production
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code (juste pour vérifier que le push est valide)
+        uses: actions/checkout@v4
+
+      # Charge la clé privée SSH dans l'agent ssh-agent du runner
+      - name: Setup SSH key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      # Ajoute le host SiteGround à known_hosts pour éviter le prompt
+      # "Are you sure you want to continue connecting?" qui bloquerait la commande
+      - name: Add SiteGround to known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -p ${{ secrets.SSH_PORT }} -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+
+      # Test la connexion SSH avant le déploiement (échec rapide si KO)
+      - name: Verify SSH connection
+        run: |
+          ssh -p ${{ secrets.SSH_PORT }} ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} 'echo "✓ SSH OK"; pwd; php -v | head -1'
+
+      # ⚡ Le vrai déploiement : on appelle le script bash deploy.sh installé sur
+      # le serveur, qui orchestre git pull + composer + migrations + cache clear.
+      # Cf scripts/deploy.sh à la racine du projet (à copier sur le serveur la 1ère fois).
+      - name: Run deploy script on SiteGround
+        run: |
+          ssh -p ${{ secrets.SSH_PORT }} ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
+            "cd ${{ secrets.DEPLOY_PATH }} && bash scripts/deploy.sh ${{ github.sha }}"
+
+      - name: Notify success
+        if: success()
+        run: echo "🚀 Deploy successful — commit ${{ github.sha }}"
+
+      - name: Notify failure
+        if: failure()
+        run: echo "❌ Deploy failed — check logs above. Le serveur est dans l'état du commit précédent."

@@ -6,6 +6,84 @@
 @source '../**/*.js';
 
 @theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+    --font-sans: 'Inter', 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
+    --font-display: 'Space Grotesk', 'Inter', ui-sans-serif, system-ui, sans-serif;
+
+    --color-kardafrica-primary: #4ECDC4;
+    --color-kardafrica-secondary: #1F2937;
+    --color-kardafrica-accent: #44A08D;
+    --color-kardafrica-dark: #111827;
+
+    /* Soft shadows for the premium marketplace look */
+    --shadow-card: 0 1px 2px rgb(0 0 0 / 0.04), 0 1px 3px rgb(0 0 0 / 0.06);
+    --shadow-card-hover: 0 10px 24px -8px rgb(0 0 0 / 0.10), 0 4px 8px -4px rgb(0 0 0 / 0.06);
+    --shadow-pop: 0 24px 48px -12px rgb(0 0 0 / 0.20);
+}
+
+/* Utilities pour le design system marketplace */
+@layer utilities {
+    .font-display { font-family: var(--font-display); }
+    .shadow-card { box-shadow: var(--shadow-card); }
+    .shadow-card-hover { box-shadow: var(--shadow-card-hover); }
+    .shadow-pop { box-shadow: var(--shadow-pop); }
+}
+
+/* Hero card stack — empilement 3D des cartes cadeaux */
+.card-stack {
+    perspective: 1200px;
+    transform-style: preserve-3d;
+}
+.card-stack > .stack-card {
+    position: absolute;
+    inset: 0;
+    transition: transform 600ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 600ms ease;
+    will-change: transform;
+}
+.card-stack > .stack-card:nth-child(1) { transform: rotate(-8deg) translateY(12px) translateX(-30px); z-index: 1; }
+.card-stack > .stack-card:nth-child(2) { transform: rotate(0deg)  translateY(0)    translateX(0);   z-index: 2; }
+.card-stack > .stack-card:nth-child(3) { transform: rotate(8deg)  translateY(12px) translateX(30px); z-index: 1; }
+.card-stack:hover > .stack-card:nth-child(1) { transform: rotate(-12deg) translateY(20px) translateX(-50px) scale(1.02); }
+.card-stack:hover > .stack-card:nth-child(3) { transform: rotate(12deg)  translateY(20px) translateX(50px)  scale(1.02); }
+.card-stack:hover > .stack-card:nth-child(2) { transform: translateY(-6px) scale(1.03); }
+
+/* Floating ambient animation — joue sur mobile (pas de hover) et accompagne sur desktop */
+@keyframes cs-float-left  {
+    0%, 100% { transform: rotate(-8deg)  translateY(12px) translateX(-30px); }
+    50%      { transform: rotate(-10deg) translateY(6px)  translateX(-36px); }
+}
+@keyframes cs-float-mid   {
+    0%, 100% { transform: rotate(0deg) translateY(0)    translateX(0); }
+    50%      { transform: rotate(0deg) translateY(-8px) translateX(0); }
+}
+@keyframes cs-float-right {
+    0%, 100% { transform: rotate(8deg)  translateY(12px) translateX(30px); }
+    50%      { transform: rotate(10deg) translateY(6px)  translateX(36px); }
+}
+.card-stack-mobile > .stack-card:nth-child(1) { animation: cs-float-left  5s ease-in-out infinite; }
+.card-stack-mobile > .stack-card:nth-child(2) { animation: cs-float-mid   4.5s ease-in-out infinite .3s; }
+.card-stack-mobile > .stack-card:nth-child(3) { animation: cs-float-right 5.5s ease-in-out infinite .6s; }
+/* Désactive le float quand on hover (laisse le hover prendre le relais) */
+.card-stack-mobile:hover > .stack-card { animation: none; }
+@media (prefers-reduced-motion: reduce) {
+    .card-stack-mobile > .stack-card { animation: none; }
+}
+
+/* Flip-card 3D primitives (utilisees par auth modal + cards/show) */
+.perspective       { perspective: 1000px; }
+.perspective-1000  { perspective: 1000px; }
+.preserve-3d       { transform-style: preserve-3d; }
+.transform-style-3d{ transform-style: preserve-3d; }
+.backface-hidden   { backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+.rotate-y-0        { transform: rotateY(0deg); }
+.rotate-y-180      { transform: rotateY(180deg); }
+
+/* Skeleton pulse */
+@keyframes skeleton-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+.skeleton { animation: skeleton-pulse 1.5s ease-in-out infinite; background: linear-gradient(90deg, #f1f5f9, #e2e8f0, #f1f5f9); background-size: 200% 100%; }
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+    .card-stack > .stack-card,
+    .card-stack:hover > .stack-card { transition: none; }
 }

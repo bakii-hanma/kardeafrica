@@ -152,7 +152,7 @@
             <!-- Actions -->
             <div class="mt-8 flex gap-4">
                 <button type="submit" 
-                        class="bg-kardafrica-secondary text-white px-8 py-3 rounded-lg hover-kardafrica">
+                        class="bg-[#1F2937] text-white px-8 py-3 rounded-lg hover:bg-gray-800 transition-colors">
                     Créer la Carte
                 </button>
                 <a href="{{ route('cards.index') }}" 

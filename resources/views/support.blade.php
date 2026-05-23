@@ -1,449 +1,316 @@
 @extends('layouts.app')
 
-@section('title', 'Support - Kardafrica')
+@section('title', 'Centre d\'aide — KardAfrica')
+
+@php
+    $faqs = [
+        'commande' => [
+            'label' => 'Commandes & livraison',
+            'icon'  => 'M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z',
+            'color' => '#44A08D',
+            'items' => [
+                ['q' => 'Combien de temps pour recevoir ma carte ?',     'a' => 'Les codes sont livrés en moins de 60 secondes après confirmation du paiement, directement sur votre adresse e-mail et dans la section « Mes cartes » de votre compte.'],
+                ['q' => 'Que faire si je n\'ai pas reçu mon code ?',     'a' => 'Vérifiez d\'abord votre dossier spam. Si rien n\'apparaît dans les 5 minutes, allez dans « Mes commandes » et cliquez sur « Relancer la livraison ». Notre support est aussi joignable 24/7.'],
+                ['q' => 'Puis-je annuler une commande ?',                  'a' => 'Une fois le code généré, l\'annulation n\'est pas possible (le code est définitivement attribué). Avant validation du paiement, contactez-nous immédiatement.'],
+            ],
+        ],
+        'paiement' => [
+            'label' => 'Paiements',
+            'icon'  => 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
+            'color' => '#3B82F6',
+            'items' => [
+                ['q' => 'Quels sont les moyens de paiement ?', 'a' => 'Airtel Money, Moov Money et Visa via notre partenaire Futursowax. Toutes les transactions sont chiffrées de bout en bout.'],
+                ['q' => 'Mon paiement a échoué, que faire ?',  'a' => 'Vérifiez votre solde Mobile Money et la limite de plafond. Si le débit a eu lieu sans validation de la commande, le montant est remboursé automatiquement sous 24h.'],
+                ['q' => 'Puis-je payer en cryptomonnaie ?',     'a' => 'Pas encore — c\'est sur la roadmap pour 2027.'],
+            ],
+        ],
+        'compte' => [
+            'label' => 'Compte & sécurité',
+            'icon'  => 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z',
+            'color' => '#7C3AED',
+            'items' => [
+                ['q' => 'Comment réinitialiser mon mot de passe ?',     'a' => 'Sur la page de connexion, cliquez sur « Mot de passe oublié » et suivez les instructions envoyées par e-mail.'],
+                ['q' => 'Mes données sont-elles en sécurité ?',          'a' => 'Oui : nous chiffrons toutes les communications en TLS, ne stockons jamais vos identifiants Mobile Money et nos serveurs sont conformes aux normes de l\'industrie.'],
+                ['q' => 'Comment supprimer mon compte ?',                 'a' => 'Écrivez-nous à hello@kardafrica.com depuis l\'adresse de votre compte. Suppression effective sous 72h.'],
+            ],
+        ],
+        'cartes' => [
+            'label' => 'Utilisation des cartes',
+            'icon'  => 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2',
+            'color' => '#EA580C',
+            'items' => [
+                ['q' => 'Comment activer ma carte Netflix ?',     'a' => 'Connectez-vous sur netflix.com/redeem, entrez le code à 16 caractères reçu et le crédit s\'ajoute instantanément à votre compte.'],
+                ['q' => 'Le code est-il valable à l\'international ?', 'a' => 'Chaque carte est liée à une région spécifique (indiquée sur la fiche produit). Vérifiez la région avant l\'achat.'],
+                ['q' => 'La carte a une date d\'expiration ?',         'a' => 'En général 12 à 24 mois selon la marque. Cette information est affichée sur chaque carte dans « Mes cartes ».'],
+            ],
+        ],
+    ];
+@endphp
 
 @section('content')
-<div class="min-h-screen bg-gray-50">
-    <!-- Hero Section -->
-    <section class="relative bg-gradient-to-br from-green-900 via-teal-900 to-blue-900 text-white py-20">
-        <div class="absolute inset-0 bg-black opacity-40"></div>
-        <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="text-center">
-                <h1 class="text-5xl md:text-6xl font-bold mb-6 hero-text-animate">
-                    Centre de <span class="bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent">Support</span>
-                </h1>
-                <p class="text-xl md:text-2xl mb-8 max-w-3xl mx-auto hero-text-animate opacity-90">
-                    Trouvez rapidement des réponses à vos questions et obtenez l'aide dont vous avez besoin
-                </p>
-                <div class="flex justify-center space-x-4 hero-text-animate">
-                    <span class="inline-flex items-center px-4 py-2 bg-white/20 rounded-full text-sm font-medium">
-                        🔍 Recherche Rapide
-                    </span>
-                    <span class="inline-flex items-center px-4 py-2 bg-white/20 rounded-full text-sm font-medium">
-                        📚 Guides Détaillés
-                    </span>
-                    <span class="inline-flex items-center px-4 py-2 bg-white/20 rounded-full text-sm font-medium">
-                        💬 Support Live
-                    </span>
-                </div>
-            </div>
-        </div>
-    </section>
+<div class="bg-white">
 
-    <!-- Search Section -->
-    <section class="py-12 bg-white">
-        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="text-center mb-8">
-                <h2 class="text-3xl font-bold text-gray-900 mb-4">Comment pouvons-nous vous aider ?</h2>
-                <p class="text-gray-600">Recherchez dans notre base de connaissances</p>
-            </div>
-            
-            <div class="relative max-w-2xl mx-auto">
-                <input type="text" id="searchInput" placeholder="Tapez votre question ici..." class="w-full px-6 py-4 pr-12 border-2 border-gray-200 rounded-xl text-lg focus:outline-none focus:ring-2 focus:ring-kardafrica-primary focus:border-transparent">
-                <button class="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-kardafrica-primary">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-                    </svg>
-                </button>
-            </div>
-            
-            <!-- Quick Links -->
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8">
-                <button class="quick-search-btn p-4 bg-blue-50 rounded-xl hover:bg-blue-100 transition-all duration-300" data-search="commande">
-                    <div class="text-2xl mb-2">📦</div>
-                    <div class="text-sm font-medium text-gray-700">Mes Commandes</div>
-                </button>
-                <button class="quick-search-btn p-4 bg-green-50 rounded-xl hover:bg-green-100 transition-all duration-300" data-search="paiement">
-                    <div class="text-2xl mb-2">💳</div>
-                    <div class="text-sm font-medium text-gray-700">Paiements</div>
-                </button>
-                <button class="quick-search-btn p-4 bg-purple-50 rounded-xl hover:bg-purple-100 transition-all duration-300" data-search="carte">
-                    <div class="text-2xl mb-2">🎮</div>
-                    <div class="text-sm font-medium text-gray-700">Cartes Numériques</div>
-                </button>
-                <button class="quick-search-btn p-4 bg-orange-50 rounded-xl hover:bg-orange-100 transition-all duration-300" data-search="compte">
-                    <div class="text-2xl mb-2">👤</div>
-                    <div class="text-sm font-medium text-gray-700">Mon Compte</div>
-                </button>
-            </div>
-        </div>
-    </section>
+    {{-- ============================================================
+         HERO + SEARCH
+       ============================================================ --}}
+    <section style="position: relative; overflow: hidden;
+                    background:
+                      radial-gradient(circle at 20% 0%, rgba(78,205,196,0.18) 0%, transparent 45%),
+                      radial-gradient(circle at 80% 100%, rgba(124,58,237,0.12) 0%, transparent 45%),
+                      linear-gradient(135deg, #060A14 0%, #0F172A 50%, #1E293B 100%);
+                    padding: 80px 16px 140px;">
 
-    <!-- FAQ Section -->
-    <section class="py-20 section-animate">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="text-center mb-16">
-                <h2 class="text-4xl font-bold text-gray-900 mb-4 section-title">
-                    Questions Fréquemment Posées
-                </h2>
-                <p class="text-xl text-gray-600 max-w-3xl mx-auto">
-                    Trouvez rapidement des réponses aux questions les plus courantes
-                </p>
+        {{-- grid pattern --}}
+        <div style="position: absolute; inset: 0; pointer-events: none;
+                    background-image: linear-gradient(to right, rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.04) 1px, transparent 1px);
+                    background-size: 48px 48px;
+                    -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 30%, black 40%, transparent 100%);
+                            mask-image: radial-gradient(ellipse 80% 60% at 50% 30%, black 40%, transparent 100%);"></div>
+
+        {{-- ambient glows --}}
+        <div style="position: absolute; top: -160px; left: 50%; transform: translateX(-50%);
+                    width: 800px; height: 400px; border-radius: 50%; pointer-events: none;
+                    background: radial-gradient(circle, rgba(78,205,196,0.20) 0%, transparent 70%); filter: blur(60px);"></div>
+
+        <div style="position: relative; max-width: 880px; margin: 0 auto; text-align: center;">
+            <div style="display: inline-flex; align-items: center; gap: 8px;
+                        padding: 6px 14px; border-radius: 9999px;
+                        background: rgba(78,205,196,0.08); border: 1px solid rgba(78,205,196,0.28);
+                        margin-bottom: 28px;">
+                <svg style="width: 12px; height: 12px;" fill="none" stroke="#5EEAD4" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <span style="font-size: 11px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: #5EEAD4;">Centre d'aide</span>
             </div>
-            
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <!-- FAQ Category 1: Commandes -->
-                <div class="bg-white rounded-2xl shadow-lg p-8">
-                    <div class="flex items-center space-x-3 mb-6">
-                        <div class="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
-                            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path>
-                            </svg>
-                        </div>
-                        <h3 class="text-2xl font-bold text-gray-900">Commandes & Livraison</h3>
-                    </div>
-                    
-                    <div class="space-y-4">
-                        <div class="faq-item border-b border-gray-200 pb-4">
-                            <button class="faq-question w-full text-left flex justify-between items-center font-semibold text-gray-900 hover:text-kardafrica-primary transition-colors">
-                                <span>Comment passer une commande ?</span>
-                                <svg class="w-5 h-5 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                                </svg>
-                            </button>
-                            <div class="faq-answer hidden mt-3 text-gray-600">
-                                <p>1. Parcourez notre catalogue de cartes<br>
-                                2. Sélectionnez la carte désirée<br>
-                                3. Choisissez le montant<br>
-                                4. Ajoutez au panier<br>
-                                5. Procédez au paiement sécurisé</p>
-                            </div>
-                        </div>
-                        
-                        <div class="faq-item border-b border-gray-200 pb-4">
-                            <button class="faq-question w-full text-left flex justify-between items-center font-semibold text-gray-900 hover:text-kardafrica-primary transition-colors">
-                                <span>Combien de temps pour recevoir ma carte ?</span>
-                                <svg class="w-5 h-5 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                                </svg>
-                            </button>
-                            <div class="faq-answer hidden mt-3 text-gray-600">
-                                <p>Les cartes numériques sont livrées instantanément par email après validation du paiement. Vous recevrez votre code dans les 5 minutes maximum.</p>
-                            </div>
-                        </div>
-                        
-                        <div class="faq-item border-b border-gray-200 pb-4">
-                            <button class="faq-question w-full text-left flex justify-between items-center font-semibold text-gray-900 hover:text-kardafrica-primary transition-colors">
-                                <span>Puis-je annuler ma commande ?</span>
-                                <svg class="w-5 h-5 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                                </svg>
-                            </button>
-                            <div class="faq-answer hidden mt-3 text-gray-600">
-                                <p>Vous pouvez annuler votre commande avant la livraison de la carte. Une fois la carte livrée, les annulations ne sont plus possibles.</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- FAQ Category 2: Paiements -->
-                <div class="bg-white rounded-2xl shadow-lg p-8">
-                    <div class="flex items-center space-x-3 mb-6">
-                        <div class="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg flex items-center justify-center">
-                            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path>
-                            </svg>
-                        </div>
-                        <h3 class="text-2xl font-bold text-gray-900">Paiements & Sécurité</h3>
-                    </div>
-                    
-                    <div class="space-y-4">
-                        <div class="faq-item border-b border-gray-200 pb-4">
-                            <button class="faq-question w-full text-left flex justify-between items-center font-semibold text-gray-900 hover:text-kardafrica-primary transition-colors">
-                                <span>Quels moyens de paiement acceptez-vous ?</span>
-                                <svg class="w-5 h-5 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                                </svg>
-                            </button>
-                            <div class="faq-answer hidden mt-3 text-gray-600">
-                                <p>Nous acceptons : Visa, MasterCard, Orange Money, Wave, PayPal, et les virements bancaires locaux.</p>
-                            </div>
-                        </div>
-                        
-                        <div class="faq-item border-b border-gray-200 pb-4">
-                            <button class="faq-question w-full text-left flex justify-between items-center font-semibold text-gray-900 hover:text-kardafrica-primary transition-colors">
-                                <span>Mes données de paiement sont-elles sécurisées ?</span>
-                                <svg class="w-5 h-5 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                                </svg>
-                            </button>
-                            <div class="faq-answer hidden mt-3 text-gray-600">
-                                <p>Oui, nous utilisons le cryptage SSL 256-bits et sommes certifiés PCI DSS. Vos données bancaires ne sont jamais stockées sur nos serveurs.</p>
-                            </div>
-                        </div>
-                        
-                        <div class="faq-item border-b border-gray-200 pb-4">
-                            <button class="faq-question w-full text-left flex justify-between items-center font-semibold text-gray-900 hover:text-kardafrica-primary transition-colors">
-                                <span>Puis-je obtenir un remboursement ?</span>
-                                <svg class="w-5 h-5 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                                </svg>
-                            </button>
-                            <div class="faq-answer hidden mt-3 text-gray-600">
-                                <p>Les remboursements sont possibles dans les 24h suivant l'achat si la carte n'a pas été utilisée. Contactez notre support pour toute demande.</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- FAQ Category 3: Cartes -->
-                <div class="bg-white rounded-2xl shadow-lg p-8">
-                    <div class="flex items-center space-x-3 mb-6">
-                        <div class="w-12 h-12 bg-gradient-to-br from-purple-500 to-violet-600 rounded-lg flex items-center justify-center">
-                            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
-                            </svg>
-                        </div>
-                        <h3 class="text-2xl font-bold text-gray-900">Cartes Numériques</h3>
-                    </div>
-                    
-                    <div class="space-y-4">
-                        <div class="faq-item border-b border-gray-200 pb-4">
-                            <button class="faq-question w-full text-left flex justify-between items-center font-semibold text-gray-900 hover:text-kardafrica-primary transition-colors">
-                                <span>Comment utiliser ma carte numérique ?</span>
-                                <svg class="w-5 h-5 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                                </svg>
-                            </button>
-                            <div class="faq-answer hidden mt-3 text-gray-600">
-                                <p>1. Connectez-vous à la plateforme concernée<br>
-                                2. Allez dans la section "Recharger" ou "Ajouter des fonds"<br>
-                                3. Saisissez le code reçu par email<br>
-                                4. Validez - Le crédit sera ajouté instantanément</p>
-                            </div>
-                        </div>
-                        
-                        <div class="faq-item border-b border-gray-200 pb-4">
-                            <button class="faq-question w-full text-left flex justify-between items-center font-semibold text-gray-900 hover:text-kardafrica-primary transition-colors">
-                                <span>Ma carte a une date d'expiration ?</span>
-                                <svg class="w-5 h-5 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                                </svg>
-                            </button>
-                            <div class="faq-answer hidden mt-3 text-gray-600">
-                                <p>La plupart de nos cartes n'expirent pas. Cependant, certaines cartes promotionnelles peuvent avoir une durée de validité limitée, précisée lors de l'achat.</p>
-                            </div>
-                        </div>
-                        
-                        <div class="faq-item border-b border-gray-200 pb-4">
-                            <button class="faq-question w-full text-left flex justify-between items-center font-semibold text-gray-900 hover:text-kardafrica-primary transition-colors">
-                                <span>Que faire si ma carte ne fonctionne pas ?</span>
-                                <svg class="w-5 h-5 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                                </svg>
-                            </button>
-                            <div class="faq-answer hidden mt-3 text-gray-600">
-                                <p>Vérifiez d'abord que vous êtes dans la bonne région et que la plateforme accepte ce type de carte. Si le problème persiste, contactez immédiatement notre support.</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- FAQ Category 4: Compte -->
-                <div class="bg-white rounded-2xl shadow-lg p-8">
-                    <div class="flex items-center space-x-3 mb-6">
-                        <div class="w-12 h-12 bg-gradient-to-br from-orange-500 to-red-600 rounded-lg flex items-center justify-center">
-                            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
-                            </svg>
-                        </div>
-                        <h3 class="text-2xl font-bold text-gray-900">Compte & Profil</h3>
-                    </div>
-                    
-                    <div class="space-y-4">
-                        <div class="faq-item border-b border-gray-200 pb-4">
-                            <button class="faq-question w-full text-left flex justify-between items-center font-semibold text-gray-900 hover:text-kardafrica-primary transition-colors">
-                                <span>Comment créer un compte ?</span>
-                                <svg class="w-5 h-5 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                                </svg>
-                            </button>
-                            <div class="faq-answer hidden mt-3 text-gray-600">
-                                <p>Cliquez sur "Connexion" puis "Inscription". Remplissez le formulaire avec votre email et un mot de passe sécurisé. Validez votre email pour activer votre compte.</p>
-                            </div>
-                        </div>
-                        
-                        <div class="faq-item border-b border-gray-200 pb-4">
-                            <button class="faq-question w-full text-left flex justify-between items-center font-semibold text-gray-900 hover:text-kardafrica-primary transition-colors">
-                                <span>J'ai oublié mon mot de passe</span>
-                                <svg class="w-5 h-5 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                                </svg>
-                            </button>
-                            <div class="faq-answer hidden mt-3 text-gray-600">
-                                <p>Cliquez sur "Mot de passe oublié" sur la page de connexion. Saisissez votre email pour recevoir un lien de réinitialisation.</p>
-                            </div>
-                        </div>
-                        
-                        <div class="faq-item border-b border-gray-200 pb-4">
-                            <button class="faq-question w-full text-left flex justify-between items-center font-semibold text-gray-900 hover:text-kardafrica-primary transition-colors">
-                                <span>Comment modifier mes informations ?</span>
-                                <svg class="w-5 h-5 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                                </svg>
-                            </button>
-                            <div class="faq-answer hidden mt-3 text-gray-600">
-                                <p>Connectez-vous à votre compte et accédez à la section "Mon Profil" pour modifier vos informations personnelles, votre mot de passe ou vos préférences.</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Contact Support Section -->
-    <section class="py-20 bg-gradient-to-r from-kardafrica-primary to-kardafrica-secondary">
-        <div class="max-w-4xl mx-auto text-center px-4 sm:px-6 lg:px-8">
-            <h2 class="text-4xl font-bold text-white mb-6">
-                Vous ne trouvez pas votre réponse ?
-            </h2>
-            <p class="text-xl text-white/90 mb-8 max-w-2xl mx-auto">
-                Notre équipe de support est là pour vous aider personnellement
+            <h1 style="font-family: 'Space Grotesk','Inter',sans-serif; font-weight: 700;
+                       font-size: clamp(36px, 6vw, 72px); line-height: 1.05; letter-spacing: -0.02em;
+                       color: #ffffff; margin: 0;">
+                Comment pouvons-nous <br/>
+                <span style="background: linear-gradient(120deg, #4ECDC4 0%, #44A08D 50%, #5EEAD4 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;">vous aider ?</span>
+            </h1>
+            <p style="margin: 24px auto 0; max-width: 560px;
+                      font-size: clamp(15px, 1.4vw, 18px); line-height: 1.65; color: #94A3B8;">
+                Trouvez rapidement une réponse à votre question parmi notre base de connaissances.
             </p>
-            <div class="flex flex-col sm:flex-row gap-4 justify-center">
-                <a href="{{ route('contact') }}" class="bg-white text-kardafrica-primary px-8 py-4 rounded-xl font-bold text-lg hover:shadow-xl hover:scale-105 transition-all duration-300">
-                    📞 Contacter le Support
-                </a>
-                <button id="openSupportChat" class="border-2 border-white text-white px-8 py-4 rounded-xl font-bold text-lg hover:bg-white hover:text-kardafrica-primary transition-all duration-300">
-                    💬 Chat en Direct
-                </button>
-            </div>
-            
-            <!-- Support Stats -->
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mt-16">
-                <div class="text-center">
-                    <div class="text-3xl font-bold text-white mb-2">< 5min</div>
-                    <div class="text-white/80">Temps de réponse moyen</div>
+
+            {{-- search --}}
+            <div style="margin: 40px auto 0; max-width: 560px;" x-data="faqSearch()">
+                <div style="position: relative;">
+                    <svg style="position: absolute; left: 18px; top: 50%; transform: translateY(-50%); width: 20px; height: 20px; pointer-events: none; z-index: 2;"
+                         fill="none" stroke="#94A3B8" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                    <input type="text" x-model="query" @input="filter()"
+                           placeholder="Rechercher dans la FAQ…"
+                           style="width: 100%; padding: 16px 16px 16px 50px;
+                                  background: #ffffff; color: #0F172A;
+                                  font-size: 16px; font-weight: 500;
+                                  border: 0; border-radius: 16px; outline: none;
+                                  box-shadow: 0 30px 60px -15px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.08);">
                 </div>
-                <div class="text-center">
-                    <div class="text-3xl font-bold text-white mb-2">24/7</div>
-                    <div class="text-white/80">Support disponible</div>
-                </div>
-                <div class="text-center">
-                    <div class="text-3xl font-bold text-white mb-2">98%</div>
-                    <div class="text-white/80">Satisfaction client</div>
+                <div style="margin-top: 16px; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; font-size: 12px;">
+                    <span style="color: #64748B;">Suggestions :</span>
+                    @foreach (['livraison', 'paiement', 'mot de passe', 'remboursement'] as $tag)
+                        <button @click="query='{{ $tag }}'; filter();"
+                                style="padding: 6px 12px; border-radius: 9999px; font-weight: 500;
+                                       background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.10); color: #CBD5E1;
+                                       cursor: pointer; transition: all .2s;"
+                                onmouseover="this.style.background='rgba(78,205,196,0.15)';this.style.borderColor='rgba(78,205,196,0.30)';this.style.color='#5EEAD4';"
+                                onmouseout="this.style.background='rgba(255,255,255,0.06)';this.style.borderColor='rgba(255,255,255,0.10)';this.style.color='#CBD5E1';">{{ $tag }}</button>
+                    @endforeach
                 </div>
             </div>
         </div>
     </section>
+
+    {{-- ============================================================
+         CATEGORIES
+       ============================================================ --}}
+    <section style="position: relative; margin-top: -80px; padding: 0 16px 64px;">
+        <div style="max-width: 1200px; margin: 0 auto;
+                    display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px;">
+            @foreach ($faqs as $key => $cat)
+                <a href="#cat-{{ $key }}"
+                   style="position: relative; overflow: hidden; display: block;
+                          background: #ffffff; border: 1px solid #E2E8F0; border-radius: 18px;
+                          padding: 22px; text-decoration: none;
+                          box-shadow: 0 14px 30px -12px rgba(15,23,42,0.08), 0 0 0 1px rgba(15,23,42,0.02);
+                          transition: transform .3s ease, box-shadow .3s ease, border-color .3s ease;"
+                   onmouseover="this.style.transform='translateY(-4px)';this.style.boxShadow='0 30px 60px -20px {{ $cat['color'] }}40, 0 0 0 1px {{ $cat['color'] }}30';this.style.borderColor='transparent';"
+                   onmouseout="this.style.transform='translateY(0)';this.style.boxShadow='0 14px 30px -12px rgba(15,23,42,0.08), 0 0 0 1px rgba(15,23,42,0.02)';this.style.borderColor='#E2E8F0';">
+
+                    <div style="position: absolute; top: -50px; right: -50px; width: 140px; height: 140px;
+                                border-radius: 50%; opacity: 0.15;
+                                background: radial-gradient(circle, {{ $cat['color'] }} 0%, transparent 70%);
+                                filter: blur(20px); pointer-events: none;"></div>
+
+                    <div style="position: relative;">
+                        <div style="width: 44px; height: 44px; border-radius: 14px;
+                                    background: linear-gradient(135deg, {{ $cat['color'] }} 0%, {{ $cat['color'] }}cc 100%);
+                                    box-shadow: 0 10px 20px -6px {{ $cat['color'] }}66;
+                                    display: flex; align-items: center; justify-content: center;
+                                    margin-bottom: 18px;">
+                            <svg style="width: 20px; height: 20px;" fill="none" stroke="#ffffff" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $cat['icon'] }}"/></svg>
+                        </div>
+                        <div style="font-family: 'Space Grotesk','Inter',sans-serif; font-size: 16px; font-weight: 700; color: #0F172A;">{{ $cat['label'] }}</div>
+                        <div style="font-size: 12px; color: #64748B; margin-top: 4px;">{{ count($cat['items']) }} articles</div>
+                    </div>
+                </a>
+            @endforeach
+        </div>
+    </section>
+
+    {{-- ============================================================
+         FAQ SECTIONS
+       ============================================================ --}}
+    <section style="max-width: 880px; margin: 0 auto; padding: 0 16px 80px;" x-data="{ openItem: null }">
+        @foreach ($faqs as $key => $cat)
+            <div id="cat-{{ $key }}" style="margin-bottom: 48px; scroll-margin-top: 128px;">
+                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px;">
+                    <div style="width: 36px; height: 36px; border-radius: 12px;
+                                background: linear-gradient(135deg, {{ $cat['color'] }} 0%, {{ $cat['color'] }}cc 100%);
+                                box-shadow: 0 8px 16px -6px {{ $cat['color'] }}66;
+                                display: flex; align-items: center; justify-content: center;
+                                flex-shrink: 0;">
+                        <svg style="width: 16px; height: 16px;" fill="none" stroke="#ffffff" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $cat['icon'] }}"/></svg>
+                    </div>
+                    <h2 style="font-family: 'Space Grotesk','Inter',sans-serif; font-size: clamp(20px, 2.4vw, 30px); font-weight: 700; color: #0F172A; letter-spacing: -0.01em; margin: 0;">{{ $cat['label'] }}</h2>
+                </div>
+
+                <div class="faq-section" data-category="{{ $cat['label'] }}" style="display: flex; flex-direction: column; gap: 8px;">
+                    @foreach ($cat['items'] as $idx => $item)
+                        @php $itemKey = $key . '-' . $idx; @endphp
+                        <div class="faq-item"
+                             style="background: #ffffff; border: 1px solid #E2E8F0; border-radius: 16px; overflow: hidden;
+                                    transition: border-color .2s ease, box-shadow .2s ease;"
+                             onmouseover="this.style.borderColor='#CBD5E1';this.style.boxShadow='0 4px 12px -4px rgba(15,23,42,0.08)';"
+                             onmouseout="this.style.borderColor='#E2E8F0';this.style.boxShadow='none';"
+                             data-question="{{ Str::lower($item['q']) }}"
+                             data-answer="{{ Str::lower($item['a']) }}">
+                            <button type="button" @click="openItem = (openItem === '{{ $itemKey }}') ? null : '{{ $itemKey }}'"
+                                    style="width: 100%; display: flex; align-items: center; justify-content: space-between;
+                                           gap: 16px; padding: 16px 20px; text-align: left;
+                                           background: transparent; border: 0; cursor: pointer;">
+                                <span style="font-weight: 600; color: #0F172A; font-size: 15px;">{{ $item['q'] }}</span>
+                                <div style="width: 28px; height: 28px; border-radius: 10px;
+                                            display: flex; align-items: center; justify-content: center;
+                                            transition: all .2s; flex-shrink: 0;"
+                                     :style="openItem === '{{ $itemKey }}' ? 'background: #44A08D; color: #fff; transform: rotate(180deg);' : 'background: #F1F5F9; color: #64748B;'">
+                                    <svg style="width: 16px; height: 16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                                </div>
+                            </button>
+                            <div x-show="openItem === '{{ $itemKey }}'"
+                                 x-transition:enter="transition ease-out duration-200"
+                                 x-transition:enter-start="opacity-0 -translate-y-1"
+                                 x-transition:enter-end="opacity-100 translate-y-0"
+                                 x-cloak>
+                                <div style="padding: 4px 20px 20px; font-size: 14px; line-height: 1.65; color: #475569; border-top: 1px solid #F1F5F9;">
+                                    {{ $item['a'] }}
+                                </div>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+        @endforeach
+
+        {{-- No results state --}}
+        <div id="faqEmpty" style="display: none; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 18px; padding: 48px 32px; text-align: center;">
+            <div style="width: 48px; height: 48px; border-radius: 14px; background: #fff; border: 1px solid #E2E8F0;
+                        margin: 0 auto 12px; display: flex; align-items: center; justify-content: center;">
+                <svg style="width: 22px; height: 22px;" fill="none" stroke="#94A3B8" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </div>
+            <div style="font-family: 'Space Grotesk','Inter',sans-serif; font-size: 17px; font-weight: 700; color: #0F172A;">Aucun résultat trouvé</div>
+            <div style="font-size: 13px; color: #64748B; margin-top: 6px;">Essayez avec d'autres mots-clés ou contactez notre support.</div>
+        </div>
+    </section>
+
+    {{-- ============================================================
+         CTA — STILL NEED HELP
+       ============================================================ --}}
+    <section style="padding: 0 16px 80px;">
+        <div style="max-width: 1100px; margin: 0 auto;
+                    background: #ffffff; border: 1px solid #E2E8F0; border-radius: 28px;
+                    padding: clamp(28px, 4vw, 56px);
+                    box-shadow: 0 14px 30px -12px rgba(15,23,42,0.08);">
+            <div style="display: flex; flex-wrap: wrap; gap: 32px; align-items: center;">
+                <div style="flex: 1 1 320px; min-width: 0;">
+                    <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em; color: #44A08D; margin-bottom: 10px;">Pas trouvé ?</div>
+                    <h2 style="font-family: 'Space Grotesk','Inter',sans-serif; font-weight: 700;
+                               font-size: clamp(22px, 3vw, 36px); line-height: 1.15; letter-spacing: -0.02em;
+                               color: #0F172A; margin: 0;">
+                        Notre équipe est là pour vous aider.
+                    </h2>
+                    <p style="font-size: 15px; color: #64748B; margin-top: 16px; line-height: 1.65;">
+                        Contactez-nous par e-mail, WhatsApp ou téléphone — réponse en moins d'1h en heures ouvrées.
+                    </p>
+                </div>
+                <div style="flex: 1 1 320px; min-width: 0;
+                            display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px;">
+                    <a href="{{ route('contact') }}"
+                       style="display: flex; align-items: flex-start; gap: 12px;
+                              padding: 16px; border-radius: 16px;
+                              background: #F8FAFC; text-decoration: none; transition: all .2s;"
+                       onmouseover="this.style.background='#44A08D';this.querySelector('.cta-icon').style.background='rgba(255,255,255,0.18)';this.querySelector('.cta-icon svg').style.stroke='#fff';this.querySelector('.cta-title').style.color='#fff';this.querySelector('.cta-sub').style.color='rgba(255,255,255,0.85)';"
+                       onmouseout="this.style.background='#F8FAFC';this.querySelector('.cta-icon').style.background='#fff';this.querySelector('.cta-icon svg').style.stroke='#44A08D';this.querySelector('.cta-title').style.color='#0F172A';this.querySelector('.cta-sub').style.color='#64748B';">
+                        <div class="cta-icon" style="width: 40px; height: 40px; border-radius: 12px;
+                                                     background: #ffffff; display: flex; align-items: center; justify-content: center;
+                                                     flex-shrink: 0; transition: background .2s;">
+                            <svg style="width: 20px; height: 20px; transition: stroke .2s;" fill="none" stroke="#44A08D" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                        </div>
+                        <div>
+                            <div class="cta-title" style="font-family: 'Space Grotesk','Inter',sans-serif; font-weight: 700; font-size: 14px; color: #0F172A;">Formulaire</div>
+                            <div class="cta-sub" style="font-size: 12px; color: #64748B; margin-top: 2px;">Réponse sous 1h</div>
+                        </div>
+                    </a>
+                    <a href="https://wa.me/24100000000" target="_blank" rel="noopener"
+                       style="display: flex; align-items: flex-start; gap: 12px;
+                              padding: 16px; border-radius: 16px;
+                              background: #F8FAFC; text-decoration: none; transition: all .2s;"
+                       onmouseover="this.style.background='#25D366';this.querySelector('.cta-icon').style.background='rgba(255,255,255,0.18)';this.querySelector('.cta-icon svg').style.stroke='#fff';this.querySelector('.cta-title').style.color='#fff';this.querySelector('.cta-sub').style.color='rgba(255,255,255,0.85)';"
+                       onmouseout="this.style.background='#F8FAFC';this.querySelector('.cta-icon').style.background='#fff';this.querySelector('.cta-icon svg').style.stroke='#25D366';this.querySelector('.cta-title').style.color='#0F172A';this.querySelector('.cta-sub').style.color='#64748B';">
+                        <div class="cta-icon" style="width: 40px; height: 40px; border-radius: 12px;
+                                                     background: #ffffff; display: flex; align-items: center; justify-content: center;
+                                                     flex-shrink: 0; transition: background .2s;">
+                            <svg style="width: 20px; height: 20px; transition: stroke .2s;" fill="none" stroke="#25D366" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+                        </div>
+                        <div>
+                            <div class="cta-title" style="font-family: 'Space Grotesk','Inter',sans-serif; font-weight: 700; font-size: 14px; color: #0F172A;">WhatsApp</div>
+                            <div class="cta-sub" style="font-size: 12px; color: #64748B; margin-top: 2px;">Le plus rapide</div>
+                        </div>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
 </div>
 
+@push('scripts')
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // FAQ Toggle Functionality
-    const faqItems = document.querySelectorAll('.faq-item');
-    
-    faqItems.forEach(item => {
-        const question = item.querySelector('.faq-question');
-        const answer = item.querySelector('.faq-answer');
-        const icon = question.querySelector('svg');
-        
-        question.addEventListener('click', function() {
-            const isOpen = !answer.classList.contains('hidden');
-            
-            if (isOpen) {
-                answer.classList.add('hidden');
-                icon.style.transform = 'rotate(0deg)';
-            } else {
-                answer.classList.remove('hidden');
-                icon.style.transform = 'rotate(180deg)';
+    function faqSearch() {
+        return {
+            query: '',
+            filter() {
+                const q = this.query.trim().toLowerCase();
+                const items = document.querySelectorAll('.faq-item');
+                const sections = document.querySelectorAll('.faq-section');
+                let totalVisible = 0;
+
+                items.forEach(item => {
+                    if (!q) { item.style.display = ''; totalVisible++; return; }
+                    const haystack = (item.dataset.question || '') + ' ' + (item.dataset.answer || '');
+                    const match = haystack.includes(q);
+                    item.style.display = match ? '' : 'none';
+                    if (match) totalVisible++;
+                });
+
+                // Hide empty section headers
+                sections.forEach(section => {
+                    const visible = section.querySelectorAll('.faq-item:not([style*="display: none"])').length;
+                    section.parentElement.style.display = (q && visible === 0) ? 'none' : '';
+                });
+
+                document.getElementById('faqEmpty').style.display = totalVisible === 0 ? '' : 'none';
             }
-        });
-    });
-    
-    // Search Functionality
-    const searchInput = document.getElementById('searchInput');
-    const quickSearchBtns = document.querySelectorAll('.quick-search-btn');
-    
-    // Quick search buttons
-    quickSearchBtns.forEach(btn => {
-        btn.addEventListener('click', function() {
-            const searchTerm = this.getAttribute('data-search');
-            searchInput.value = searchTerm;
-            performSearch(searchTerm);
-        });
-    });
-    
-    // Search input
-    searchInput.addEventListener('input', function() {
-        const searchTerm = this.value.toLowerCase();
-        if (searchTerm.length > 2) {
-            performSearch(searchTerm);
-        } else {
-            resetSearch();
-        }
-    });
-    
-    function performSearch(term) {
-        const faqItems = document.querySelectorAll('.faq-item');
-        let hasResults = false;
-        
-        faqItems.forEach(item => {
-            const question = item.querySelector('.faq-question span').textContent.toLowerCase();
-            const answer = item.querySelector('.faq-answer').textContent.toLowerCase();
-            
-            if (question.includes(term) || answer.includes(term)) {
-                item.style.display = 'block';
-                // Highlight the matching question
-                item.querySelector('.faq-question').style.backgroundColor = '#fef3c7';
-                hasResults = true;
-            } else {
-                item.style.display = 'none';
-            }
-        });
-        
-        // Show "no results" message if needed
-        if (!hasResults) {
-            showNoResults();
-        } else {
-            hideNoResults();
         }
     }
-    
-    function resetSearch() {
-        const faqItems = document.querySelectorAll('.faq-item');
-        faqItems.forEach(item => {
-            item.style.display = 'block';
-            item.querySelector('.faq-question').style.backgroundColor = '';
-        });
-        hideNoResults();
-    }
-    
-    function showNoResults() {
-        let noResultsMsg = document.getElementById('noResultsMessage');
-        if (!noResultsMsg) {
-            noResultsMsg = document.createElement('div');
-            noResultsMsg.id = 'noResultsMessage';
-            noResultsMsg.className = 'text-center py-8 text-gray-500';
-            noResultsMsg.innerHTML = `
-                <div class="text-4xl mb-4">🔍</div>
-                <h3 class="text-xl font-semibold mb-2">Aucun résultat trouvé</h3>
-                <p>Essayez avec d'autres mots-clés ou contactez notre support.</p>
-            `;
-            document.querySelector('.max-w-7xl').appendChild(noResultsMsg);
-        }
-        noResultsMsg.style.display = 'block';
-    }
-    
-    function hideNoResults() {
-        const noResultsMsg = document.getElementById('noResultsMessage');
-        if (noResultsMsg) {
-            noResultsMsg.style.display = 'none';
-        }
-    }
-    
-    // Support chat button
-    const supportChatBtn = document.getElementById('openSupportChat');
-    if (supportChatBtn) {
-        supportChatBtn.addEventListener('click', function() {
-            // Open chatbot
-            const chatbotToggle = document.getElementById('chatbotToggle');
-            if (chatbotToggle) {
-                chatbotToggle.click();
-            }
-        });
-    }
-});
 </script>
-@endsection 
+@endpush
+@endsection

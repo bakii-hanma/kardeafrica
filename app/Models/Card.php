@@ -87,7 +87,7 @@ class Card extends Model
      */
     public function getFormattedBalanceAttribute(): string
     {
-        return number_format($this->balance, 2) . ' ' . $this->currency;
+        return number_format($this->balance, 0, ',', ' ') . ' FCFA';
     }
 
     /**
@@ -95,7 +95,7 @@ class Card extends Model
      */
     public function getFormattedValueAttribute(): string
     {
-        return number_format($this->value, 2) . ' ' . $this->currency;
+        return number_format($this->value, 0, ',', ' ') . ' FCFA';
     }
 
     /**

@@ -8,7 +8,9 @@
     "require": {
         "php": "^8.2",
         "laravel/framework": "^12.0",
-        "laravel/tinker": "^2.10.1"
+        "laravel/sanctum": "^4.0",
+        "laravel/tinker": "^2.10.1",
+        "phpoffice/phpspreadsheet": "^5.7"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",
@@ -58,7 +60,12 @@
     },
     "extra": {
         "laravel": {
-            "dont-discover": []
+            "dont-discover": [
+                "laravel/pail",
+                "laravel/sail",
+                "laravel/pint",
+                "nunomaduro/collision"
+            ]
         }
     },
     "config": {

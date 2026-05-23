@@ -10,10 +10,20 @@
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=figtree:400,600&display=swap" rel="stylesheet" />
+    <link href="https://fonts.bunny.net/css?family=inter:400,500,600,700,800,900|space-grotesk:500,600,700&display=swap" rel="stylesheet" />
     
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Scripts -->
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.3/dist/cdn.min.js"></script>
     
+    <script>
+        window.currentUser = @json(auth()->user() ? [
+            'name' => auth()->user()->name,
+            'email' => auth()->user()->email,
+            'phone' => auth()->user()->phone ?? '00000000'
+        ] : null);
+    </script>
+
     <!-- Custom CSS -->
     <style>
         /* Couleurs inspirées du logo */
@@ -30,10 +40,8 @@
         
         /* Top Bar Styles */
         .top-bar {
-            background: linear-gradient(135deg, #2d3748 0%, #1a202c 100%);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
+            background: #111827; /* Gray-900 to match mobile dark theme base */
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
         }
         
         .top-bar a:hover {
@@ -41,41 +49,11 @@
             transform: translateY(-1px);
         }
         
-        .top-bar .social-link {
-            width: 24px;
-            height: 24px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 50%;
-            background: rgba(255, 255, 255, 0.1);
-            transition: all 0.3s ease;
-        }
-        
-        .top-bar .social-link:hover {
-            background: rgba(78, 205, 196, 0.2);
-            transform: translateY(-2px) scale(1.1);
-        }
-        
-        /* Enhanced Navbar Styles */
-        .navbar-glass {
-            background: rgba(78, 205, 196, 0.95);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-        }
-        
-        .navbar-glass::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: linear-gradient(135deg, #4ECDC4 0%, #44A08D 100%);
-            opacity: 0.9;
-            z-index: -1;
+        /* Mobile-Aligned Navbar Styles */
+        .navbar-mobile-style {
+            background-color: #1F2937; /* Mobile Header Color */
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
         }
         
         /* Dropdown Menu Styles */
@@ -237,16 +215,16 @@
         
         /* Dynamic Background Images */
         .carousel-slide.netflix {
-            background-image: url('/assets/banner/Banner-Netflix---Kardafrica.jpg');
+            background-image: url("{{ asset('assets/banner/Banner-Netflix---Kardafrica.jpg') }}");
         }
         .carousel-slide.spotify {
-            background-image: url('/assets/banner/Banner-Spotify---Kardafrica.jpg');
+            background-image: url("{{ asset('assets/banner/Banner-Spotify---Kardafrica.jpg') }}");
         }
         .carousel-slide.apple {
-            background-image: url('/assets/banner/Banner-Apple---Kardafrica.jpg');
+            background-image: url("{{ asset('assets/banner/Banner-Apple---Kardafrica.jpg') }}");
         }
         .carousel-slide.uber {
-            background-image: url('/assets/banner/Banner-Uber--Kardafrica.jpg');
+            background-image: url("{{ asset('assets/banner/Banner-Uber--Kardafrica.jpg') }}");
         }
         
         /* Animated Overlay */
@@ -682,90 +660,390 @@
              transform: translateY(-2px);
          }
          
-         /* Chatbot */
-         .chatbot-container {
-             position: fixed;
-             bottom: 20px;
-             right: 20px;
-             z-index: 1000;
+         /* ============================================================
+              CHATBOT — Assistant Kardafrica (premium)
+            ============================================================ */
+         .ka-bot-container {
+             position: fixed; bottom: 20px; right: 20px; z-index: 1000;
+             font-family: 'Inter', 'Figtree', sans-serif;
          }
-         
-                 .chatbot-toggle {
-            width: 64px;
-            height: 64px;
-            background: linear-gradient(135deg, #4ECDC4 0%, #44A08D 100%);
-            border: none;
-            border-radius: 50%;
-            color: white;
-            cursor: pointer;
-            box-shadow: 0 8px 32px rgba(78, 205, 196, 0.4);
-            transition: all 0.3s ease;
-            animation: pulse 2s infinite;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            position: relative;
-            overflow: hidden;
-        }
-        
-        .chatbot-toggle::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: linear-gradient(45deg, transparent, rgba(255,255,255,0.1), transparent);
-            border-radius: 50%;
-            opacity: 0;
-            transition: all 0.3s ease;
-        }
-         
-                 .chatbot-toggle:hover {
-            transform: scale(1.1);
-            box-shadow: 0 12px 40px rgba(78, 205, 196, 0.6);
-        }
-        
-        .chatbot-toggle:hover::before {
-            opacity: 1;
-        }
-        
-        .chatbot-toggle svg {
-            position: relative;
-            z-index: 2;
-            transition: all 0.3s ease;
-        }
-        
-        .chatbot-toggle:hover svg {
-            transform: scale(1.1);
-        }
-         
-         @keyframes pulse {
-             0% { box-shadow: 0 8px 20px rgba(0,0,0,0.2), 0 0 0 0 rgba(78, 205, 196, 0.4); }
-             70% { box-shadow: 0 8px 20px rgba(0,0,0,0.2), 0 0 0 10px rgba(78, 205, 196, 0); }
-             100% { box-shadow: 0 8px 20px rgba(0,0,0,0.2), 0 0 0 0 rgba(78, 205, 196, 0); }
+         /* En mobile, on remonte légèrement pour éviter le bord du clavier
+            virtuel et le bottom-nav éventuel */
+         @media (max-width: 540px) {
+             .ka-bot-container { bottom: 16px; right: 14px; }
+             /* Sur petits écrans, on cache directement le label du launcher
+                (déjà visible dans le header de la fenêtre une fois ouverte) */
+             .ka-bot-launcher-label { display: none !important; }
          }
-         
-         .chatbot-window {
-             position: absolute;
-             bottom: 70px;
-             right: 0;
-             width: 350px;
-             height: 500px;
+
+         /* Étiquette "Kara — assistante IA" qui glisse à côté du bouton sur
+            mobile (premier affichage), puis se replie vers l'icône */
+         .ka-bot-launcher {
+             position: relative;
+             display: inline-flex; align-items: center; gap: 10px;
+         }
+         .ka-bot-launcher-label {
+             display: flex; flex-direction: column;
+             padding: 8px 14px;
              background: white;
-             border-radius: 16px;
-             box-shadow: 0 20px 40px rgba(0,0,0,0.15);
-             opacity: 0;
-             visibility: hidden;
-             transform: translateY(20px);
-             transition: all 0.3s ease;
+             border-radius: 999px;
+             box-shadow: 0 10px 25px -8px rgba(15,23,42,0.20), 0 0 0 1px rgba(15,23,42,0.05);
+             white-space: nowrap;
+             animation: ka-bot-label-in .4s cubic-bezier(.22,1,.36,1);
+             transition: opacity .25s ease, transform .25s ease;
          }
-         
-         .chatbot-window.show {
-             opacity: 1;
-             visibility: visible;
-             transform: translateY(0);
+         .ka-bot-launcher-label-name {
+             font-family: 'Space Grotesk', 'Inter', sans-serif;
+             font-size: 13px; font-weight: 800; color: #0F172A; line-height: 1;
          }
+         .ka-bot-launcher-label-sub {
+             font-size: 10px; font-weight: 600; color: #44A08D; line-height: 1; margin-top: 3px;
+             display: flex; align-items: center; gap: 4px;
+         }
+         .ka-bot-launcher-label-sub::before {
+             content: ''; width: 5px; height: 5px; border-radius: 50%; background: #34D399;
+             box-shadow: 0 0 0 0 rgba(52,211,153,0.6);
+             animation: ka-bot-online-pulse 1.8s ease-out infinite;
+         }
+         .ka-bot-launcher-label.hidden {
+             opacity: 0; pointer-events: none;
+             transform: translateX(10px) scale(0.95);
+         }
+         @keyframes ka-bot-label-in {
+             0% { opacity: 0; transform: translateX(10px) scale(.95); }
+             100% { opacity: 1; transform: translateX(0) scale(1); }
+         }
+         @keyframes ka-bot-online-pulse {
+             0%   { box-shadow: 0 0 0 0 rgba(52,211,153,0.6); }
+             70%  { box-shadow: 0 0 0 6px rgba(52,211,153,0); }
+             100% { box-shadow: 0 0 0 0 rgba(52,211,153,0); }
+         }
+
+         /* Toggle launcher */
+         .ka-bot-toggle {
+             position: relative;
+             width: 60px; height: 60px;
+             border: 0; border-radius: 50%;
+             background: linear-gradient(135deg, #4ECDC4 0%, #44A08D 100%);
+             color: white; cursor: pointer;
+             box-shadow: 0 14px 30px -8px rgba(78, 205, 196, 0.55), inset 0 1px 0 rgba(255,255,255,0.3);
+             display: flex; align-items: center; justify-content: center;
+             transition: transform .25s cubic-bezier(.22,1,.36,1), box-shadow .25s ease;
+             flex-shrink: 0;
+         }
+         /* Plus compact sur mobile */
+         @media (max-width: 540px) {
+             .ka-bot-toggle { width: 54px; height: 54px; }
+         }
+         .ka-bot-toggle::before {
+             content: ''; position: absolute; inset: -3px;
+             border-radius: 50%;
+             background: linear-gradient(135deg, #4ECDC4, #44A08D);
+             opacity: .35; z-index: -1;
+             animation: ka-bot-pulse 2.4s ease-out infinite;
+         }
+         .ka-bot-toggle:hover { transform: translateY(-3px) scale(1.04); box-shadow: 0 20px 40px -10px rgba(78, 205, 196, 0.65); }
+         .ka-bot-toggle:active { transform: scale(0.96); }
+         .ka-bot-toggle .ka-bot-badge {
+             position: absolute; top: -2px; right: -2px;
+             min-width: 20px; height: 20px; padding: 0 6px;
+             background: linear-gradient(135deg, #F43F5E, #BE123C); color: white;
+             border-radius: 9999px; font-size: 11px; font-weight: 700;
+             display: flex; align-items: center; justify-content: center;
+             box-shadow: 0 4px 10px -2px rgba(244, 63, 94, .45), 0 0 0 2px white;
+         }
+         @keyframes ka-bot-pulse {
+             0%   { transform: scale(1);   opacity: .35; }
+             70%  { transform: scale(1.4); opacity: 0; }
+             100% { transform: scale(1.4); opacity: 0; }
+         }
+
+         /* Window */
+         .ka-bot-window {
+             position: absolute;
+             bottom: 78px; right: 0;
+             width: 380px; max-width: calc(100vw - 32px);
+             height: 580px; max-height: calc(100vh - 120px);
+             background: #ffffff;
+             border-radius: 20px;
+             box-shadow: 0 30px 80px -15px rgba(15,23,42,0.25), 0 0 0 1px rgba(15,23,42,0.06);
+             opacity: 0; visibility: hidden; pointer-events: none;
+             transform: translateY(20px) scale(.96);
+             transform-origin: bottom right;
+             transition: opacity .25s ease, transform .25s cubic-bezier(.22,1,.36,1), visibility 0s linear .25s;
+             display: flex; flex-direction: column; overflow: hidden;
+         }
+         .ka-bot-window.show {
+             opacity: 1; visibility: visible; pointer-events: auto;
+             transform: translateY(0) scale(1);
+             transition: opacity .25s ease, transform .25s cubic-bezier(.22,1,.36,1), visibility 0s;
+         }
+
+         /* ============================================================
+            BACKDROP MOBILE — masque la page derrière Kara
+          ============================================================ */
+         .ka-bot-backdrop {
+             position: fixed; inset: 0;
+             background: rgba(15,23,42,0.55);
+             z-index: 999;  /* juste sous la fenêtre */
+             opacity: 0; visibility: hidden; pointer-events: none;
+             transition: opacity .25s ease, visibility 0s linear .25s;
+             display: none;
+         }
+         @media (max-width: 540px) {
+             .ka-bot-backdrop { display: block; }
+             .ka-bot-backdrop.show {
+                 opacity: 1; visibility: visible; pointer-events: auto;
+                 transition: opacity .25s ease, visibility 0s;
+             }
+         }
+
+         /* ============================================================
+            FENÊTRE MOBILE — plein écran, design refait
+          ============================================================ */
+         @media (max-width: 540px) {
+             .ka-bot-window {
+                 position: fixed !important;
+                 top: 0 !important; right: 0 !important; left: 0 !important; bottom: 0 !important;
+                 width: 100vw !important; max-width: 100vw !important;
+                 height: 100dvh !important; max-height: 100dvh !important;
+                 border-radius: 0 !important;
+                 transform: translateY(100%) !important;
+                 z-index: 1001;
+             }
+             .ka-bot-window.show {
+                 transform: translateY(0) !important;
+             }
+
+             /* HEADER compact en haut */
+             .ka-bot-header {
+                 padding: 12px 12px 12px !important;
+                 padding-top: max(12px, env(safe-area-inset-top, 0px)) !important;
+                 flex-shrink: 0;
+             }
+             .ka-bot-header > div:first-child {
+                 gap: 10px !important;
+             }
+             .ka-bot-avatar {
+                 width: 38px !important; height: 38px !important; border-radius: 11px !important;
+             }
+             .ka-bot-avatar svg { width: 20px !important; height: 20px !important; }
+             .ka-bot-avatar-dot {
+                 width: 10px !important; height: 10px !important; bottom: -2px !important; right: -2px !important;
+                 border-width: 2px !important;
+             }
+             /* Titre + sous-titre du header (cibles via leur CSS inline) */
+             .ka-bot-header [style*="font-family:'Space Grotesk'"],
+             .ka-bot-header [style*='font-family:"Space Grotesk"'] {
+                 font-size: 15px !important;
+             }
+
+             /* CLOSE button */
+             #closeChatbot {
+                 width: 36px !important; height: 36px !important; border-radius: 10px !important;
+             }
+
+             /* MESSAGES : plus de place, padding optimisé */
+             .ka-bot-messages {
+                 padding: 14px 14px 8px !important;
+                 gap: 8px !important;
+                 background: #F8FAFC !important;
+             }
+             .ka-bot-msg { max-width: 90% !important; gap: 7px !important; }
+             .ka-bot-msg-bubble {
+                 font-size: 13.5px !important; line-height: 1.5 !important;
+                 padding: 9px 13px !important; border-radius: 14px !important;
+             }
+             .ka-bot-msg.bot .ka-bot-msg-bubble  { border-bottom-left-radius: 3px !important; }
+             .ka-bot-msg.user .ka-bot-msg-bubble { border-bottom-right-radius: 3px !important; }
+             .ka-bot-msg-mini-avatar { width: 24px !important; height: 24px !important; }
+
+             /* Suggestions chips — bande horizontale qui scroll */
+             .ka-bot-suggestions {
+                 padding: 8px 12px !important; gap: 6px !important;
+                 background: white !important;
+                 border-top: 1px solid #F1F5F9;
+                 flex-wrap: nowrap !important;
+                 overflow-x: auto !important;
+                 -webkit-overflow-scrolling: touch;
+                 scrollbar-width: none;
+             }
+             .ka-bot-suggestions::-webkit-scrollbar { display: none; }
+             /* (le nom réel est .ka-bot-chip — voir renderChips() en bas du fichier) */
+             .ka-bot-chip {
+                 white-space: nowrap !important;
+                 flex-shrink: 0 !important;
+                 padding: 7px 12px !important;
+                 font-size: 12px !important;
+             }
+
+             /* Composer sticky en bas */
+             .ka-bot-composer {
+                 padding: 10px 12px !important;
+                 padding-bottom: max(10px, env(safe-area-inset-bottom, 0px)) !important;
+                 background: white !important;
+                 border-top: 1px solid #F1F5F9;
+                 gap: 8px !important;
+             }
+             .ka-bot-input {
+                 font-size: 15px !important;  /* >=16px évite le zoom iOS, mais 15px est OK avec font-size>=15 */
+                 padding: 11px 16px !important;
+                 border-radius: 999px !important;
+                 background: #F8FAFC !important;
+                 border: 1px solid #E2E8F0 !important;
+             }
+             .ka-bot-send {
+                 width: 42px !important; height: 42px !important; border-radius: 50% !important;
+                 flex-shrink: 0;
+             }
+
+             /* Évite que le scroll de la page passe derrière la modale */
+             body.ka-bot-open { overflow: hidden; }
+         }
+
+         /* Header */
+         .ka-bot-header {
+             position: relative;
+             padding: 18px 18px 16px;
+             background:
+                radial-gradient(circle at 90% 0%, rgba(255,255,255,0.18) 0%, transparent 45%),
+                linear-gradient(135deg, #44A08D 0%, #4ECDC4 100%);
+             color: white; overflow: hidden;
+         }
+         .ka-bot-header::before {
+             content: ''; position: absolute; inset: 0;
+             background-image: radial-gradient(circle at 1px 1px, rgba(255,255,255,0.10) 1px, transparent 0);
+             background-size: 18px 18px; opacity: .6; pointer-events: none;
+         }
+         .ka-bot-avatar {
+             position: relative;
+             width: 44px; height: 44px; border-radius: 14px;
+             background: rgba(255,255,255,0.18);
+             display: flex; align-items: center; justify-content: center;
+             box-shadow: inset 0 1px 0 rgba(255,255,255,0.3);
+             flex-shrink: 0;
+         }
+         .ka-bot-avatar-dot {
+             position: absolute; bottom: -2px; right: -2px;
+             width: 12px; height: 12px; border-radius: 50%;
+             background: #34D399; border: 2.5px solid #44A08D;
+         }
+
+         /* Messages area */
+         .ka-bot-messages {
+             flex: 1; min-height: 0; padding: 16px;
+             overflow-y: auto; background: #F8FAFC;
+             display: flex; flex-direction: column; gap: 10px;
+             scroll-behavior: smooth;
+         }
+         .ka-bot-messages::-webkit-scrollbar { width: 6px; }
+         .ka-bot-messages::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 9999px; }
+         .ka-bot-messages::-webkit-scrollbar-track { background: transparent; }
+
+         .ka-bot-msg { display: flex; gap: 8px; max-width: 90%; align-items: flex-end; animation: ka-bot-msg-in .25s cubic-bezier(.22,1,.36,1); }
+         .ka-bot-msg.bot { align-self: flex-start; }
+         .ka-bot-msg.user { align-self: flex-end; flex-direction: row-reverse; }
+         .ka-bot-msg-bubble {
+             padding: 10px 14px; border-radius: 16px;
+             font-size: 13.5px; line-height: 1.55;
+             max-width: 100%; word-wrap: break-word;
+         }
+         .ka-bot-msg.bot .ka-bot-msg-bubble {
+             background: white; color: #0F172A;
+             border-bottom-left-radius: 4px;
+             box-shadow: 0 1px 2px rgba(15,23,42,0.05);
+         }
+         .ka-bot-msg.user .ka-bot-msg-bubble {
+             background: linear-gradient(135deg, #44A08D, #4ECDC4); color: white;
+             border-bottom-right-radius: 4px;
+             box-shadow: 0 4px 10px -2px rgba(68,160,141,0.35);
+         }
+         .ka-bot-msg-mini-avatar {
+             width: 26px; height: 26px; border-radius: 50%;
+             flex-shrink: 0; align-self: flex-end;
+             display: flex; align-items: center; justify-content: center;
+             font-size: 11px; font-weight: 700;
+         }
+         .ka-bot-msg.bot .ka-bot-msg-mini-avatar {
+             background: linear-gradient(135deg, #44A08D, #4ECDC4); color: white;
+         }
+         .ka-bot-msg-time {
+             font-size: 10px; color: #94A3B8;
+             margin-top: 4px; padding: 0 4px;
+         }
+         @keyframes ka-bot-msg-in {
+             from { opacity: 0; transform: translateY(8px); }
+             to   { opacity: 1; transform: translateY(0); }
+         }
+
+         /* Quick links inside a bot message */
+         .ka-bot-quick-links {
+             display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px;
+         }
+         .ka-bot-quick-link {
+             display: inline-flex; align-items: center; gap: 5px;
+             padding: 6px 12px; border-radius: 9999px;
+             background: rgba(68,160,141,0.10); color: #44A08D;
+             border: 1px solid rgba(68,160,141,0.25);
+             font-size: 11.5px; font-weight: 600;
+             text-decoration: none; transition: all .15s ease;
+         }
+         .ka-bot-quick-link:hover { background: #44A08D; color: white; border-color: #44A08D; }
+
+         /* Typing indicator */
+         .ka-bot-typing { display: flex; gap: 4px; padding: 12px 14px; background: white; border-radius: 16px 16px 16px 4px; box-shadow: 0 1px 2px rgba(15,23,42,0.05); }
+         .ka-bot-typing span {
+             width: 7px; height: 7px; border-radius: 50%; background: #94A3B8;
+             animation: ka-bot-typing-bounce 1.2s ease-in-out infinite;
+         }
+         .ka-bot-typing span:nth-child(2) { animation-delay: .15s; }
+         .ka-bot-typing span:nth-child(3) { animation-delay: .30s; }
+         @keyframes ka-bot-typing-bounce {
+             0%, 60%, 100% { transform: translateY(0); opacity: .4; }
+             30%           { transform: translateY(-5px); opacity: 1; }
+         }
+
+         /* Suggestion chips (initial / after bot replies) */
+         .ka-bot-suggestions {
+             padding: 10px 14px;
+             background: #F8FAFC; border-top: 1px solid #F1F5F9;
+             display: flex; gap: 6px; overflow-x: auto;
+             scrollbar-width: none;
+         }
+         .ka-bot-suggestions::-webkit-scrollbar { display: none; }
+         .ka-bot-chip {
+             flex-shrink: 0;
+             padding: 7px 12px; border-radius: 9999px;
+             background: white; color: #475569;
+             border: 1px solid #E2E8F0;
+             font-size: 12px; font-weight: 600; cursor: pointer;
+             white-space: nowrap; transition: all .15s ease;
+         }
+         .ka-bot-chip:hover { background: #44A08D; color: white; border-color: #44A08D; transform: translateY(-1px); }
+
+         /* Composer */
+         .ka-bot-composer {
+             padding: 12px 14px;
+             border-top: 1px solid #F1F5F9; background: white;
+             display: flex; gap: 8px; align-items: center;
+         }
+         .ka-bot-input {
+             flex: 1; min-width: 0; padding: 10px 14px;
+             background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 12px;
+             font-size: 13.5px; color: #0F172A; outline: none;
+             transition: all .15s ease;
+         }
+         .ka-bot-input:focus { background: white; border-color: #44A08D; box-shadow: 0 0 0 3px rgba(68,160,141,0.12); }
+         .ka-bot-send {
+             width: 38px; height: 38px; border: 0; border-radius: 12px;
+             background: linear-gradient(135deg, #44A08D, #4ECDC4); color: white;
+             display: flex; align-items: center; justify-content: center;
+             cursor: pointer; flex-shrink: 0;
+             box-shadow: 0 6px 14px -4px rgba(68,160,141,0.45);
+             transition: all .15s ease;
+         }
+         .ka-bot-send:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 10px 18px -4px rgba(68,160,141,0.55); }
+         .ka-bot-send:disabled { opacity: .4; cursor: not-allowed; }
          
          /* Enhanced Section Styles */
          .section-title {
@@ -975,16 +1253,19 @@
          }
 
          /* Styles pour le menu mobile et overlay */
-         #mobileMenuOverlay {
-             background: rgba(0, 0, 0, 0.6) !important;
-             backdrop-filter: blur(4px);
-             -webkit-backdrop-filter: blur(4px);
-             z-index: 999;
+         /* Garde-fou : l'overlay reste invisible tant que .show n'est pas applique par le JS */
+         #mobileMenuOverlay,
+         #mobileCartOverlay {
+             opacity: 0;
+             visibility: hidden;
+             pointer-events: none;
          }
-
-         #mobileMenuOverlay.show {
+         #mobileMenuOverlay.show,
+         #mobileCartOverlay.show {
              opacity: 1 !important;
              visibility: visible !important;
+             pointer-events: auto;
+             display: block !important;
          }
 
          #mobileMenu {
@@ -996,8 +1277,17 @@
              opacity: 1 !important;
          }
 
+         /* Tailwind v4 utilise la prop CSS native `translate` au lieu de `transform`,
+            donc on neutralise les deux pour etre sur que la sidebar glisse. */
          #mobileMenu.show {
              transform: translateX(0) !important;
+             translate: 0 0 !important;
+             --tw-translate-x: 0;
+         }
+         #mobileCartSidebar.show {
+             transform: translateX(0) !important;
+             translate: 0 0 !important;
+             --tw-translate-x: 0;
          }
 
          /* Forcer le fond blanc pour tous les éléments de la sidebar */
@@ -1092,56 +1382,68 @@
          }
     </style>
 </head>
-<body class="bg-gray-50 font-sans antialiased" style="padding-top: 120px;">
+<body x-data class="bg-gray-50 font-sans antialiased">
     <!-- Page Loader -->
-    <div id="pageLoader" class="page-loader">
-        <div class="loader-content">
-            <div class="loader-logo">
-                <img src="{{ asset('assets/logo/FAVCON-KARDAFRICA-.png') }}" 
-                     alt="Kardafrica Logo" 
-                     class="loader-pulse">
-            </div>
-            <h2 class="text-2xl font-bold mb-2">Kardafrica</h2>
-            <p id="loaderText" class="text-lg opacity-80">Chargement en cours...</p>
-            <div class="mt-6 flex justify-center space-x-2">
-                <div class="w-3 h-3 bg-white rounded-full loader-pulse" style="animation-delay: 0s;"></div>
-                <div class="w-3 h-3 bg-white rounded-full loader-pulse" style="animation-delay: 0.2s;"></div>
-                <div class="w-3 h-3 bg-white rounded-full loader-pulse" style="animation-delay: 0.4s;"></div>
+    <x-loader />
+
+    <!-- Mobile Header (Visible only on mobile/tablet) -->
+    @unless(View::hasSection('hide_mobile_header'))
+    <div class="md:hidden bg-[#1F2937] px-4 pt-3 pb-4 shadow-lg fixed top-0 w-full z-50 border-b border-white/5">
+        <div class="flex justify-between items-center mb-3">
+            <a href="{{ route('home') }}" class="flex items-center gap-2">
+                <img src="{{ asset('assets/logo/FAVCON-KARDAFRICA-.png') }}" class="w-9 h-9 rounded-lg bg-white/10 p-1 object-contain" alt="Logo">
+                <span class="font-display text-xl font-bold text-white tracking-tight">KardAfrica</span>
+            </a>
+            <div class="flex items-center gap-2">
+                <button id="cartBtnMobile" class="relative w-10 h-10 rounded-xl flex items-center justify-center text-white hover:bg-white/10 active:scale-95 transition" aria-label="Panier">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>
+                    <span id="cartCountMobileHeader" class="absolute top-1 right-1 min-w-[16px] h-4 px-1 rounded-full bg-[#44A08D] text-white text-[9px] font-bold flex items-center justify-center ring-2 ring-[#1F2937]">0</span>
+                </button>
+                <button id="mobileMenuBtn" class="w-10 h-10 rounded-xl flex items-center justify-center text-white hover:bg-white/10 active:scale-95 transition" aria-label="Menu">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
+                </button>
             </div>
         </div>
+
+        <button type="button" data-search-trigger
+                class="relative w-full flex items-center bg-white/[0.06] rounded-xl pl-3 pr-2 py-2 border border-white/10 hover:border-[#4ECDC4]/40 hover:bg-white/[0.08] active:scale-[0.99] transition text-left">
+            <svg class="w-4 h-4 text-slate-400 mr-2 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            <span class="text-slate-400 text-sm">Rechercher Netflix, Apple…</span>
+        </button>
     </div>
-    <!-- Top Bar -->
-    <div class="top-bar text-white py-3 fixed top-0 w-full z-50 shadow-lg">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between items-center text-sm">
-                <!-- Informations de contact -->
-                <div class="hidden md:flex items-center space-x-6">
-                    <a href="mailto:hello@kardafrica.com" class="flex items-center space-x-2 transition-all duration-300">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
-                        </svg>
+    @endunless
+    
+    <!-- Desktop Header Wrapper (Hidden on mobile) -->
+    <div class="hidden md:block">
+        <!-- Top Bar (slim) -->
+        <div class="top-bar text-slate-300 fixed top-0 w-full z-50 h-[40px] border-b border-white/5">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full">
+            <div class="flex justify-between items-center text-xs h-full">
+                <div class="hidden md:flex items-center gap-5">
+                    <a href="mailto:hello@kardafrica.com" class="flex items-center gap-1.5 hover:text-[#4ECDC4] transition">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                         <span>hello@kardafrica.com</span>
                     </a>
-                    <a href="tel:+221XXXXXXXXX" class="flex items-center space-x-2 transition-all duration-300">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path>
-                        </svg>
-                        <span>+221 XX XXX XX XX</span>
+                    <span class="text-white/10">·</span>
+                    <a href="tel:+241XXXXXXXX" class="flex items-center gap-1.5 hover:text-[#4ECDC4] transition">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+                        <span>+241 00 00 00 00</span>
                     </a>
-                    <div class="flex items-center space-x-1 text-gray-300">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                        </svg>
-                        <span>Service client 24/7</span>
-                    </div>
+                    <span class="text-white/10">·</span>
+                    <span class="flex items-center gap-1.5">
+                        <span class="relative flex h-1.5 w-1.5">
+                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                            <span class="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+                        </span>
+                        Service client 24/7
+                    </span>
                 </div>
-                
-                <!-- Menu navigation secondaire -->
-                <div class="flex items-center space-x-4">
-                    <div class="hidden sm:flex items-center space-x-4">
-                        <a href="{{ route('about') }}" class="transition-all duration-300 hover:text-kardafrica-primary">À propos</a>
-                        <a href="{{ route('contact') }}" class="transition-all duration-300 hover:text-kardafrica-primary">Nous contacter</a>
-                        <a href="{{ route('support') }}" class="transition-all duration-300 hover:text-kardafrica-primary">Support</a>
+
+                <div class="flex items-center gap-3">
+                    <div class="hidden sm:flex items-center gap-4 text-slate-400">
+                        <a href="{{ route('about') }}" class="hover:text-[#4ECDC4] transition">À propos</a>
+                        <a href="{{ route('contact') }}" class="hover:text-[#4ECDC4] transition">Contact</a>
+                        <a href="{{ route('support') }}" class="hover:text-[#4ECDC4] transition">Support</a>
                     </div>
                     
                     <!-- Réseaux sociaux -->
@@ -1173,366 +1475,509 @@
     </div>
     
     <!-- Navigation -->
-    <nav class="navbar-glass fixed top-10 w-full z-40">
+    <nav class="bg-[#1F2937]/95 backdrop-blur-md border-b border-white/5 fixed top-[40px] w-full z-40 transition-all duration-300">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between items-center h-20">
+            <div class="flex justify-between items-center h-16">
                 <!-- Logo -->
-                <div class="flex items-center">
-                    <a href="{{ route('home') }}" class="flex items-center space-x-3">
-                        <img src="{{ asset('assets/logo/FAVCON-KARDAFRICA-.png') }}" 
-                             alt="Kardafrica Logo" 
-                             class="h-12 w-12 float-animation">
-                        <div>
-                            <h1 class="text-2xl font-bold text-white">Kardafrica</h1>
-                            <p class="text-sm text-gray-100">Cartes numériques en un clic !</p>
-                        </div>
-                    </a>
-                </div>
-                
+                <a href="{{ route('home') }}" class="flex items-center gap-2.5 group">
+                    <img src="{{ asset('assets/logo/FAVCON-KARDAFRICA-.png') }}"
+                         alt="Kardafrica"
+                         class="h-9 w-9 transition-transform duration-300 group-hover:scale-105">
+                    <span class="font-display text-xl font-bold text-white tracking-tight">KardAfrica</span>
+                </a>
+
                 <!-- Menu de navigation -->
-                <div class="hidden md:flex space-x-2 items-center">
-                    <a href="{{ route('home') }}" class="text-white hover:text-gray-200 hover:bg-white/10 px-4 py-3 rounded-xl text-base font-medium transition-all duration-300">
-                        🏠 Accueil
+                <div class="hidden md:flex items-center gap-1">
+                    <a href="{{ route('home') }}"
+                       class="px-3.5 py-2 rounded-lg text-sm font-medium transition {{ request()->routeIs('home') ? 'text-white bg-white/[0.08]' : 'text-slate-300 hover:text-white hover:bg-white/[0.06]' }}">
+                        Accueil
                     </a>
-                    
-                    <!-- Menu déroulant Cartes -->
+
+                    <!-- Dropdown Catalogue -->
                     <div class="relative group">
-                        <button class="text-white hover:text-gray-200 hover:bg-white/10 px-4 py-3 rounded-xl text-base font-medium transition-all duration-300 flex items-center space-x-2">
-                            <span>🎯 Cartes</span>
-                            <svg class="w-4 h-4 transition-transform duration-300 group-hover:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        <button class="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-white/[0.06] transition">
+                            <span>Catalogue</span>
+                            <svg class="w-3.5 h-3.5 transition-transform duration-300 group-hover:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
                             </svg>
                         </button>
+
+                        <div class="absolute left-1/2 -translate-x-1/2 top-full pt-3 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 transform translate-y-2 group-hover:translate-y-0 z-50">
+                            <div class="w-[420px] bg-white rounded-2xl shadow-pop border border-slate-100 overflow-hidden">
+                                <div class="grid grid-cols-2 p-2">
+                                    @php
+                                        $catalogLinks = [
+                                            ['title' => 'Gaming',     'desc' => 'PlayStation, Xbox, Steam',  'icon' => 'gamepad',      'cat' => 2],
+                                            ['title' => 'Streaming',  'desc' => 'Netflix, Spotify, Disney+', 'icon' => 'film',         'cat' => 1],
+                                            ['title' => 'Musique',    'desc' => 'Apple Music, Deezer',       'icon' => 'music',        'cat' => 3],
+                                            ['title' => 'Shopping',   'desc' => 'Amazon, Nike, Zalando',     'icon' => 'shopping-bag', 'cat' => 4],
+                                            ['title' => 'Daywatch',   'desc' => 'Streaming local',           'icon' => 'tv',           'cat' => 5],
+                                            ['title' => 'Voyage',     'desc' => 'Uber, Airbnb, Booking',     'icon' => 'plane',        'cat' => 6],
+                                        ];
+                                    @endphp
+
+                                    @foreach($catalogLinks as $link)
+                                        <a href="{{ route('category', $link['cat']) }}"
+                                           class="group/item flex items-start gap-3 p-3 rounded-xl hover:bg-slate-50 transition">
+                                            <div class="shrink-0 w-10 h-10 rounded-lg bg-teal-50 group-hover/item:bg-teal-100 flex items-center justify-center text-[#44A08D] transition">
+                                                @switch($link['icon'])
+                                                    @case('gamepad')
+                                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                                        @break
+                                                    @case('film')
+                                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 4h16a1 1 0 011 1v14a1 1 0 01-1 1H4a1 1 0 01-1-1V5a1 1 0 011-1z"/></svg>
+                                                        @break
+                                                    @case('music')
+                                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2z"/></svg>
+                                                        @break
+                                                    @case('shopping-bag')
+                                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>
+                                                        @break
+                                                    @case('tv')
+                                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25m18 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m18 0V12a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 12V5.25"/></svg>
+                                                        @break
+                                                    @case('plane')
+                                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l3-3 4 4 8-8 3 3-11 11-4-4-3-3z"/></svg>
+                                                        @break
+                                                @endswitch
+                                            </div>
+                                            <div class="min-w-0">
+                                                <div class="font-semibold text-slate-900 text-sm group-hover/item:text-[#44A08D] transition-colors">{{ $link['title'] }}</div>
+                                                <div class="text-xs text-slate-500 truncate">{{ $link['desc'] }}</div>
+                                            </div>
+                                        </a>
+                                    @endforeach
+                                </div>
+                                <a href="{{ route('boutique') }}" class="flex items-center justify-between px-4 py-3 bg-slate-50 border-t border-slate-100 text-sm font-semibold text-[#44A08D] hover:bg-slate-100 transition group/all">
+                                    <span class="flex items-center gap-2">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
+                                        Voir tout le catalogue
+                                    </span>
+                                    <svg class="w-4 h-4 transition-transform group-hover/all:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <a href="{{ url('/#how-it-works') }}"
+                       class="px-3.5 py-2 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-white/[0.06] transition">
+                        Comment ça marche
+                    </a>
+                </div>
+
+                <!-- Controles a droite : recherche, panier, user -->
+                <div class="hidden md:flex items-center gap-2">
+                    <!-- Search trigger (desktop) — icone seule, Ctrl+K disponible -->
+                    <button type="button" data-search-trigger
+                            class="w-10 h-10 rounded-xl flex items-center justify-center text-slate-300 hover:text-white hover:bg-white/[0.06] active:scale-95 transition"
+                            aria-label="Rechercher (Ctrl+K)" title="Rechercher (Ctrl+K)">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                    </button>
+
+                    <!-- Panier -->
+                    <div class="relative" x-data="{ open: false }" @open-cart-dropdown.window="open = true" @toggle-cart-dropdown.window="open = !open" @click.away="open = false">
+                        <button id="cartBtn" class="relative w-10 h-10 rounded-xl flex items-center justify-center text-slate-300 hover:text-white hover:bg-white/[0.06] active:scale-95 transition" aria-label="Panier">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>
+                            <span id="cartCount" class="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-[#44A08D] text-white text-[10px] font-bold flex items-center justify-center ring-2 ring-[#1F2937]">0</span>
+                        </button>
                         
-                        <!-- Dropdown menu -->
-                        <div class="absolute left-0 mt-2 w-64 bg-white rounded-2xl shadow-xl border border-gray-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 transform translate-y-2 group-hover:translate-y-0 z-50">
-                            <div class="py-3">
-                                <a href="{{ route('boutique') }}" class="flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-gray-50 hover:text-kardafrica-primary transition-all duration-200">
-                                    <span class="text-xl">🎮</span>
-                                    <div>
-                                        <div class="font-semibold">Gaming</div>
-                                        <div class="text-sm text-gray-500">PlayStation, Xbox, Steam...</div>
+                        <!-- Dropdown du panier -->
+                        <div x-show="open" 
+                             x-transition:enter="transition ease-out duration-200"
+                             x-transition:enter-start="opacity-0 translate-y-2"
+                             x-transition:enter-end="opacity-100 translate-y-0"
+                             x-transition:leave="transition ease-in duration-150"
+                             x-transition:leave-start="opacity-100 translate-y-0"
+                             x-transition:leave-end="opacity-0 translate-y-2"
+                             id="cartDropdown" 
+                             class="absolute right-0 mt-4 w-96 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden z-50"
+                             style="display: none;">
+                            
+                            <!-- Header -->
+                            <div class="px-6 py-4 border-b border-gray-100 bg-white flex justify-between items-center">
+                                <h3 class="font-bold text-gray-900 text-lg flex items-center gap-2">
+                                    <span class="text-kardafrica-primary">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path>
+                                        </svg>
+                                    </span>
+                                    Mon Panier
+                                </h3>
+                                <span class="text-xs font-medium px-2.5 py-1 bg-gray-100 text-gray-600 rounded-full" id="cartCountBadge">0 articles</span>
+                            </div>
+
+                            <!-- Items -->
+                            <div class="max-h-[24rem] overflow-y-auto custom-scrollbar" id="cartItems">
+                                <div class="text-center py-12 px-6">
+                                    <div class="w-20 h-20 mx-auto mb-4 bg-gray-50 rounded-full flex items-center justify-center border border-gray-100">
+                                        <svg class="w-10 h-10 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path>
+                                        </svg>
                                     </div>
-                                </a>
-                                <a href="{{ route('boutique') }}" class="flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-gray-50 hover:text-kardafrica-primary transition-all duration-200">
-                                    <span class="text-xl">🎬</span>
-                                    <div>
-                                        <div class="font-semibold">Streaming</div>
-                                        <div class="text-sm text-gray-500">Netflix, Spotify, Disney+...</div>
+                                    <p class="text-gray-900 font-bold mb-1">Votre panier est vide</p>
+                                    <p class="text-sm text-gray-500 mb-6">Découvrez nos cartes numériques et commencez vos achats.</p>
+                                    <a href="{{ route('boutique') }}" class="inline-flex items-center justify-center px-6 py-2.5 border border-transparent text-sm font-medium rounded-xl text-white bg-kardafrica-primary hover:bg-kardafrica-secondary transition-colors shadow-lg shadow-kardafrica-primary/20">
+                                        Découvrir la boutique
+                                    </a>
+                                </div>
+                            </div>
+
+                            <!-- Footer -->
+                            <div class="p-6 bg-gray-50 border-t border-gray-100">
+                                <div class="flex justify-between items-end mb-6">
+                                    <span class="text-gray-500 font-medium">Total à payer</span>
+                                    <div class="text-right">
+                                        <span id="cartTotal" class="block text-2xl font-bold text-gray-900">0 FCFA</span>
+                                        <span class="text-xs text-green-600 font-medium">Frais de service offerts</span>
                                     </div>
-                                </a>
-                                <a href="{{ route('boutique') }}" class="flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-gray-50 hover:text-kardafrica-primary transition-all duration-200">
-                                    <span class="text-xl">🍎</span>
-                                    <div>
-                                        <div class="font-semibold">Apple Store</div>
-                                        <div class="text-sm text-gray-500">App Store, iTunes...</div>
-                                    </div>
-                                </a>
-                                <a href="{{ route('boutique') }}" class="flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-gray-50 hover:text-kardafrica-primary transition-all duration-200">
-                                    <span class="text-xl">🛍️</span>
-                                    <div>
-                                        <div class="font-semibold">Shopping</div>
-                                        <div class="text-sm text-gray-500">Nike, Zalando, Amazon...</div>
-                                    </div>
-                                </a>
-                                <a href="{{ route('boutique') }}" class="flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-gray-50 hover:text-kardafrica-primary transition-all duration-200">
-                                    <span class="text-xl">✈️</span>
-                                    <div>
-                                        <div class="font-semibold">Voyage</div>
-                                        <div class="text-sm text-gray-500">Uber, Airbnb, Deliveroo...</div>
-                                    </div>
-                                </a>
-                                <a href="{{ route('boutique') }}" class="flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-gray-50 hover:text-kardafrica-primary transition-all duration-200">
-                                    <span class="text-xl">🚀</span>
-                                    <div>
-                                        <div class="font-semibold">Crypto</div>
-                                        <div class="text-sm text-gray-500">Bitcoin, Binance, NordVPN...</div>
-                                    </div>
-                                </a>
-                                <div class="border-t border-gray-100 mt-2 pt-2">
-                                    <a href="{{ route('boutique') }}" class="flex items-center space-x-3 px-4 py-3 text-kardafrica-primary hover:bg-gray-50 transition-all duration-200 font-semibold">
-                                        <span class="text-xl">🔥</span>
-                                        <div>Voir toutes les cartes</div>
+                                </div>
+                                
+                                <div class="grid grid-cols-2 gap-3">
+                                    <a href="{{ route('cart.index') }}" class="flex items-center justify-center px-4 py-3 border border-gray-200 text-gray-700 font-semibold rounded-xl hover:bg-white hover:border-gray-300 hover:shadow-sm transition-all duration-200">
+                                        Voir le panier
+                                    </a>
+                                    <a href="{{ route('cart.index') }}" class="flex items-center justify-center px-4 py-3 bg-[#1F2937] text-white font-semibold rounded-xl hover:bg-[#374151] hover:shadow-lg transition-all duration-200">
+                                        Commander
+                                        <svg class="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
+                                        </svg>
                                     </a>
                                 </div>
                             </div>
                         </div>
                     </div>
                     
-                    <!-- Panier -->
-                    <div class="relative">
-                        <button id="cartBtn" class="text-white hover:text-gray-200 hover:bg-white/10 p-3 rounded-xl transition-all duration-300 relative group">
-                            <svg class="w-6 h-6 transition-transform duration-300 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path>
-                            </svg>
-                            <span id="cartCount" class="absolute -top-2 -right-2 bg-gradient-to-r from-red-500 to-red-600 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-bold shadow-lg ring-2 ring-white transition-all duration-300 group-hover:scale-110">0</span>
+                    @auth
+                    <div class="relative" x-data="{ open: false }">
+                        <button @click="open = !open" @click.away="open = false"
+                                class="flex items-center gap-2 pl-1 pr-3 py-1 rounded-xl bg-white/[0.06] border border-white/10 hover:bg-white/[0.10] transition">
+                            <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-[#4ECDC4] to-[#44A08D] flex items-center justify-center overflow-hidden">
+                                @if(optional(Auth::user()->profile)->avatar)
+                                    <img src="{{ Auth::user()->profile->avatar }}" alt="{{ Auth::user()->name }}" class="w-full h-full object-cover">
+                                @else
+                                    <span class="text-white font-bold text-xs">{{ strtoupper(substr(Auth::user()->name, 0, 1)) }}</span>
+                                @endif
+                            </div>
+                            <span class="font-medium text-sm text-white">{{ explode(' ', Auth::user()->name)[0] }}</span>
+                            <svg class="w-3.5 h-3.5 text-slate-400 transition-transform" :class="{'rotate-180': open}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
                         </button>
-                        
-                        <!-- Dropdown du panier -->
-                        <div id="cartDropdown" class="cart-dropdown">
-                            <div class="p-4 border-b border-gray-100" style="background: linear-gradient(135deg, #4ECDC4 0%, #44A08D 100%);">
-                                <h3 class="font-bold flex items-center space-x-3" style="color: white;">
-                                    <div class="bg-white/20 p-2 rounded-lg backdrop-blur-sm">
-                                        <svg class="w-5 h-5" fill="none" stroke="white" viewBox="0 0 24 24" stroke-width="2">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path>
-                                        </svg>
-                                    </div>
-                                    <span class="text-lg">Mon Panier</span>
-                                </h3>
+
+                        <div x-show="open"
+                             x-transition:enter="transition ease-out duration-200"
+                             x-transition:enter-start="opacity-0 translate-y-2"
+                             x-transition:enter-end="opacity-100 translate-y-0"
+                             x-transition:leave="transition ease-in duration-150"
+                             x-transition:leave-start="opacity-100 translate-y-0"
+                             x-transition:leave-end="opacity-0 translate-y-2"
+                             class="absolute right-0 mt-2 w-64 bg-white rounded-2xl shadow-pop border border-slate-100 overflow-hidden z-50"
+                             style="display: none;">
+                            <div class="px-4 py-3 border-b border-slate-100">
+                                <p class="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Connecté</p>
+                                <p class="text-sm font-semibold text-slate-900 truncate mt-0.5">{{ Auth::user()->email }}</p>
                             </div>
-                            <div class="p-4 max-h-72 overflow-y-auto" id="cartItems">
-                                <div class="text-center py-8">
-                                    <div class="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
-                                        <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path>
-                                        </svg>
+                            <div class="p-2">
+                                <a href="{{ route('profile.show') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-700 hover:bg-slate-50 hover:text-[#44A08D] transition group/item">
+                                    <div class="w-8 h-8 rounded-lg bg-slate-100 group-hover/item:bg-teal-50 flex items-center justify-center text-slate-600 group-hover/item:text-[#44A08D] transition">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
                                     </div>
-                                    <p class="text-gray-500 font-medium mb-2">Votre panier est vide</p>
-                                    <p class="text-sm text-gray-400">Découvrez nos cartes numériques</p>
-                                </div>
-                            </div>
-                            <div class="p-4 border-t border-gray-100" style="background: linear-gradient(to right, #f9fafb, #f3f4f6);">
-                                <div class="flex justify-between items-center mb-4">
-                                    <span class="font-semibold" style="color: #374151;">Total:</span>
-                                    <div class="flex items-center space-x-2">
-                                        <span id="cartTotal" class="text-2xl font-bold" style="color: #44A08D;">0 FCFA</span>
-                                        <div style="background: rgba(78, 205, 196, 0.1);" class="p-1 rounded-full">
-                                            <svg class="w-4 h-4" fill="none" stroke="#44A08D" viewBox="0 0 24 24" stroke-width="2">
-                                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
-                                            </svg>
-                                        </div>
+                                    <span class="font-medium text-sm">Mon profil</span>
+                                </a>
+                                <a href="{{ route('cards.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-700 hover:bg-slate-50 hover:text-[#44A08D] transition group/item">
+                                    <div class="w-8 h-8 rounded-lg bg-slate-100 group-hover/item:bg-teal-50 flex items-center justify-center text-slate-600 group-hover/item:text-[#44A08D] transition">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
                                     </div>
-                                </div>
-                                
-                                <!-- Boutons en row -->
-                                <div class="flex space-x-2 mb-3">
-                                    <button class="flex-1 border-2 border-gray-300 text-gray-700 py-2 px-4 rounded-xl font-medium hover:bg-gray-50 hover:border-gray-400 transition-all duration-300 flex items-center justify-center space-x-2">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
-                                        </svg>
-                                        <span>Voir panier</span>
-                                    </button>
-                                    <button class="flex-1 text-white py-2 px-4 rounded-xl font-semibold hover-kardafrica shadow-lg flex items-center justify-center space-x-2" style="background: linear-gradient(135deg, #4ECDC4 0%, #44A08D 100%);">
-                                        <svg class="w-4 h-4" fill="none" stroke="white" viewBox="0 0 24 24" stroke-width="2">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path>
-                                        </svg>
-                                        <span>Commander</span>
-                                    </button>
-                                </div>
+                                    <span class="font-medium text-sm">Mes cartes</span>
+                                </a>
+                                <a href="{{ url('/orders') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-700 hover:bg-slate-50 hover:text-[#44A08D] transition group/item">
+                                    <div class="w-8 h-8 rounded-lg bg-slate-100 group-hover/item:bg-teal-50 flex items-center justify-center text-slate-600 group-hover/item:text-[#44A08D] transition">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                                    </div>
+                                    <span class="font-medium text-sm">Mes commandes</span>
+                                </a>
                             </div>
+                            <form method="POST" action="{{ route('logout') }}" class="p-2 border-t border-slate-100">
+                                @csrf
+                                <button type="submit" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-rose-600 hover:bg-rose-50 transition text-left group/item">
+                                    <div class="w-8 h-8 rounded-lg bg-rose-50 group-hover/item:bg-rose-100 flex items-center justify-center transition">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+                                    </div>
+                                    <span class="font-medium text-sm">Déconnexion</span>
+                                </button>
+                            </form>
                         </div>
                     </div>
-                    
-                    <a href="#" class="bg-kardafrica-secondary text-white px-6 py-3 rounded-xl text-base font-medium hover-kardafrica shadow-lg">
-                        👤 Connexion
-                    </a>
-                </div>
-                
-                <!-- Menu mobile -->
-                <div class="md:hidden flex items-center space-x-2">
-                    <!-- Panier mobile -->
-                    <button id="cartBtnMobile" class="text-white hover:text-gray-200 hover:bg-white/10 p-2 rounded-xl transition-all duration-300 relative group">
-                        <svg class="w-6 h-6 transition-transform duration-300 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path>
-                        </svg>
-                        <span id="cartCountMobile" class="absolute -top-2 -right-2 bg-gradient-to-r from-red-500 to-red-600 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-bold shadow-lg ring-2 ring-white transition-all duration-300 group-hover:scale-110">0</span>
+                    @else
+                    <button @click="$dispatch('open-auth-modal'); $dispatch('set-auth-view', { view: 'login' })"
+                            class="px-4 py-2 rounded-xl bg-[#44A08D] hover:bg-[#3d9180] text-white text-sm font-semibold shadow-lg shadow-[#44A08D]/25 active:scale-95 transition">
+                        Connexion
                     </button>
-                    
-                    <!-- Menu burger -->
-                    <button id="mobileMenuBtn" class="text-white hover:text-gray-200 hover:bg-white/10 p-2 rounded-xl transition-all duration-300">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
-                        </svg>
-                    </button>
+                    @endauth
                 </div>
+
             </div>
         </div>
     </nav>
+    </div>
 
     <!-- Contenu principal -->
-    <main class="min-h-screen pt-20">
-        @if(session('success'))
-            <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mx-4 my-4">
-                {{ session('success') }}
-            </div>
+    <main class="min-h-screen pt-[120px] md:pt-[104px]">
+
+        @if(session('success') || session('error') || session('info'))
+            @php
+                $msgType = session('success') ? 'success' : (session('error') ? 'error' : 'info');
+                $msg = session($msgType);
+            @endphp
+            <x-flash-modal :type="$msgType" :message="$msg" />
         @endif
-        
-        @if(session('error'))
-            <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mx-4 my-4">
-                {{ session('error') }}
-            </div>
-        @endif
-        
+
         @yield('content')
     </main>
 
 
 
-    <!-- Chatbot -->
-    <div class="chatbot-container">
-        <div id="chatbotWindow" class="chatbot-window">
-            <div class="bg-kardafrica-primary text-white p-4 rounded-t-2xl">
-                <div class="flex justify-between items-center">
-                    <h3 class="font-semibold">Assistant Kardafrica</h3>
-                    <button id="closeChatbot" class="text-white hover:text-gray-200">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                        </svg>
-                    </button>
-                </div>
-            </div>
-            <div class="p-4 h-96 overflow-y-auto" id="chatMessages">
-                <div class="mb-4">
-                    <div class="bg-gray-100 p-3 rounded-lg">
-                        <p class="text-sm">Bonjour ! Je suis votre assistant virtuel. Comment puis-je vous aider aujourd'hui ?</p>
+    <!-- Chatbot — Assistant Kardafrica (Kara) -->
+    {{-- Backdrop mobile (sibling, pas enfant — évite les soucis de stacking) --}}
+    <div id="kaBotBackdrop" class="ka-bot-backdrop" aria-hidden="true"></div>
+
+    <div class="ka-bot-container" id="kaBot">
+        {{-- Window --}}
+        <div id="chatbotWindow" class="ka-bot-window" role="dialog" aria-label="Assistant Kardafrica">
+
+            {{-- Header --}}
+            <div class="ka-bot-header">
+                <div style="position:relative;display:flex;align-items:center;gap:12px;">
+                    <div class="ka-bot-avatar">
+                        <svg style="width:24px;height:24px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z"/></svg>
+                        <span class="ka-bot-avatar-dot"></span>
                     </div>
-                </div>
-            </div>
-            <div class="p-4 border-t border-gray-200">
-                <div class="flex space-x-2">
-                    <input type="text" id="chatInput" placeholder="Tapez votre message..." class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-kardafrica-primary">
-                    <button id="sendMessage" class="bg-kardafrica-primary text-white px-4 py-2 rounded-lg hover-kardafrica">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
-                        </svg>
+                    <div style="flex:1;min-width:0;">
+                        <div style="font-family:'Space Grotesk','Inter',sans-serif;font-size:16px;font-weight:700;line-height:1.1;">Kara</div>
+                        <div style="font-size:11px;opacity:.85;display:flex;align-items:center;gap:5px;margin-top:2px;">
+                            <span style="width:5px;height:5px;border-radius:50%;background:#34D399;"></span>
+                            En ligne · Réponse instantanée
+                        </div>
+                    </div>
+                    <button id="closeChatbot" type="button"
+                            style="width:32px;height:32px;border:0;border-radius:9px;background:rgba(255,255,255,0.15);color:white;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s;"
+                            onmouseover="this.style.background='rgba(255,255,255,0.25)';"
+                            onmouseout="this.style.background='rgba(255,255,255,0.15)';"
+                            aria-label="Fermer">
+                        <svg style="width:16px;height:16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                     </button>
                 </div>
+            </div>
+
+            {{-- Messages --}}
+            <div class="ka-bot-messages" id="chatMessages"></div>
+
+            {{-- Suggestion chips --}}
+            <div class="ka-bot-suggestions" id="kaBotChips"></div>
+
+            {{-- Composer --}}
+            <div class="ka-bot-composer">
+                <input type="text" id="chatInput" class="ka-bot-input" placeholder="Posez votre question…" autocomplete="off">
+                <button id="sendMessage" type="button" class="ka-bot-send" aria-label="Envoyer">
+                    <svg style="width:16px;height:16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5"/></svg>
+                </button>
             </div>
         </div>
-        <button id="chatbotToggle" class="chatbot-toggle">
-            <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M20 2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h4l4 4 4-4h4c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM8 11h1m3 0h1m3 0h1"></path>
-            </svg>
-        </button>
+
+        {{-- Toggle launcher avec étiquette "Kara" affichée à côté --}}
+        <div class="ka-bot-launcher">
+            {{-- Étiquette "Kara — Assistante IA" — se cache après la 1ère ouverture --}}
+            <div class="ka-bot-launcher-label" id="kaBotLabel">
+                <span class="ka-bot-launcher-label-name">Kara</span>
+                <span class="ka-bot-launcher-label-sub">Assistante IA · En ligne</span>
+            </div>
+
+            <button id="chatbotToggle" type="button" class="ka-bot-toggle" aria-label="Ouvrir l'assistante Kara">
+                <svg style="width:26px;height:26px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z"/></svg>
+                <span class="ka-bot-badge" id="kaBotBadge" style="display:none;">1</span>
+            </button>
+        </div>
     </div>
 
     <!-- Overlay pour la sidebar mobile -->
-    <div id="mobileMenuOverlay" class="fixed inset-0 bg-black bg-opacity-60 z-40 opacity-0 invisible transition-all duration-300 md:hidden backdrop-blur-sm"></div>
-    
+    <div id="mobileMenuOverlay" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[998] opacity-0 invisible transition-all duration-300 md:hidden" style="display:none;"></div>
+
     <!-- Overlay pour la sidebar panier mobile -->
-    <div id="mobileCartOverlay" class="fixed inset-0 bg-black bg-opacity-60 z-40 opacity-0 invisible transition-all duration-300 md:hidden backdrop-blur-sm"></div>
-    
+    <div id="mobileCartOverlay" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[998] opacity-0 invisible transition-all duration-300 md:hidden" style="display:none;"></div>
+
     <!-- Mobile Sidebar -->
-    <div id="mobileMenu" class="fixed top-0 right-0 h-full w-80 bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out md:hidden border-l border-gray-200" style="background-color: #ffffff !important;">
+    <div id="mobileMenu" class="fixed top-0 right-0 h-full w-[85%] max-w-[360px] bg-white shadow-2xl z-[999] transform translate-x-full transition-transform duration-300 ease-out md:hidden border-l border-slate-200">
         <!-- Sidebar Header -->
-        <div class="sidebar-header bg-gradient-to-r from-kardafrica-primary to-kardafrica-secondary p-6 text-white">
-            <div class="flex items-center justify-between">
-                <div class="flex items-center space-x-3">
-                    <img src="{{ asset('assets/logo/FAVCON-KARDAFRICA-.png') }}" alt="Logo" class="w-10 h-10">
-                    <div>
-                        <h2 class="font-bold text-lg">Kardafrica</h2>
-                        <p class="text-sm opacity-90">Menu Navigation</p>
-                    </div>
-                </div>
-                <button id="closeMobileMenu" class="p-2 hover:bg-white/20 rounded-lg transition-all duration-200">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                    </svg>
+        <div class="sidebar-header bg-gradient-to-br from-[#1F2937] to-[#0F172A] px-5 py-5 text-white relative overflow-hidden">
+            <div class="absolute -top-12 -right-12 w-40 h-40 bg-[#44A08D]/20 rounded-full blur-3xl"></div>
+            <div class="relative flex items-center justify-between">
+                <a href="{{ route('home') }}" class="flex items-center gap-2.5">
+                    <img src="{{ asset('assets/logo/FAVCON-KARDAFRICA-.png') }}" alt="Logo" class="w-9 h-9">
+                    <span class="font-display text-xl font-bold tracking-tight">KardAfrica</span>
+                </a>
+                <button id="closeMobileMenu" class="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-white/10 active:scale-95 transition" aria-label="Fermer">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
             </div>
         </div>
-        
+
         <!-- Sidebar Content -->
-        <div class="sidebar-content flex-1 overflow-y-auto px-4 py-6 space-y-4 h-[calc(100vh-200px)]" style="background-color: #ffffff !important;">
-            <a href="{{ route('home') }}" class="sidebar-item flex items-center space-x-3 text-gray-700 hover:text-kardafrica-primary hover:bg-gray-50 px-4 py-3 rounded-xl transition-all duration-200">
-                            <span class="text-xl">🏠</span>
-                            <span class="font-medium">Accueil</span>
-                        </a>
-                        
-            <!-- Menu cartes avec dropdown -->
-            <div class="sidebar-item space-y-2">
-                <button id="mobileCardsBtn" class="w-full flex items-center justify-between text-gray-700 hover:text-kardafrica-primary hover:bg-gray-50 px-4 py-3 rounded-xl transition-all duration-200">
-                    <div class="flex items-center space-x-3">
-                                <span class="text-xl">🎯</span>
-                                <span class="font-medium">Cartes</span>
-                            </div>
-                    <svg id="mobileCardsIcon" class="w-5 h-5 transform transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                    </svg>
-                </button>
-                <div id="mobileCardsSubmenu" class="ml-8 space-y-1 max-h-0 overflow-hidden transition-all duration-300">
-                                <a href="{{ route('boutique') }}" class="flex items-center space-x-3 text-gray-600 hover:text-kardafrica-primary hover:bg-gray-50 px-4 py-2 rounded-lg transition-all duration-200">
-                                    <span class="text-lg">🎮</span>
-                                    <span>Gaming</span>
-                                </a>
-                                <a href="{{ route('boutique') }}" class="flex items-center space-x-3 text-gray-600 hover:text-kardafrica-primary hover:bg-gray-50 px-4 py-2 rounded-lg transition-all duration-200">
-                                    <span class="text-lg">🎬</span>
-                                    <span>Streaming</span>
-                                </a>
-                                <a href="{{ route('boutique') }}" class="flex items-center space-x-3 text-gray-600 hover:text-kardafrica-primary hover:bg-gray-50 px-4 py-2 rounded-lg transition-all duration-200">
-                                    <span class="text-lg">🍎</span>
-                                    <span>Apple Store</span>
-                                </a>
-                                <a href="{{ route('boutique') }}" class="flex items-center space-x-3 text-gray-600 hover:text-kardafrica-primary hover:bg-gray-50 px-4 py-2 rounded-lg transition-all duration-200">
-                                    <span class="text-lg">🛍️</span>
-                                    <span>Shopping</span>
-                                </a>
-                                <a href="{{ route('boutique') }}" class="flex items-center space-x-3 text-gray-600 hover:text-kardafrica-primary hover:bg-gray-50 px-4 py-2 rounded-lg transition-all duration-200">
-                                    <span class="text-lg">✈️</span>
-                                    <span>Voyage</span>
-                                </a>
-                                <a href="{{ route('boutique') }}" class="flex items-center space-x-3 text-gray-600 hover:text-kardafrica-primary hover:bg-gray-50 px-4 py-2 rounded-lg transition-all duration-200">
-                                    <span class="text-lg">🚀</span>
-                                    <span>Crypto</span>
-                                </a>
-                                <a href="{{ route('boutique') }}" class="flex items-center space-x-3 text-kardafrica-primary hover:bg-gray-50 px-4 py-2 rounded-lg transition-all duration-200 font-semibold">
-                                    <span class="text-lg">🔥</span>
-                                    <span>Voir toutes les cartes</span>
-                                </a>
-                            </div>
-                        </div>
-                        
-            <a href="{{ route('about') }}" class="sidebar-item flex items-center space-x-3 text-gray-700 hover:text-kardafrica-primary hover:bg-gray-50 px-4 py-3 rounded-xl transition-all duration-200">
-                            <span class="text-xl">ℹ️</span>
-                            <span class="font-medium">À propos</span>
-                        </a>
-                        
-            <a href="{{ route('contact') }}" class="sidebar-item flex items-center space-x-3 text-gray-700 hover:text-kardafrica-primary hover:bg-gray-50 px-4 py-3 rounded-xl transition-all duration-200">
-                <span class="text-xl">📞</span>
-                <span class="font-medium">Contact</span>
-            </a>
-            
-            <a href="{{ route('support') }}" class="sidebar-item flex items-center space-x-3 text-gray-700 hover:text-kardafrica-primary hover:bg-gray-50 px-4 py-3 rounded-xl transition-all duration-200">
-                <span class="text-xl">🛠️</span>
-                <span class="font-medium">Support</span>
-            </a>
-            
-            <!-- Informations de contact dans la sidebar -->
-            <div class="border-t border-gray-200 pt-4 mt-6">
-                <div class="px-4 py-3 bg-gray-50 rounded-xl">
-                    <h3 class="font-semibold text-gray-900 mb-3 text-sm">Contact Rapide</h3>
-                    <div class="space-y-2 text-sm">
-                        <a href="mailto:hello@kardafrica.com" class="flex items-center space-x-2 text-gray-600 hover:text-kardafrica-primary">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
-                            </svg>
-                            <span>hello@kardafrica.com</span>
-                        </a>
-                        <a href="tel:+221XXXXXXXXX" class="flex items-center space-x-2 text-gray-600 hover:text-kardafrica-primary">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path>
-                            </svg>
-                            <span>+221 XX XXX XX XX</span>
+        <div class="sidebar-content flex-1 overflow-y-auto px-3 py-4 h-[calc(100vh-180px)] bg-white">
+
+            {{-- Nav links --}}
+            <nav class="space-y-1">
+                <a href="{{ route('home') }}" class="sidebar-item flex items-center gap-3 px-3 py-3 rounded-xl text-slate-700 hover:bg-slate-50 hover:text-[#44A08D] transition group">
+                    <div class="w-9 h-9 rounded-lg bg-slate-100 group-hover:bg-teal-50 flex items-center justify-center text-slate-600 group-hover:text-[#44A08D] transition">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+                    </div>
+                    <span class="font-medium text-sm">Accueil</span>
+                </a>
+
+                <a href="{{ route('boutique') }}" class="sidebar-item flex items-center gap-3 px-3 py-3 rounded-xl text-slate-700 hover:bg-slate-50 hover:text-[#44A08D] transition group">
+                    <div class="w-9 h-9 rounded-lg bg-slate-100 group-hover:bg-teal-50 flex items-center justify-center text-slate-600 group-hover:text-[#44A08D] transition">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
+                    </div>
+                    <span class="font-medium text-sm">Boutique</span>
+                </a>
+
+                {{-- Menu cartes avec dropdown --}}
+                <div class="sidebar-item">
+                    <button id="mobileCardsBtn" class="w-full flex items-center justify-between gap-3 px-3 py-3 rounded-xl text-slate-700 hover:bg-slate-50 transition group">
+                        <span class="flex items-center gap-3">
+                            <span class="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center text-slate-600 transition">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
+                            </span>
+                            <span class="font-medium text-sm">Catalogue</span>
+                        </span>
+                        <svg id="mobileCardsIcon" class="w-4 h-4 text-slate-400 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
+                    <div id="mobileCardsSubmenu" class="ml-12 mt-1 space-y-0.5 max-h-0 overflow-hidden transition-all duration-300">
+                        @foreach ([
+                            ['Streaming',  'film',         1],
+                            ['Gaming',     'gamepad',      2],
+                            ['Musique',    'music',        3],
+                            ['Shopping',   'shopping-bag', 4],
+                            ['Daywatch',   'tv',           5],
+                            ['Voyage',     'plane',        6],
+                        ] as [$label, $icon, $catId])
+                            <a href="{{ route('category', $catId) }}" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-50 hover:text-[#44A08D] text-sm transition">
+                                <span class="text-[#44A08D]">
+                                    @switch($icon)
+                                        @case('film')         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 4h16a1 1 0 011 1v14a1 1 0 01-1 1H4a1 1 0 01-1-1V5a1 1 0 011-1z"/></svg>@break
+                                        @case('gamepad')      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>@break
+                                        @case('music')        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2z"/></svg>@break
+                                        @case('shopping-bag') <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>@break
+                                        @case('tv')           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25m18 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m18 0V12a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 12V5.25"/></svg>@break
+                                        @case('plane')        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l3-3 4 4 8-8 3 3-11 11-4-4-3-3z"/></svg>@break
+                                    @endswitch
+                                </span>
+                                {{ $label }}
                             </a>
-                        </div>
+                        @endforeach
+                    </div>
+                </div>
+
+                <a href="{{ url('/#how-it-works') }}" class="sidebar-item flex items-center gap-3 px-3 py-3 rounded-xl text-slate-700 hover:bg-slate-50 hover:text-[#44A08D] transition group">
+                    <div class="w-9 h-9 rounded-lg bg-slate-100 group-hover:bg-teal-50 flex items-center justify-center text-slate-600 group-hover:text-[#44A08D] transition">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    </div>
+                    <span class="font-medium text-sm">Comment ça marche</span>
+                </a>
+
+                <a href="{{ route('support') }}" class="sidebar-item flex items-center gap-3 px-3 py-3 rounded-xl text-slate-700 hover:bg-slate-50 hover:text-[#44A08D] transition group">
+                    <div class="w-9 h-9 rounded-lg bg-slate-100 group-hover:bg-teal-50 flex items-center justify-center text-slate-600 group-hover:text-[#44A08D] transition">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M18.364 5.636a9 9 0 010 12.728m0 0l-2.829-2.829m2.829 2.829L21 21M15.536 8.464a5 5 0 010 7.072m0 0l-2.829-2.829m-4.243 2.829a4.978 4.978 0 01-1.414-2.83m-1.414 5.658a9 9 0 01-2.167-9.238m7.824 2.167a1 1 0 111.414 1.414m-1.414-1.414L3 3m8.293 8.293l1.414 1.414"/></svg>
+                    </div>
+                    <span class="font-medium text-sm">Support 24/7</span>
+                </a>
+
+                <a href="{{ route('about') }}" class="sidebar-item flex items-center gap-3 px-3 py-3 rounded-xl text-slate-700 hover:bg-slate-50 hover:text-[#44A08D] transition group">
+                    <div class="w-9 h-9 rounded-lg bg-slate-100 group-hover:bg-teal-50 flex items-center justify-center text-slate-600 group-hover:text-[#44A08D] transition">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    </div>
+                    <span class="font-medium text-sm">À propos</span>
+                </a>
+            </nav>
+
+            {{-- Quick contact --}}
+            <div class="mt-6 pt-6 border-t border-slate-100">
+                <div class="px-2">
+                    <p class="text-[10px] uppercase tracking-wider font-bold text-slate-400 mb-3">Contact rapide</p>
+                    <div class="space-y-2">
+                        <a href="mailto:hello@kardafrica.com" class="flex items-center gap-2 text-xs text-slate-600 hover:text-[#44A08D] transition">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                            hello@kardafrica.com
+                        </a>
+                        <a href="tel:+241000000" class="flex items-center gap-2 text-xs text-slate-600 hover:text-[#44A08D] transition">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+                            +241 00 00 00 00
+                        </a>
                     </div>
                 </div>
             </div>
+        </div>
         
         <!-- Sidebar Footer -->
-        <div class="border-t border-gray-200 p-4" style="background-color: #ffffff !important;">
-            <button id="mobileAuthBtn" class="w-full flex items-center justify-center space-x-3 bg-kardafrica-secondary text-white px-6 py-3 rounded-xl font-medium hover-kardafrica shadow-lg transition-all duration-300">
-                <span class="text-xl">👤</span>
-                <span>Connexion</span>
-            </button>
+        <div class="border-t border-slate-100 p-3 bg-white">
+            @auth
+            <div class="space-y-1">
+                <div class="px-3 py-2.5 rounded-xl bg-slate-50 mb-2 flex items-center gap-3">
+                    <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-[#4ECDC4] to-[#44A08D] flex items-center justify-center overflow-hidden">
+                        @if(optional(Auth::user()->profile)->avatar)
+                            <img src="{{ Auth::user()->profile->avatar }}" alt="{{ Auth::user()->name }}" class="w-full h-full object-cover">
+                        @else
+                            <span class="text-white font-bold text-xs">{{ strtoupper(substr(Auth::user()->name, 0, 1)) }}</span>
+                        @endif
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-semibold text-slate-900 truncate">{{ Auth::user()->name }}</p>
+                        <p class="text-[11px] text-slate-500 truncate">{{ Auth::user()->email }}</p>
+                    </div>
+                </div>
+
+                <a href="{{ route('profile.show') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-700 hover:bg-slate-50 hover:text-[#44A08D] transition group">
+                    <div class="w-7 h-7 rounded-md bg-slate-100 group-hover:bg-teal-50 flex items-center justify-center text-slate-600 group-hover:text-[#44A08D] transition">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                    </div>
+                    <span class="text-sm font-medium">Mon profil</span>
+                </a>
+
+                <a href="{{ route('cards.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-700 hover:bg-slate-50 hover:text-[#44A08D] transition group">
+                    <div class="w-7 h-7 rounded-md bg-slate-100 group-hover:bg-teal-50 flex items-center justify-center text-slate-600 group-hover:text-[#44A08D] transition">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
+                    </div>
+                    <span class="text-sm font-medium">Mes cartes</span>
+                </a>
+
+                <a href="{{ url('/orders') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-700 hover:bg-slate-50 hover:text-[#44A08D] transition group">
+                    <div class="w-7 h-7 rounded-md bg-slate-100 group-hover:bg-teal-50 flex items-center justify-center text-slate-600 group-hover:text-[#44A08D] transition">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                    </div>
+                    <span class="text-sm font-medium">Mes commandes</span>
+                </a>
+
+                <form method="POST" action="{{ route('logout') }}">
+                    @csrf
+                    <button type="submit" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-rose-600 hover:bg-rose-50 transition group">
+                        <div class="w-7 h-7 rounded-md bg-rose-50 group-hover:bg-rose-100 flex items-center justify-center transition">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+                        </div>
+                        <span class="text-sm font-medium">Déconnexion</span>
+                    </button>
+                </form>
             </div>
+            @else
+            <button id="mobileAuthBtn" @click="$dispatch('open-auth-modal'); $dispatch('set-auth-view', { view: 'login' })"
+                    class="w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-[#44A08D] hover:bg-[#3d9180] text-white text-sm font-semibold shadow-lg shadow-[#44A08D]/25 active:scale-95 transition">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                Connexion
+            </button>
+            @endauth
+        </div>
             </div>
     
     <!-- Mobile Cart Sidebar -->
     <div id="mobileCartSidebar" class="fixed top-0 right-0 h-full w-80 bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out md:hidden border-l border-gray-200" style="background-color: #ffffff !important;">
         <!-- Cart Sidebar Header -->
-        <div class="sidebar-header bg-gradient-to-r from-kardafrica-primary to-kardafrica-secondary p-6 text-white">
+        <div class="sidebar-header bg-[#1F2937] p-6 text-white">
             <div class="flex items-center justify-between">
                 <div class="flex items-center space-x-3">
                     <div class="bg-white/20 p-2 rounded-lg backdrop-blur-sm">
@@ -1584,47 +2029,190 @@
             
             <!-- Boutons d'action -->
             <div class="space-y-3">
-                <button class="w-full border-2 border-gray-300 text-gray-700 py-3 px-4 rounded-xl font-medium hover:bg-gray-50 hover:border-gray-400 transition-all duration-300 flex items-center justify-center space-x-2">
+                <a href="{{ route('cart.index') }}" class="w-full border-2 border-gray-300 text-gray-700 py-3 px-4 rounded-xl font-medium hover:bg-gray-50 hover:border-gray-400 transition-all duration-300 flex items-center justify-center space-x-2">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
                         <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
-            </svg>
+                    </svg>
                     <span>Voir détails</span>
-                </button>
-                <button class="w-full bg-kardafrica-primary text-white py-3 px-4 rounded-xl font-semibold hover-kardafrica shadow-lg flex items-center justify-center space-x-2">
+                </a>
+                <button onclick="startPayment()" class="w-full bg-kardafrica-primary text-white py-3 px-4 rounded-xl font-semibold hover-kardafrica shadow-lg flex items-center justify-center space-x-2">
                     <svg class="w-5 h-5" fill="none" stroke="white" viewBox="0 0 24 24" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path>
                     </svg>
                     <span>Commander maintenant</span>
-        </button>
+                </button>
             </div>
         </div>
     </div>
 
     <!-- Footer -->
-    <footer class="bg-gray-800 text-white py-12">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-                <div>
-                    <h3 class="text-lg font-semibold mb-4">Kardafrica</h3>
-                    <p class="text-gray-300">La plateforme de référence pour les cartes numériques en Afrique.</p>
-                </div>
-                <div>
-                    <h3 class="text-lg font-semibold mb-4">Liens utiles</h3>
-                    <ul class="space-y-2 text-gray-300">
-                        <li><a href="#" class="hover:text-white">À propos</a></li>
-                        <li><a href="#" class="hover:text-white">Contact</a></li>
-                        <li><a href="#" class="hover:text-white">Support</a></li>
-                    </ul>
-                </div>
-                <div>
-                    <h3 class="text-lg font-semibold mb-4">Contact</h3>
-                    <p class="text-gray-300">Email: hello@kardafrica.com</p>
-                    <p class="text-gray-300">Téléphone: +221 XX XXX XX XX</p>
+    <footer class="relative bg-[#0F172A] text-slate-300 overflow-hidden">
+        {{-- Glow ambient en haut --}}
+        <div class="pointer-events-none absolute -top-32 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-[#44A08D]/10 rounded-full blur-3xl"></div>
+
+        {{-- ===== Newsletter strip ===== --}}
+        <div class="relative border-b border-white/5">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+                <div class="grid md:grid-cols-2 gap-6 items-center">
+                    <div>
+                        <h3 class="font-display text-2xl md:text-3xl font-bold text-white tracking-tight">
+                            Promos & nouvelles cartes
+                            <span class="block text-[#4ECDC4]">droit dans ta boîte mail.</span>
+                        </h3>
+                        <p class="text-sm text-slate-400 mt-2">Une newsletter par semaine. Pas de spam, désinscription en un clic.</p>
+                    </div>
+                    <div x-data="newsletterForm()">
+                        <form @submit.prevent="submit()" data-no-loader class="flex flex-col sm:flex-row gap-2">
+                            @csrf
+                            <div class="flex-1 flex items-center bg-white/[0.06] rounded-xl border border-white/10 focus-within:border-[#4ECDC4]/50 transition px-3.5"
+                                 :class="{ 'border-rose-400/60': error, 'border-emerald-400/60': success }">
+                                <svg class="w-4 h-4 text-slate-400 mr-2 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                                <input type="email" x-model="email" :disabled="loading || success" required placeholder="ton.email@exemple.com"
+                                       class="bg-transparent border-0 text-white placeholder-slate-500 focus:ring-0 w-full text-sm py-3 focus:outline-none disabled:opacity-50">
+                            </div>
+                            <button type="submit" :disabled="loading || success || !email"
+                                    class="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-[#44A08D] hover:bg-[#3d9180] text-white text-sm font-semibold shadow-lg shadow-[#44A08D]/30 active:scale-95 transition disabled:opacity-60 disabled:cursor-not-allowed">
+                                <svg x-show="loading" x-cloak class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                                </svg>
+                                <svg x-show="success" x-cloak class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                                <span x-show="!loading && !success">S'inscrire</span>
+                                <span x-show="loading" x-cloak>Inscription...</span>
+                                <span x-show="success" x-cloak>Inscrit !</span>
+                            </button>
+                        </form>
+                        <p x-show="message" x-cloak x-transition.opacity class="mt-2 text-xs"
+                           :class="error ? 'text-rose-300' : 'text-emerald-300'"
+                           x-text="message"></p>
+                    </div>
                 </div>
             </div>
-            <div class="border-t border-gray-700 mt-8 pt-8 text-center text-gray-400">
-                <p>&copy; 2025 Kardafrica. Tous droits réservés.</p>
+        </div>
+
+        {{-- ===== Main columns ===== --}}
+        <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+            <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-8">
+
+                {{-- Brand col (2 cols sur lg) --}}
+                <div class="col-span-2 lg:col-span-2">
+                    <a href="{{ route('home') }}" class="inline-flex items-center gap-2.5">
+                        <img src="{{ asset('assets/logo/FAVCON-KARDAFRICA-.png') }}" class="w-10 h-10" alt="KardAfrica">
+                        <span class="font-display text-2xl font-bold text-white tracking-tight">KardAfrica</span>
+                    </a>
+                    <p class="mt-4 text-sm text-slate-400 leading-relaxed max-w-sm">
+                        La marketplace n°1 de cartes cadeaux numériques en Afrique. Plus de 300 marques, paiement Mobile Money, livraison instantanée.
+                    </p>
+
+                    {{-- Social links --}}
+                    <div class="mt-6 flex items-center gap-2">
+                        @foreach ([
+                            ['name' => 'Facebook',  'href' => '#', 'path' => 'M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z'],
+                            ['name' => 'Twitter',   'href' => '#', 'path' => 'M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723c-.951.555-2.005.959-3.127 1.184a4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.827 4.996 4.996 0 01-2.212.085 4.936 4.936 0 004.604 3.417 9.867 9.867 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.053 0 13.998-7.496 13.998-13.985 0-.21 0-.42-.015-.63A9.935 9.935 0 0024 4.59z'],
+                            ['name' => 'Instagram', 'href' => '#', 'path' => 'M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z'],
+                            ['name' => 'LinkedIn',  'href' => '#', 'path' => 'M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z'],
+                        ] as $social)
+                            <a href="{{ $social['href'] }}"
+                               aria-label="{{ $social['name'] }}"
+                               class="w-9 h-9 rounded-lg bg-white/[0.06] hover:bg-[#44A08D] border border-white/10 hover:border-[#44A08D] flex items-center justify-center text-slate-400 hover:text-white transition active:scale-95">
+                                <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="{{ $social['path'] }}"/></svg>
+                            </a>
+                        @endforeach
+                    </div>
+                </div>
+
+                {{-- Catalogue --}}
+                <div>
+                    <h4 class="text-white text-sm font-bold uppercase tracking-wider mb-4">Catalogue</h4>
+                    <ul class="space-y-2.5 text-sm">
+                        <li><a href="{{ route('boutique') }}" class="hover:text-[#4ECDC4] transition">Toutes les cartes</a></li>
+                        <li><a href="{{ route('category', 1) }}" class="hover:text-[#4ECDC4] transition">Streaming</a></li>
+                        <li><a href="{{ route('category', 2) }}" class="hover:text-[#4ECDC4] transition">Gaming</a></li>
+                        <li><a href="{{ route('category', 3) }}" class="hover:text-[#4ECDC4] transition">Musique</a></li>
+                        <li><a href="{{ route('category', 4) }}" class="hover:text-[#4ECDC4] transition">Shopping</a></li>
+                    </ul>
+                </div>
+
+                {{-- Aide --}}
+                <div>
+                    <h4 class="text-white text-sm font-bold uppercase tracking-wider mb-4">Aide</h4>
+                    <ul class="space-y-2.5 text-sm">
+                        <li><a href="{{ url('/#how-it-works') }}" class="hover:text-[#4ECDC4] transition">Comment ça marche</a></li>
+                        <li><a href="{{ route('support') }}" class="hover:text-[#4ECDC4] transition">Support 24/7</a></li>
+                        <li><a href="{{ route('contact') }}" class="hover:text-[#4ECDC4] transition">Nous contacter</a></li>
+                        <li><a href="#" class="hover:text-[#4ECDC4] transition">FAQ</a></li>
+                        <li><a href="#" class="hover:text-[#4ECDC4] transition">Suivi de commande</a></li>
+                    </ul>
+                </div>
+
+                {{-- Légal --}}
+                <div>
+                    <h4 class="text-white text-sm font-bold uppercase tracking-wider mb-4">Légal</h4>
+                    <ul class="space-y-2.5 text-sm">
+                        <li><a href="{{ route('about') }}" class="hover:text-[#4ECDC4] transition">À propos</a></li>
+                        <li><a href="#" class="hover:text-[#4ECDC4] transition">Conditions d'utilisation</a></li>
+                        <li><a href="#" class="hover:text-[#4ECDC4] transition">Politique de confidentialité</a></li>
+                        <li><a href="#" class="hover:text-[#4ECDC4] transition">Mentions légales</a></li>
+                        <li><a href="#" class="hover:text-[#4ECDC4] transition">Cookies</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            {{-- Contact strip --}}
+            <div class="mt-12 pt-8 border-t border-white/5 grid md:grid-cols-3 gap-6">
+                <a href="mailto:hello@kardafrica.com" class="flex items-center gap-3 group">
+                    <div class="w-10 h-10 rounded-xl bg-white/[0.06] border border-white/10 flex items-center justify-center text-[#4ECDC4] group-hover:bg-[#44A08D] group-hover:text-white group-hover:border-[#44A08D] transition">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                    </div>
+                    <div>
+                        <div class="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Email</div>
+                        <div class="text-sm text-white font-medium">hello@kardafrica.com</div>
+                    </div>
+                </a>
+                <a href="tel:+241000000" class="flex items-center gap-3 group">
+                    <div class="w-10 h-10 rounded-xl bg-white/[0.06] border border-white/10 flex items-center justify-center text-[#4ECDC4] group-hover:bg-[#44A08D] group-hover:text-white group-hover:border-[#44A08D] transition">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+                    </div>
+                    <div>
+                        <div class="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Téléphone</div>
+                        <div class="text-sm text-white font-medium">+241 00 00 00 00</div>
+                    </div>
+                </a>
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-white/[0.06] border border-white/10 flex items-center justify-center text-[#4ECDC4]">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0zM15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                    </div>
+                    <div>
+                        <div class="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Adresse</div>
+                        <div class="text-sm text-white font-medium">Libreville, Gabon</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {{-- ===== Bottom bar ===== --}}
+        <div class="relative border-t border-white/5">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="text-xs text-slate-500">
+                    &copy; {{ date('Y') }} KardAfrica. Tous droits réservés. Conçu avec
+                    <span class="text-rose-500">♥</span>
+                    en Afrique.
+                </p>
+
+                {{-- Moyens de paiement --}}
+                <div class="flex items-center gap-3">
+                    <span class="text-[10px] uppercase tracking-wider text-slate-500 font-bold mr-2">Paiement</span>
+                    @foreach ([
+                        ['name' => 'Airtel Money',   'bg' => 'bg-rose-600'],
+                        ['name' => 'Moov Money',     'bg' => 'bg-blue-600'],
+                        ['name' => 'Visa',           'bg' => 'bg-indigo-700'],
+                    ] as $pay)
+                        <div class="px-2.5 py-1.5 rounded-md {{ $pay['bg'] }} text-white text-[10px] font-bold tracking-tight" title="{{ $pay['name'] }}">
+                            {{ strtoupper(substr($pay['name'], 0, 4)) }}
+                        </div>
+                    @endforeach
+                </div>
             </div>
         </div>
     </footer>
@@ -1708,6 +2296,11 @@
             const forms = document.querySelectorAll('form');
             forms.forEach(function(form) {
                 form.addEventListener('submit', function(e) {
+                    // Ignorer les formulaires avec l'attribut data-no-loader
+                    if (form.hasAttribute('data-no-loader')) {
+                        return;
+                    }
+
                     if (form.querySelector('input[name="search"]')) {
                         showLoader('Recherche en cours...');
                     } else {
@@ -1731,13 +2324,10 @@
             
             function handleScroll() {
                 const scrolled = window.pageYOffset;
-                const rate = scrolled * -0.5;
                 
                 if (scrolled > 50) {
-                    navbar.style.background = 'rgba(78, 205, 196, 0.98)';
                     navbar.style.boxShadow = '0 8px 32px rgba(0, 0, 0, 0.2)';
                 } else {
-                    navbar.style.background = 'rgba(78, 205, 196, 0.95)';
                     navbar.style.boxShadow = '0 8px 32px rgba(0, 0, 0, 0.1)';
                 }
             }
@@ -1816,8 +2406,12 @@
                     });
                     
                     // Update dots
-                    dots.forEach(dot => dot.classList.remove('active'));
-                    dots[index].classList.add('active');
+                    if (dots.length > 0) {
+                        dots.forEach(dot => dot.classList.remove('active'));
+                        if (dots[index]) {
+                            dots[index].classList.add('active');
+                        }
+                    }
                     
                     // Reset current slide
                     currentSlide = index;
@@ -1946,7 +2540,59 @@
         });
         
         // Cart and Chatbot functionality
+        // Currency conversion — taux EUR/USD/AED viennent de la BDD (admin),
+        // les autres restent figés en client. Synchronisé avec App\Support\Money
+        // via Blade : si l'admin change EUR=750 → 800, le rendu suivant l'utilise.
+        const EXCHANGE_RATES = @json(\App\Support\Money::currentRates());
+        const FCFA_ROUND_STEP = {{ \App\Support\Money::roundStep() }};
+
+        // Convert to FCFA (applique le même arrondi vers le haut que côté serveur).
+        function convertToFCFA(amount, currencyCode) {
+            if (!currencyCode) return amount;
+            const rate = EXCHANGE_RATES[currencyCode.toUpperCase()] || 0;
+            if (rate === 0) return amount;
+            const converted = amount * rate;
+            if (FCFA_ROUND_STEP <= 1) return Math.ceil(converted);
+            // Arrondi au plus haut multiple de FCFA_ROUND_STEP (1016 → 1100)
+            return Math.ceil(converted / FCFA_ROUND_STEP) * FCFA_ROUND_STEP;
+        }
+
+        // Format as FCFA
+        function formatFCFA(amount) {
+            return new Intl.NumberFormat('fr-FR', {
+                style: 'currency',
+                currency: 'XAF',
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0
+            }).format(amount).replace('XAF', 'FCFA');
+        }
+
+        // Expose globally
+        window.convertToFCFA = convertToFCFA;
+        window.formatFCFA = formatFCFA;
+        
+        // Auto-convert prices
+        function updatePrices() {
+            document.querySelectorAll('.price-display').forEach(el => {
+                // Avoid double conversion if already processed (optional check)
+                if (el.dataset.processed === 'true') return;
+                
+                const price = parseFloat(el.dataset.price);
+                const currency = el.dataset.currency;
+                
+                if (!isNaN(price) && currency) {
+                    const converted = convertToFCFA(price, currency);
+                    el.textContent = formatFCFA(converted);
+                    el.dataset.processed = 'true';
+                }
+            });
+        }
+        window.updatePrices = updatePrices;
+        
         document.addEventListener('DOMContentLoaded', function() {
+            // Run price update on load
+            updatePrices();
+
             // Mobile sidebar functionality
             const mobileMenuBtn = document.getElementById('mobileMenuBtn');
             const mobileMenu = document.getElementById('mobileMenu');
@@ -2102,146 +2748,253 @@
                 });
             }
             
-            // Cart functionality
-            const cartBtn = document.getElementById('cartBtn');
-            const cartBtnMobile = document.getElementById('cartBtnMobile');
-            const cartDropdown = document.getElementById('cartDropdown');
-            const cartCount = document.getElementById('cartCount');
-            const cartCountMobile = document.getElementById('cartCountMobile');
+            // Auto-convert prices on load (Removed from here, moved to global scope)
+            // updatePrices();
             
-            // Éléments de la sidebar panier mobile
+            // Expose updatePrices for dynamic content (Removed from here)
+            // window.updatePrices = updatePrices;
+
+        }); // End of previous DOMContentLoaded
+
+        // Global Cart Variables and Functions
+        let cart = [];
+        
+        function getCsrfToken() {
+            return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+        }
+
+        function isMobile() {
+            return window.innerWidth <= 768;
+        }
+
+        async function fetchCart() {
+            try {
+                const response = await fetch('{{ route("api.cart.index") }}');
+                const data = await response.json();
+                cart = data.items;
+                updateCartDisplay(data);
+            } catch (error) {
+                console.error('Erreur lors de la récupération du panier:', error);
+            }
+        }
+
+        async function addToCart(productId, name, price, imageUrl = null) {
+            try {
+                const csrfToken = getCsrfToken();
+                const response = await fetch('{{ route("api.cart.add") }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        product_id: productId,
+                        name: name,
+                        price: price,
+                        image_url: imageUrl,
+                        quantity: 1
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    window.dispatchEvent(new CustomEvent('cart-updated', { detail: data }));
+                    
+                    if (isMobile()) {
+                        openMobileCartSidebar();
+                    } else {
+                        window.dispatchEvent(new CustomEvent('open-cart-dropdown'));
+                    }
+                }
+            } catch (error) {
+                console.error('Erreur lors de l\'ajout au panier:', error);
+            }
+        }
+
+        async function removeFromCart(id) {
+            try {
+                const csrfToken = getCsrfToken();
+                const response = await fetch(`/api/cart/${id}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'X-CSRF-TOKEN': csrfToken,
+                        'Accept': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    window.dispatchEvent(new CustomEvent('cart-updated', { detail: data }));
+                }
+            } catch (error) {
+                console.error('Erreur lors de la suppression du panier:', error);
+            }
+        }
+
+        function openMobileCartSidebar() {
             const mobileCartSidebar = document.getElementById('mobileCartSidebar');
             const mobileCartOverlay = document.getElementById('mobileCartOverlay');
-            const closeMobileCart = document.getElementById('closeMobileCart');
+            
+            if (mobileCartSidebar && mobileCartOverlay) {
+                document.body.classList.add('mobile-cart-open');
+                mobileCartOverlay.classList.add('show');
+                mobileCartOverlay.style.display = 'block';
+                mobileCartSidebar.classList.add('show');
+                setTimeout(() => {
+                    mobileCartOverlay.style.opacity = '1';
+                    mobileCartOverlay.style.visibility = 'visible';
+                }, 10);
+            }
+        }
+
+        function closeMobileCartSidebar() {
+            const mobileCartSidebar = document.getElementById('mobileCartSidebar');
+            const mobileCartOverlay = document.getElementById('mobileCartOverlay');
+            
+            if (mobileCartSidebar && mobileCartOverlay) {
+                document.body.classList.remove('mobile-cart-open');
+                mobileCartSidebar.classList.remove('show');
+                mobileCartOverlay.classList.remove('show');
+                mobileCartOverlay.style.opacity = '0';
+                mobileCartOverlay.style.visibility = 'hidden';
+                setTimeout(() => {
+                    mobileCartOverlay.style.display = 'none';
+                }, 300);
+            }
+        }
+
+        function updateCartDisplay(cartData) {
+            const cartCount = document.getElementById('cartCount');
+            const cartCountMobile = document.getElementById('cartCountMobile');
+            const cartCountMobileHeader = document.getElementById('cartCountMobileHeader');
             const mobileCartItems = document.getElementById('mobileCartItems');
             const mobileCartTotal = document.getElementById('mobileCartTotal');
+            const cartTotal = document.getElementById('cartTotal');
+            const cartItems = document.getElementById('cartItems');
+
+            const count = cartData ? (cartData.count || 0) : cart.length;
+
+            if (cartCount) cartCount.textContent = count;
+            if (cartCountMobile) cartCountMobile.textContent = count;
+            if (cartCountMobileHeader) cartCountMobileHeader.textContent = count;
             
-            let cart = JSON.parse(localStorage.getItem('cart')) || [];
-
-
-
-            // Fonction pour détecter si on est en mobile
-            function isMobile() {
-                return window.innerWidth <= 768;
-            }
-
-            // Fonction pour ouvrir la sidebar panier mobile
-            function openMobileCartSidebar() {
-                if (mobileCartSidebar && mobileCartOverlay) {
-                    // Empêcher le scroll du body
-                    document.body.classList.add('mobile-cart-open');
-                    
-                    // Afficher l'overlay avec animation
-                    mobileCartOverlay.classList.add('show');
-                    mobileCartOverlay.style.display = 'block';
-                    
-                    // Afficher la sidebar avec animation
-                    mobileCartSidebar.classList.add('show');
-                    
-                    // Animation avec délai pour les éléments
-                    setTimeout(() => {
-                        mobileCartOverlay.style.opacity = '1';
-                        mobileCartOverlay.style.visibility = 'visible';
-                    }, 10);
-                }
-            }
+            const emptyCartHtml = `
+                        <div class="text-center py-8">
+                            <div class="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+                        <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path>
+                                </svg>
+                            </div>
+                    <p class="text-gray-500 font-medium mb-2">Votre panier est vide</p>
+                    <p class="text-sm text-gray-400">Découvrez nos cartes numériques</p>
+                        </div>
+                    `;
             
-            // Fonction pour fermer la sidebar panier mobile
-            function closeMobileCartSidebar() {
-                if (mobileCartSidebar && mobileCartOverlay) {
-                    // Réactiver le scroll du body
-                    document.body.classList.remove('mobile-cart-open');
-                    
-                    // Masquer la sidebar
-                    mobileCartSidebar.classList.remove('show');
-                    
-                    // Masquer l'overlay avec transition
-                    mobileCartOverlay.classList.remove('show');
-                    mobileCartOverlay.style.opacity = '0';
-                    mobileCartOverlay.style.visibility = 'hidden';
-                    
-                    // Masquer complètement après l'animation
-                    setTimeout(() => {
-                        mobileCartOverlay.style.display = 'none';
-                    }, 300);
-                }
-            }
-            
-            function updateCartDisplay() {
-                const count = cart.length;
-                if (cartCount) cartCount.textContent = count;
-                if (cartCountMobile) cartCountMobile.textContent = count;
-                
-                // Contenu des items (même pour desktop et mobile)
-                const emptyCartHtml = `
-                            <div class="text-center py-8">
-                                <div class="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
-                            <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path>
+            const cartItemsHtml = cart.map(item => `
+                <div class="cart-item flex justify-between items-center p-3 mb-2 bg-white rounded-lg border border-gray-100">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background: linear-gradient(135deg, #4ECDC4 0%, #44A08D 100%);">
+                                    ${item.image_url ? `<img src="${item.image_url}" class="w-full h-full object-cover rounded-lg" />` : 
+                                    `<svg class="w-5 h-5" fill="none" stroke="white" viewBox="0 0 24 24" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path>
+                                    </svg>`}
+                                </div>
+                                <div>
+                            <span class="text-sm font-medium text-gray-900 block truncate w-32">${item.name}</span>
+                            <p class="text-xs text-gray-500">Qté: ${item.quantity}</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                        <span class="text-sm font-bold text-kardafrica-primary">${new Intl.NumberFormat('fr-FR').format(item.price * item.quantity)} FCFA</span>
+                        <button class="remove-from-cart-btn p-1 hover:bg-red-50 rounded transition-all duration-200 text-red-500" data-id="${item.id}">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path>
                                     </svg>
-                                </div>
-                        <p class="text-gray-500 font-medium mb-2">Votre panier est vide</p>
-                        <p class="text-sm text-gray-400">Découvrez nos cartes numériques</p>
+                                </button>
                             </div>
-                        `;
+                        </div>
+                    `).join('');
+            
+            if (cartItems) {
+                cartItems.innerHTML = cart.length === 0 ? emptyCartHtml : cartItemsHtml;
+            }
+            
+            if (mobileCartItems) {
+                mobileCartItems.innerHTML = cart.length === 0 ? emptyCartHtml : cartItemsHtml;
+            }
                 
-                const cartItemsHtml = cart.map(item => `
-                    <div class="cart-item flex justify-between items-center p-3 mb-2 bg-white rounded-lg border border-gray-100">
-                                <div class="flex items-center space-x-3">
-                                    <div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background: linear-gradient(135deg, #4ECDC4 0%, #44A08D 100%);">
-                                        <svg class="w-5 h-5" fill="none" stroke="white" viewBox="0 0 24 24" stroke-width="2">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path>
-                                        </svg>
-                                    </div>
-                                    <div>
-                                <span class="text-sm font-medium text-gray-900">${item.name}</span>
-                                <p class="text-xs text-gray-500">Carte numérique</p>
-                                    </div>
-                                </div>
-                                <div class="flex items-center space-x-2">
-                            <span class="text-sm font-bold text-kardafrica-primary">${new Intl.NumberFormat('fr-FR').format(item.price)} FCFA</span>
-                            <button class="p-1 hover:bg-red-50 rounded transition-all duration-200 text-red-500">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path>
-                                        </svg>
-                                    </button>
-                                </div>
-                            </div>
-                        `).join('');
-                
-                // Update cart items display desktop
-                const cartItems = document.getElementById('cartItems');
-                if (cartItems) {
-                    cartItems.innerHTML = cart.length === 0 ? emptyCartHtml : cartItemsHtml;
-                }
-                
-                // Update cart items display mobile
-                if (mobileCartItems) {
-                    mobileCartItems.innerHTML = cart.length === 0 ? emptyCartHtml : cartItemsHtml;
+            const total = cart.reduce((sum, item) => sum + parseFloat(item.price), 0);
+            const totalText = new Intl.NumberFormat('fr-FR').format(total) + ' FCFA';
+            
+            if (cartTotal) cartTotal.textContent = totalText;
+            
+            if (mobileCartTotal) mobileCartTotal.textContent = totalText;
+
+            document.querySelectorAll('.remove-from-cart-btn').forEach(btn => {
+                btn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const id = this.getAttribute('data-id');
+                    removeFromCart(id);
+                });
+            });
+        }
+
+        // Expose globally
+        window.addToCart = addToCart;
+        window.fetchCart = fetchCart;
+        window.removeFromCart = removeFromCart;
+        window.updateCartDisplay = updateCartDisplay;
+        window.openMobileCartSidebar = openMobileCartSidebar;
+        window.closeMobileCartSidebar = closeMobileCartSidebar;
+
+        // Listen for cart updates
+        window.addEventListener('cart-updated', (e) => {
+            if (e.detail && e.detail.items) {
+                cart = e.detail.items;
+                updateCartDisplay(e.detail);
+            } else {
+                fetchCart();
+            }
+        });
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // Cart functionality (Event Listeners)
+            const cartBtn = document.getElementById('cartBtn');
+            const cartBtnMobile = document.getElementById('cartBtnMobile');
+            const closeMobileCart = document.getElementById('closeMobileCart');
+            const mobileCartOverlay = document.getElementById('mobileCartOverlay');
+            const mobileCartSidebar = document.getElementById('mobileCartSidebar');
+
+            // Global click listener for Add to Cart buttons
+            document.addEventListener('click', function(e) {
+                const btn = e.target.closest('.add-to-cart-btn');
+                if (btn) {
+                    e.preventDefault();
+                    const productId = btn.dataset.productId;
+                    const productName = btn.dataset.productName;
+                    let price = parseFloat(btn.dataset.price);
+                    const currencyCode = btn.dataset.currencyCode;
+                    const imageUrl = btn.dataset.imageUrl;
+                    
+                    if (currencyCode) {
+                        price = convertToFCFA(price, currencyCode);
                     }
                     
-                    // Update total
-                    const total = cart.reduce((sum, item) => sum + parseFloat(item.price), 0);
-                const totalText = new Intl.NumberFormat('fr-FR').format(total) + ' FCFA';
-                
-                    const cartTotal = document.getElementById('cartTotal');
-                if (cartTotal) cartTotal.textContent = totalText;
-                
-                if (mobileCartTotal) mobileCartTotal.textContent = totalText;
-            }
+                    if (productId) {
+                        addToCart(productId, productName, price, imageUrl);
+                    }
+                }
+            });
             
             if (cartBtn) {
                 cartBtn.addEventListener('click', function(e) {
                     e.preventDefault();
                     e.stopPropagation();
                     if (isMobile()) {
-                        // En mobile, ouvrir la sidebar
                         openMobileCartSidebar();
                     } else {
-                        // En desktop, ouvrir le dropdown
-                        if (cartDropdown) {
-                            cartDropdown.classList.toggle('show');
-                        }
+                        window.dispatchEvent(new CustomEvent('toggle-cart-dropdown'));
                     }
                 });
             }
@@ -2250,26 +3003,22 @@
                 cartBtnMobile.addEventListener('click', function(e) {
                     e.preventDefault();
                     e.stopPropagation();
-                    // Toujours ouvrir la sidebar pour le bouton mobile
                     openMobileCartSidebar();
                 });
             }
 
-            // Event listeners pour fermer la sidebar panier mobile
             if (closeMobileCart) {
                 closeMobileCart.addEventListener('click', function() {
                     closeMobileCartSidebar();
                 });
             }
             
-            // Fermer en cliquant sur l'overlay
             if (mobileCartOverlay) {
                 mobileCartOverlay.addEventListener('click', function() {
                     closeMobileCartSidebar();
                 });
             }
             
-            // Fermer avec la touche Escape
             document.addEventListener('keydown', function(e) {
                 if (e.key === 'Escape' && mobileCartSidebar && mobileCartSidebar.classList.contains('show')) {
                     closeMobileCartSidebar();
@@ -2293,12 +3042,10 @@
                     cartCurrentX = e.touches[0].clientX;
                     const diffX = cartCurrentX - cartStartX;
                     
-                    // Permettre uniquement le swipe vers la droite
                     if (diffX > 0) {
-                        const translateValue = Math.min(diffX, 320); // 320px = largeur de la sidebar
+                        const translateValue = Math.min(diffX, 320);
                         mobileCartSidebar.style.transform = `translateX(${translateValue}px)`;
                         
-                        // Ajuster l'opacité de l'overlay
                         const opacity = Math.max(0, 1 - (diffX / 320));
                         if (mobileCartOverlay) {
                             mobileCartOverlay.style.opacity = opacity;
@@ -2312,11 +3059,9 @@
                     
                     const diffX = cartCurrentX - cartStartX;
                     
-                    // Si le swipe dépasse 100px, fermer la sidebar
                     if (diffX > 100) {
                         closeMobileCartSidebar();
                     } else {
-                        // Sinon, remettre en position
                         mobileCartSidebar.style.transform = 'translateX(0)';
                         if (mobileCartOverlay) {
                             mobileCartOverlay.style.opacity = '1';
@@ -2325,22 +3070,8 @@
                 });
             }
             
-            // Close cart when clicking outside (desktop dropdown only)
-            document.addEventListener('click', function(e) {
-                if (cartDropdown && cartBtn && cartBtnMobile) {
-                    if (!cartBtn.contains(e.target) && !cartBtnMobile.contains(e.target) && !cartDropdown.contains(e.target)) {
-                        // Fermer seulement si on n'est pas en mobile (puisque mobile utilise la sidebar)
-                        if (!isMobile()) {
-                        cartDropdown.classList.remove('show');
-                        }
-                    }
-                }
-            });
-
-
-            
             // Initialize cart display
-            updateCartDisplay();
+            fetchCart();
             
             // Section animations on scroll
             const sections = document.querySelectorAll('.section-animate');
@@ -2378,322 +3109,1204 @@
                 brandObserver.observe(item);
             });
             
-            // Chatbot functionality
-            const chatbotToggle = document.getElementById('chatbotToggle');
-            const chatbotWindow = document.getElementById('chatbotWindow');
-            const closeChatbot = document.getElementById('closeChatbot');
-            const chatInput = document.getElementById('chatInput');
-            const sendMessage = document.getElementById('sendMessage');
-            const chatMessages = document.getElementById('chatMessages');
-            
-            function openChatbot() {
-                chatbotWindow.classList.add('show');
-            }
-            
-            function closeChatbotWindow() {
-                chatbotWindow.classList.remove('show');
-            }
-            
-            function addMessage(message, isUser = false) {
-                const messageDiv = document.createElement('div');
-                messageDiv.className = `mb-4 ${isUser ? 'text-right' : ''}`;
-                messageDiv.innerHTML = `
-                    <div class="${isUser ? 'bg-kardafrica-primary text-white ml-8' : 'bg-gray-100 mr-8'} p-3 rounded-lg">
-                        <p class="text-sm">${message}</p>
-                    </div>
-                `;
-                chatMessages.appendChild(messageDiv);
-                chatMessages.scrollTop = chatMessages.scrollHeight;
-            }
-            
-            function sendBotMessage() {
-                const userMessage = chatInput.value.trim();
-                if (userMessage) {
-                    addMessage(userMessage, true);
-                    chatInput.value = '';
-                    
-                    // Simulate bot response
+            // ============================================================
+            //  Assistant Kardafrica — Kara
+            //  - keyword routing avec liens vers les pages internes
+            //  - typing indicator + persistence sessionStorage
+            //  - badge unread sur le launcher
+            // ============================================================
+            (function () {
+                const toggle    = document.getElementById('chatbotToggle');
+                const wnd       = document.getElementById('chatbotWindow');
+                const closeBtn  = document.getElementById('closeChatbot');
+                const input     = document.getElementById('chatInput');
+                const sendBtn   = document.getElementById('sendMessage');
+                const messages  = document.getElementById('chatMessages');
+                const chips     = document.getElementById('kaBotChips');
+                const badge     = document.getElementById('kaBotBadge');
+                if (!toggle || !wnd) return;
+
+                // Routes Laravel exposées au JS
+                const routes = {
+                    boutique:    @json(route('boutique')),
+                    contact:     @json(route('contact')),
+                    support:     @json(route('support')),
+                    about:       @json(route('about')),
+                    cart:        @json(route('cart.index')),
+                    @auth
+                    orders:      @json(route('orders.index')),
+                    cards:       @json(route('cards.index')),
+                    profile:     @json(route('profile.show')),
+                    @endauth
+                    daywatch:    @json(url('/category/5')),
+                    netflix:     @json(url('/boutique?search=Netflix')),
+                    spotify:     @json(url('/boutique?search=Spotify')),
+                    playstation: @json(url('/boutique?search=PlayStation')),
+                };
+                const isAuth = @json(auth()->check());
+
+                // === Knowledge base : intent -> { reply, links?, suggestions? } ===
+                const KB = [
+                    {
+                        keywords: ['bonjour', 'salut', 'hello', 'hi', 'coucou', 'bonsoir', 'hey'],
+                        reply: () => `Bonjour 👋 Je suis Kara, l'assistante de KardAfrica. Comment puis-je t'aider aujourd'hui ?`,
+                        suggestions: ['Voir le catalogue', 'Comment payer ?', 'Délai de livraison'],
+                    },
+                    {
+                        keywords: ['merci', 'thanks', 'thank you', 'super', 'parfait', 'génial'],
+                        reply: () => `Avec plaisir ! N'hésite pas si tu as d'autres questions 😊`,
+                        suggestions: ['Voir mes cartes', 'Contacter le support'],
+                    },
+                    {
+                        keywords: ['catalogue', 'cartes', 'boutique', 'produits', 'marques', 'marque', 'voir', 'shop'],
+                        reply: () => `On a plus de 120 marques disponibles : Netflix, Spotify, Apple, PlayStation, Steam, Amazon… et notre offre locale Daywatch.`,
+                        links: [
+                            { label: 'Toute la boutique →', href: routes.boutique },
+                            { label: 'Daywatch (streaming local)', href: routes.daywatch },
+                        ],
+                        suggestions: ['Comment payer ?', 'Délai de livraison'],
+                    },
+                    {
+                        keywords: ['daywatch', 'streaming local', 'streaming africain'],
+                        reply: () => `Daywatch, c'est notre offre de streaming locale 🇬🇦. Films, séries, sport, kids — paiement Mobile Money en quelques secondes.`,
+                        links: [{ label: 'Voir les abonnements Daywatch →', href: routes.daywatch }],
+                        suggestions: ['Catalogue complet', 'Comment payer ?'],
+                    },
+                    {
+                        keywords: ['netflix'], reply: () => `Cartes Netflix dispo en plusieurs montants !`,
+                        links: [{ label: 'Voir Netflix →', href: routes.netflix }],
+                    },
+                    {
+                        keywords: ['spotify'], reply: () => `Cartes Spotify Premium pour profiter de ta musique en illimité.`,
+                        links: [{ label: 'Voir Spotify →', href: routes.spotify }],
+                    },
+                    {
+                        keywords: ['playstation', 'psn', 'ps5', 'ps4'],
+                        reply: () => `Cartes PlayStation Store pour recharger ton compte PSN.`,
+                        links: [{ label: 'Voir PlayStation →', href: routes.playstation }],
+                    },
+                    {
+                        keywords: ['paiement', 'payer', 'paie', 'mobile money', 'airtel', 'moov', 'visa', 'mastercard', 'carte bancaire', 'comment paye'],
+                        reply: () => `Tu peux payer en :\n• Airtel Money 🟧\n• Moov Money 🟦\n• Visa 💳\n\nTout est sécurisé via notre partenaire Futursowax.`,
+                        suggestions: ['Délai de livraison', 'Mon paiement a échoué'],
+                    },
+                    {
+                        keywords: ['livraison', 'delai', 'délai', 'reçu', 'recu', 'recevoir', 'rapide', 'temps'],
+                        reply: () => `Livraison instantanée ! Le code arrive dans ta boîte mail en moins de 60 secondes après confirmation du paiement, et il est aussi visible dans « Mes cartes ».`,
+                        links: isAuth ? [{ label: 'Voir mes cartes →', href: routes.cards }] : [{ label: 'Se connecter', href: '#', auth: true }],
+                        suggestions: ['Je n\'ai pas reçu mon code', 'Contacter le support'],
+                    },
+                    {
+                        keywords: ['pas reçu', 'pas recu', 'jamais reçu', 'rien reçu', 'manque', 'manquant', 'reçu', 'echoué', 'echouer', 'échec', 'echec'],
+                        reply: () => `Pas de panique 🙂 Vérifie d'abord ton dossier spam. Si rien dans 5 minutes, va dans « Mes commandes » et clique sur « Relancer la livraison ».`,
+                        links: isAuth
+                            ? [{ label: 'Mes commandes →', href: routes.orders }]
+                            : [{ label: 'Centre d\'aide', href: routes.support }],
+                        suggestions: ['Contacter le support', 'Comment payer ?'],
+                    },
+                    {
+                        keywords: ['remboursement', 'rembourser', 'refund', 'annuler', 'annulation'],
+                        reply: () => `Si le débit a eu lieu sans validation de la commande, le montant est remboursé automatiquement sous 24h. Pour toute autre demande, contacte-nous.`,
+                        links: [{ label: 'Contacter le support', href: routes.contact }],
+                    },
+                    {
+                        keywords: ['compte', 'inscription', 'inscrire', 'créer', 'creer', 'register'],
+                        reply: () => isAuth
+                            ? `Tu es déjà connecté ! Tu peux gérer ton compte depuis ton profil.`
+                            : `Crée ton compte en 30 secondes : juste un email + un mot de passe.`,
+                        links: isAuth
+                            ? [{ label: 'Mon profil →', href: routes.profile }]
+                            : [{ label: 'Créer un compte', href: '#', authRegister: true }],
+                    },
+                    {
+                        keywords: ['connexion', 'se connecter', 'login', 'connecter', 'mot de passe', 'oublié'],
+                        reply: () => isAuth
+                            ? `Tu es déjà connecté.`
+                            : `Connecte-toi avec ton email + mot de passe. Mot de passe oublié ? Clique sur « Mot de passe oublié » dans la page de connexion.`,
+                        links: isAuth ? [] : [{ label: 'Se connecter', href: '#', auth: true }],
+                    },
+                    {
+                        keywords: ['panier', 'cart'],
+                        reply: () => `Voici ton panier !`,
+                        links: [{ label: 'Voir le panier →', href: routes.cart }],
+                    },
+                    {
+                        keywords: ['contact', 'humain', 'agent', 'support', 'aide', 'whatsapp', 'téléphone', 'telephone', 'mail', 'email'],
+                        reply: () => `Notre équipe répond en moins d'1h en heures ouvrées. Plusieurs canaux dispo :`,
+                        links: [
+                            { label: 'Email / Formulaire', href: routes.contact },
+                            { label: 'Centre d\'aide', href: routes.support },
+                        ],
+                    },
+                    {
+                        keywords: ['kardafrica', 'qui', 'kard africa', 'à propos', 'a propos', 'about'],
+                        reply: () => `KardAfrica connecte des millions d'Africains aux meilleures plateformes mondiales. Une seule app, paiement Mobile Money, livraison instantanée.`,
+                        links: [{ label: 'En savoir plus →', href: routes.about }],
+                    },
+                ];
+
+                const FALLBACK = {
+                    reply: () => `Je ne suis pas sûre d'avoir bien compris 🤔. Tu peux essayer une question sur les cartes, le paiement ou la livraison — sinon notre équipe support est dispo en moins d'1h !`,
+                    links: [{ label: 'Contacter le support', href: routes.contact }],
+                    suggestions: ['Voir le catalogue', 'Comment payer ?', 'Délai de livraison'],
+                };
+
+                const DEFAULT_CHIPS = ['Voir le catalogue', 'Comment payer ?', 'Délai de livraison', 'Daywatch'];
+                const STORAGE_KEY = 'kardafrica-bot-history';
+                const OPEN_KEY    = 'kardafrica-bot-opened';
+
+                function escapeHtml(s) {
+                    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+                }
+                function formatTime(d) {
+                    return d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+                }
+
+                function renderMessage(text, isUser, links = [], skipPersist = false) {
+                    const wrap = document.createElement('div');
+                    wrap.className = `ka-bot-msg ${isUser ? 'user' : 'bot'}`;
+
+                    const avatar = document.createElement('div');
+                    avatar.className = 'ka-bot-msg-mini-avatar';
+                    if (!isUser) {
+                        avatar.innerHTML = '<svg style="width:14px;height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/></svg>';
+                    } else {
+                        avatar.style.background = '#0F172A';
+                        avatar.style.color = 'white';
+                        avatar.textContent = 'M';
+                    }
+
+                    const bubble = document.createElement('div');
+                    bubble.className = 'ka-bot-msg-bubble';
+                    bubble.innerHTML = escapeHtml(text).replace(/\n/g, '<br/>');
+
+                    if (!isUser && links && links.length > 0) {
+                        const linksWrap = document.createElement('div');
+                        linksWrap.className = 'ka-bot-quick-links';
+                        links.forEach(l => {
+                            const a = document.createElement('a');
+                            a.className = 'ka-bot-quick-link';
+                            a.textContent = l.label;
+                            if (l.auth) {
+                                a.href = '#';
+                                a.addEventListener('click', e => { e.preventDefault(); window.dispatchEvent(new CustomEvent('open-auth-modal')); window.dispatchEvent(new CustomEvent('set-auth-view', { detail: { view: 'login' } })); });
+                            } else if (l.authRegister) {
+                                a.href = '#';
+                                a.addEventListener('click', e => { e.preventDefault(); window.dispatchEvent(new CustomEvent('open-auth-modal')); window.dispatchEvent(new CustomEvent('set-auth-view', { detail: { view: 'register' } })); });
+                            } else {
+                                a.href = l.href;
+                            }
+                            linksWrap.appendChild(a);
+                        });
+                        bubble.appendChild(linksWrap);
+                    }
+
+                    wrap.appendChild(avatar);
+                    wrap.appendChild(bubble);
+                    messages.appendChild(wrap);
+
+                    requestAnimationFrame(() => { messages.scrollTop = messages.scrollHeight; });
+
+                    if (!skipPersist) {
+                        try {
+                            const hist = JSON.parse(sessionStorage.getItem(STORAGE_KEY) || '[]');
+                            hist.push({ text, isUser, links: !isUser ? links : [] });
+                            sessionStorage.setItem(STORAGE_KEY, JSON.stringify(hist.slice(-50)));
+                        } catch (_) {}
+                    }
+                }
+
+                function showTyping() {
+                    const wrap = document.createElement('div');
+                    wrap.className = 'ka-bot-msg bot';
+                    wrap.id = 'kaBotTyping';
+                    wrap.innerHTML = `
+                        <div class="ka-bot-msg-mini-avatar"><svg style="width:14px;height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25"/></svg></div>
+                        <div class="ka-bot-typing"><span></span><span></span><span></span></div>
+                    `;
+                    messages.appendChild(wrap);
+                    messages.scrollTop = messages.scrollHeight;
+                }
+                function hideTyping() {
+                    const t = document.getElementById('kaBotTyping');
+                    if (t) t.remove();
+                }
+
+                function findIntent(query) {
+                    const q = query.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
+                    let best = null;
+                    let bestScore = 0;
+                    for (const intent of KB) {
+                        let score = 0;
+                        for (const kw of intent.keywords) {
+                            const k = kw.normalize('NFD').replace(/\p{Diacritic}/gu, '');
+                            if (q.includes(k)) score += k.length;
+                        }
+                        if (score > bestScore) { bestScore = score; best = intent; }
+                    }
+                    return best || FALLBACK;
+                }
+
+                function renderChips(list) {
+                    chips.innerHTML = '';
+                    list.forEach(text => {
+                        const b = document.createElement('button');
+                        b.type = 'button';
+                        b.className = 'ka-bot-chip';
+                        b.textContent = text;
+                        b.addEventListener('click', () => {
+                            input.value = text;
+                            handleSend();
+                        });
+                        chips.appendChild(b);
+                    });
+                }
+
+                function handleSend() {
+                    const text = input.value.trim();
+                    if (!text) return;
+                    renderMessage(text, true);
+                    input.value = '';
+                    sendBtn.disabled = true;
+
+                    showTyping();
                     setTimeout(() => {
-                        const responses = [
-                            "Merci pour votre message ! Un agent va vous répondre sous peu.",
-                            "Je peux vous aider à trouver la carte parfaite pour vous.",
-                            "Avez-vous des questions sur nos cartes numériques ?",
-                            "Notre équipe est là pour vous accompagner dans vos achats.",
-                            "Consultez notre marketplace pour découvrir toutes nos cartes disponibles !"
-                        ];
-                        const randomResponse = responses[Math.floor(Math.random() * responses.length)];
-                        addMessage(randomResponse);
-                    }, 1000);
+                        hideTyping();
+                        const intent = findIntent(text);
+                        renderMessage(intent.reply(), false, intent.links || []);
+                        renderChips(intent.suggestions || DEFAULT_CHIPS);
+                        sendBtn.disabled = false;
+                    }, 600 + Math.random() * 400);
                 }
-            }
-            
-            chatbotToggle.addEventListener('click', openChatbot);
-            closeChatbot.addEventListener('click', closeChatbotWindow);
-            sendMessage.addEventListener('click', sendBotMessage);
-            
-            chatInput.addEventListener('keypress', function(e) {
-                if (e.key === 'Enter') {
-                    sendBotMessage();
+
+                const label    = document.getElementById('kaBotLabel');
+                const backdrop = document.getElementById('kaBotBackdrop');
+                const LABEL_HIDDEN_KEY = 'kaBotLabelHidden';
+
+                function openBot() {
+                    wnd.classList.add('show');
+                    if (backdrop) backdrop.classList.add('show');
+                    document.body.classList.add('ka-bot-open');
+                    badge.style.display = 'none';
+                    sessionStorage.setItem(OPEN_KEY, '1');
+                    if (label) {
+                        label.classList.add('hidden');
+                        localStorage.setItem(LABEL_HIDDEN_KEY, '1');
+                    }
+                    // Sur desktop on focus l'input ; sur mobile on évite (évite le clavier qui couvre)
+                    if (window.matchMedia('(min-width: 541px)').matches) {
+                        setTimeout(() => input.focus(), 250);
+                    }
                 }
-            });
+                function closeBot() {
+                    wnd.classList.remove('show');
+                    if (backdrop) backdrop.classList.remove('show');
+                    document.body.classList.remove('ka-bot-open');
+                }
+
+                // Cache le label si déjà ouvert auparavant
+                if (label && localStorage.getItem(LABEL_HIDDEN_KEY) === '1') {
+                    label.classList.add('hidden');
+                }
+
+                // Click sur le backdrop ferme la fenêtre (UX iOS-style)
+                if (backdrop) backdrop.addEventListener('click', closeBot);
+
+                // Echap ferme aussi
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape' && wnd.classList.contains('show')) closeBot();
+                });
+
+                // Restore history if any, otherwise greet
+                let restored = false;
+                try {
+                    const hist = JSON.parse(sessionStorage.getItem(STORAGE_KEY) || '[]');
+                    if (hist.length > 0) {
+                        hist.forEach(m => renderMessage(m.text, m.isUser, m.links || [], true));
+                        restored = true;
+                    }
+                } catch (_) {}
+
+                if (!restored) {
+                    setTimeout(() => {
+                        renderMessage(`Bonjour 👋 Je suis Kara, l'assistante KardAfrica. Comment puis-je t'aider aujourd'hui ?`, false);
+                    }, 100);
+                }
+                renderChips(DEFAULT_CHIPS);
+
+                // Show launcher badge if user never opened the bot in this session
+                if (!sessionStorage.getItem(OPEN_KEY)) {
+                    badge.style.display = '';
+                }
+
+                // Wire events
+                toggle.addEventListener('click', () => {
+                    wnd.classList.contains('show') ? closeBot() : openBot();
+                });
+                closeBtn.addEventListener('click', closeBot);
+                sendBtn.addEventListener('click', handleSend);
+                input.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSend();
+                    }
+                });
+
+                // ESC ferme
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape' && wnd.classList.contains('show')) closeBot();
+                });
+            })();
         });
     </script>
 
-    <!-- Modal de Connexion/Inscription -->
-    <div id="authModal" class="modal-overlay">
-        <div class="modal-content">
-            <div class="modal-header">
-                <button class="close-modal" id="closeAuthModal">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                    </svg>
-                </button>
-                <h2 class="text-2xl font-bold mb-2">Bienvenue sur Kardafrica</h2>
-                <p class="text-sm opacity-90">Votre marketplace de cartes numériques</p>
-            </div>
+    <!-- Auth Modal avec Alpine.js -->
+    <div x-data="{ open: false }" 
+         @open-auth-modal.window="open = true"
+         @keydown.escape.window="open = false"
+         x-show="open" 
+         class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+         style="display: none;"
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition ease-in duration-200"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0">
+        
+        <div @click.outside="open = false" class="relative w-full max-w-md">
+            <button @click="open = false" class="absolute -top-12 right-0 text-white hover:text-gray-200 focus:outline-none z-50">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
             
-            <div class="modal-tabs">
-                <div class="modal-tab active" data-tab="login">
-                    <svg class="w-5 h-5 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"></path>
-                    </svg>
-                    Connexion
-                </div>
-                <div class="modal-tab" data-tab="register">
-                    <svg class="w-5 h-5 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path>
-                    </svg>
-                    Inscription
-                </div>
-            </div>
+            @include('auth.flip-card')
+        </div>
+    </div>
+
+    <!-- Script global pour déclencher le modal auth -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initial fetch of cart data
+            if (typeof fetchCart === 'function') {
+                fetchCart();
+            }
             
-            <div class="modal-body">
-                <!-- Formulaire de Connexion -->
-                <div id="login-content" class="tab-content active">
-                    <form id="loginForm" action="#" method="POST">
-                        @csrf
-                        <div class="form-group">
-                            <label class="form-label" for="login-email">
-                                <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
-                                </svg>
-                                Adresse e-mail
-                            </label>
-                            <input type="email" id="login-email" name="email" class="form-input" placeholder="votre.email@exemple.com" required>
+            // Listen for cart updates
+            window.addEventListener('cart-updated', function() {
+                if (typeof fetchCart === 'function') {
+                    fetchCart();
+                }
+            });
+
+            // Intercepter les clics sur les boutons/liens de connexion/inscription
+            // IMPORTANT : on n'intercepte que de vrais <a>/<button> avec un texte court,
+            // sinon on remontait jusqu'au <footer> et "désinscription" matchait "inscription".
+            document.addEventListener('click', function(e) {
+                // Ignorer les clics à l'intérieur du modal d'auth lui-même
+                if (e.target.closest('.auth-modal-content')) return;
+                // Ignorer les clics à l'intérieur d'un formulaire
+                if (e.target.closest('form')) return;
+
+                // On ne traite que les vrais éléments cliquables
+                const element = e.target.closest('a, button');
+                if (!element) return;
+
+                // Si l'élément a déjà un href ou un onclick explicite, on le laisse faire
+                if (element.tagName === 'A') {
+                    const href = element.getAttribute('href') || '';
+                    // Liens "réels" (vers une page) ou ancres : on ne touche pas
+                    if (href && href !== '#' && !href.startsWith('javascript:')) return;
+                }
+
+                const text = (element.textContent || '').trim().toLowerCase();
+                // Garde-fou : ignorer les éléments avec trop de texte (header/footer, etc.)
+                if (text.length === 0 || text.length > 40) return;
+
+                // Mots ENTIERS uniquement — \b évite de matcher "désinscription" sur "inscription"
+                const isLogin    = /\b(connexion|se\s+connecter)\b/i.test(text);
+                const isRegister = /\b(inscription|s['’]inscrire|cr[ée]er\s+un\s+compte)\b/i.test(text);
+
+                if (isLogin) {
+                    e.preventDefault();
+                    window.dispatchEvent(new CustomEvent('open-auth-modal'));
+                    window.dispatchEvent(new CustomEvent('set-auth-view', { detail: { view: 'login' } }));
+                } else if (isRegister) {
+                    e.preventDefault();
+                    window.dispatchEvent(new CustomEvent('open-auth-modal'));
+                    window.dispatchEvent(new CustomEvent('set-auth-view', { detail: { view: 'register' } }));
+                }
+            });
+
+            // Exposer une fonction globale pour ouvrir le modal (compatibilité)
+            window.openAuthModal = function() {
+                window.dispatchEvent(new CustomEvent('open-auth-modal'));
+                window.dispatchEvent(new CustomEvent('set-auth-view', { detail: { view: 'login' } }));
+            };
+        });
+    </script>
+    @stack('scripts')
+
+    {{-- ===================== Global Search Modal (Ctrl+K) ===================== --}}
+    <style>
+        @keyframes ka-search-spin { to { transform: rotate(360deg); } }
+        #searchModal kbd { padding: 2px 6px; border-radius: 4px; background: #fff; border: 1px solid #E2E8F0; font-family: ui-monospace, monospace; font-size: 10px; color: #475569; }
+        .ka-search-suggest:hover { background: #F1F5F9 !important; border-color: #CBD5E1 !important; }
+        .ka-search-cat:hover     { background: rgba(78,205,196,0.08) !important; border-color: rgba(68,160,141,0.40) !important; color: #0F766E !important; }
+        .ka-search-close:hover   { background: #E2E8F0 !important; }
+        .ka-search-cta:hover     { color: #0F766E !important; }
+    </style>
+    <div id="searchModal"
+         style="position: fixed; inset: 0; z-index: 1000; display: none;"
+         role="dialog" aria-modal="true" aria-labelledby="searchModalTitle">
+        {{-- backdrop --}}
+        <div data-search-close id="searchBackdrop"
+             style="position: absolute; inset: 0; background: rgba(2,6,23,0.72);
+                    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+                    opacity: 0; transition: opacity .2s ease;"></div>
+
+        {{-- wrapper --}}
+        <div style="position: relative; height: 100%; width: 100%;
+                    display: flex; align-items: flex-start; justify-content: center;
+                    padding: clamp(40px, 8vh, 110px) 16px 24px; overflow-y: auto;">
+
+            {{-- panel --}}
+            <div id="searchPanel"
+                 style="position: relative; width: 100%; max-width: 640px;
+                        background: #ffffff; border-radius: 18px;
+                        box-shadow: 0 50px 100px -20px rgba(2,6,23,0.55), 0 0 0 1px rgba(15,23,42,0.06);
+                        opacity: 0; transform: translateY(-8px);
+                        transition: opacity .2s ease, transform .2s ease;
+                        overflow: hidden; display: flex; flex-direction: column; max-height: 80vh;
+                        font-family: 'Inter','Figtree',sans-serif;">
+
+                {{-- Header / input --}}
+                <div style="display: flex; align-items: center; gap: 12px;
+                            padding: 14px 16px; border-bottom: 1px solid #F1F5F9;
+                            flex-shrink: 0;">
+                    <svg style="width: 20px; height: 20px; color: #94A3B8; flex-shrink: 0;"
+                         fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                    <input id="searchInput" type="text" autocomplete="off" spellcheck="false"
+                           placeholder="Rechercher Netflix, Apple, Spotify…"
+                           style="flex: 1; min-width: 0;
+                                  background: transparent; border: 0; outline: none;
+                                  color: #0F172A; font-size: 16px; font-weight: 500;
+                                  font-family: inherit;">
+                    <span id="searchSpinner"
+                          style="display: none; width: 16px; height: 16px; flex-shrink: 0;
+                                 border: 2px solid #E2E8F0; border-top-color: #44A08D;
+                                 border-radius: 50%; animation: ka-search-spin .8s linear infinite;"></span>
+                    <button type="button" data-search-close class="ka-search-close"
+                            style="flex-shrink: 0; padding: 4px 8px; border-radius: 6px;
+                                   background: #F1F5F9; border: 0; cursor: pointer;
+                                   color: #64748B; font-size: 10px; font-weight: 700; font-family: ui-monospace, monospace;
+                                   transition: background .15s;">
+                        ESC
+                    </button>
+                </div>
+
+                {{-- Results / suggestions --}}
+                <div id="searchResults" style="flex: 1; min-height: 0; overflow-y: auto; padding: 12px;">
+
+                    {{-- Default state (suggestions) --}}
+                    <div id="searchDefault" style="padding: 8px;">
+                        <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em;
+                                    color: #94A3B8; margin: 0 8px 10px;">Suggestions populaires</div>
+
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px;">
+                            @foreach (['Netflix', 'Spotify', 'Apple', 'PlayStation', 'Amazon', 'Steam'] as $suggestion)
+                                <button type="button" data-search-suggestion="{{ $suggestion }}" class="ka-search-suggest"
+                                        style="display: flex; align-items: center; gap: 8px;
+                                               padding: 10px 12px; border-radius: 10px;
+                                               background: #F8FAFC; border: 1px solid #E2E8F0;
+                                               color: #334155; font-size: 14px; font-weight: 500;
+                                               text-align: left; cursor: pointer; transition: all .15s;
+                                               font-family: inherit;">
+                                    <svg style="width: 14px; height: 14px; color: #94A3B8; flex-shrink: 0;"
+                                         fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
+                                    {{ $suggestion }}
+                                </button>
+                            @endforeach
                         </div>
-                        
-                        <div class="form-group">
-                            <label class="form-label" for="login-password">
-                                <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 0h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
-                                </svg>
-                                Mot de passe
-                            </label>
-                            <input type="password" id="login-password" name="password" class="form-input" placeholder="••••••••" required>
+
+                        <div style="margin-top: 20px; padding: 0 8px;">
+                            <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em;
+                                        color: #94A3B8; margin-bottom: 10px;">Catégories</div>
+                            <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+                                @foreach ([
+                                    ['name' => 'Divertissement', 'emoji' => '🎬', 'id' => 1],
+                                    ['name' => 'Jeux Vidéo',     'emoji' => '🎮', 'id' => 2],
+                                    ['name' => 'Musique',        'emoji' => '🎵', 'id' => 3],
+                                    ['name' => 'Shopping',       'emoji' => '🛍️', 'id' => 4],
+                                ] as $cat)
+                                    <a href="{{ route('category', $cat['id']) }}" class="ka-search-cat"
+                                       style="display: inline-flex; align-items: center; gap: 6px;
+                                              padding: 6px 12px; border-radius: 9999px;
+                                              background: #ffffff; border: 1px solid #E2E8F0;
+                                              color: #475569; font-size: 12px; font-weight: 500;
+                                              text-decoration: none; transition: all .15s;">
+                                        <span>{{ $cat['emoji'] }}</span> {{ $cat['name'] }}
+                                    </a>
+                                @endforeach
+                            </div>
                         </div>
-                        
-                        <div class="form-group">
-                            <label class="flex items-center">
-                                <input type="checkbox" name="remember" class="mr-2 rounded border-gray-300 text-kardafrica-primary focus:ring-kardafrica-primary">
-                                <span class="text-sm text-gray-600">Se souvenir de moi</span>
-                            </label>
+                    </div>
+
+                    {{-- Live results container (filled by JS) --}}
+                    <div id="searchList" style="display: none;"></div>
+
+                    {{-- Empty state --}}
+                    <div id="searchEmpty" style="display: none; padding: 40px 20px; text-align: center;">
+                        <div style="width: 48px; height: 48px; border-radius: 14px;
+                                    background: #F1F5F9; margin: 0 auto 12px;
+                                    display: flex; align-items: center; justify-content: center;
+                                    color: #94A3B8;">
+                            <svg style="width: 22px; height: 22px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                         </div>
-                        
-                        <button type="submit" class="form-button">Se connecter</button>
-                    </form>
-                    
-                    <div class="form-footer">
-                        <a href="{{ route('password.request') }}" class="form-link">Mot de passe oublié ?</a>
+                        <div style="font-size: 14px; font-weight: 600; color: #334155;">Aucun résultat</div>
+                        <div style="font-size: 12px; color: #94A3B8; margin-top: 4px;">Essayez avec un autre nom de marque.</div>
                     </div>
                 </div>
+
+                {{-- Footer --}}
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;
+                            padding: 10px 16px; background: #F8FAFC; border-top: 1px solid #F1F5F9;
+                            font-size: 11px; color: #64748B; flex-shrink: 0;">
+                    <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
+                        <span style="display: inline-flex; align-items: center; gap: 6px;"><kbd>↵</kbd> Ouvrir</span>
+                        <span style="display: inline-flex; align-items: center; gap: 6px;"><kbd>↑↓</kbd> Naviguer</span>
+                    </div>
+                    <a href="{{ route('boutique') }}" id="searchSeeAll" class="ka-search-cta"
+                       style="font-weight: 600; color: #44A08D; text-decoration: none; transition: color .15s;">
+                        Voir toute la boutique →
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            const modal      = document.getElementById('searchModal');
+            const backdrop   = document.getElementById('searchBackdrop');
+            const panel      = document.getElementById('searchPanel');
+            const input      = document.getElementById('searchInput');
+            const spinner    = document.getElementById('searchSpinner');
+            const list       = document.getElementById('searchList');
+            const emptyState = document.getElementById('searchEmpty');
+            const defaultState = document.getElementById('searchDefault');
+            if (!modal || !input) return;
+
+            const cardTypeRoute = "{{ url('/card-type') }}";
+            const searchPageRoute = "{{ route('search') }}";
+            const apiProductsRoute = "{{ route('api.products') }}";
+
+            let activeIndex = -1;
+            let currentResults = [];
+            let debounceTimer = null;
+            let abortCtrl = null;
+
+            function open() {
+                modal.style.display = 'block';
+                document.body.style.overflow = 'hidden';
+                requestAnimationFrame(() => {
+                    backdrop.style.opacity = '1';
+                    panel.style.opacity = '1';
+                    panel.style.transform = 'translateY(0)';
+                    input.focus();
+                    input.select();
+                });
+            }
+
+            function close() {
+                backdrop.style.opacity = '0';
+                panel.style.opacity = '0';
+                panel.style.transform = 'translateY(-8px)';
+                setTimeout(() => {
+                    modal.style.display = 'none';
+                    document.body.style.overflow = '';
+                    input.value = '';
+                    showDefault();
+                }, 180);
+            }
+
+            function showDefault() {
+                defaultState.style.display = '';
+                list.style.display = 'none';
+                emptyState.style.display = 'none';
+                list.innerHTML = '';
+                activeIndex = -1;
+                currentResults = [];
+            }
+
+            function showLoading() {
+                spinner.style.display = 'inline-block';
+            }
+            function hideLoading() {
+                spinner.style.display = 'none';
+            }
+
+            function brandColor(name) {
+                const palette = {
+                    netflix: '#E50914', spotify: '#1DB954', apple: '#000000',
+                    itunes: '#D60017', playstation: '#003791', xbox: '#107C10',
+                    amazon: '#FF9900', google: '#01875F', steam: '#171A21',
+                    uber: '#000000', roblox: '#00A2FF', nintendo: '#E60012',
+                    disney: '#0E47A1',
+                };
+                const lower = (name || '').toLowerCase();
+                for (const k in palette) if (lower.includes(k)) return palette[k];
+                const fallbacks = ['#0F172A', '#44A08D', '#0EA5E9', '#7C3AED', '#DC2626', '#EA580C', '#059669'];
+                let h = 0;
+                for (let i = 0; i < (name || '').length; i++) h = ((h << 5) - h) + name.charCodeAt(i);
+                return fallbacks[Math.abs(h) % fallbacks.length];
+            }
+
+            function renderResults(items) {
+                currentResults = items;
+                activeIndex = items.length ? 0 : -1;
+                defaultState.style.display = 'none';
+
+                if (!items.length) {
+                    list.style.display = 'none';
+                    emptyState.style.display = 'block';
+                    return;
+                }
+                emptyState.style.display = 'none';
+                list.style.display = 'flex';
+                list.style.flexDirection = 'column';
+                list.style.gap = '2px';
+
+                list.innerHTML = items.map((p, i) => {
+                    const ct = p.cardType || p.brand || {};
+                    const name = ct.name || p.name || 'Carte';
+                    const id = ct.internalId || ct.id || p.id;
+                    const logo = ct.logoUrl || ct.logo || null;
+                    // p.price est un objet {min, max, currencyCode} renvoyé par afrikard,
+                    // pas un nombre. On extrait min, sinon fallback sur d'autres champs.
+                    const priceObj = p.price && typeof p.price === 'object' ? p.price : null;
+                    const rawPrice = priceObj
+                        ? (priceObj.min ?? priceObj.max ?? null)
+                        : (typeof p.price === 'number' ? p.price : (p.minPrice || p.minFaceValue || null));
+                    const price = (rawPrice !== null && !isNaN(rawPrice)) ? Number(rawPrice) : null;
+                    const currency = (priceObj && priceObj.currencyCode) || p.currency || 'XAF';
+                    const color = brandColor(name);
+                    const initial = name.charAt(0).toUpperCase();
+                    const href = `${cardTypeRoute}/${id}`;
+                    const initials = `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:${color};color:#fff;font-weight:700;font-size:14px;">${initial}</div>`;
+                    const logoHtml = logo
+                        ? `<img src="${logo}" alt="${name}" loading="lazy" onerror="this.outerHTML=this.dataset.fallback" data-fallback='${initials.replace(/'/g, "&#39;")}' style="width:100%;height:100%;object-fit:contain;background:#fff;">`
+                        : initials;
+
+                    return `
+                        <a href="${href}" data-result-index="${i}" class="search-result-item"
+                           style="display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:10px;text-decoration:none;color:inherit;cursor:pointer;transition:background .15s;">
+                            <div style="width:40px;height:40px;border-radius:12px;border:1px solid #E2E8F0;overflow:hidden;flex-shrink:0;box-shadow:0 1px 2px rgba(15,23,42,0.04);">${logoHtml}</div>
+                            <div style="min-width:0;flex:1;">
+                                <div style="font-size:14px;font-weight:600;color:#0F172A;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${name}</div>
+                                <div style="font-size:12px;color:#64748B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.name || 'Carte numérique'}</div>
+                            </div>
+                            ${price ? `<div style="font-size:14px;font-weight:700;color:#0F172A;font-variant-numeric:tabular-nums;flex-shrink:0;">${(window.convertToFCFA ? window.convertToFCFA(price, currency) : price).toLocaleString('fr-FR')} <span style="font-size:10px;color:#94A3B8;font-weight:500;">FCFA</span></div>` : ''}
+                            <svg style="width:16px;height:16px;color:#CBD5E1;flex-shrink:0;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+                        </a>`;
+                }).join('');
+
+                highlightActive();
+            }
+
+            function highlightActive() {
+                list.querySelectorAll('.search-result-item').forEach((el, i) => {
+                    if (i === activeIndex) {
+                        el.style.background = '#F1F5F9';
+                        el.scrollIntoView({ block: 'nearest' });
+                    } else {
+                        el.style.background = '';
+                    }
+                });
+            }
+
+            async function runSearch(q) {
+                if (!q || q.trim().length < 2) {
+                    showDefault();
+                    hideLoading();
+                    return;
+                }
+                if (abortCtrl) abortCtrl.abort();
+                abortCtrl = new AbortController();
+                showLoading();
+                try {
+                    const url = `${apiProductsRoute}?search=${encodeURIComponent(q)}&size=12`;
+                    const res = await fetch(url, { signal: abortCtrl.signal, headers: { Accept: 'application/json' } });
+                    if (!res.ok) throw new Error('http_' + res.status);
+                    const data = await res.json();
+                    const items = (data && data.success && Array.isArray(data.data)) ? data.data : [];
+                    renderResults(items);
+                } catch (e) {
+                    if (e.name !== 'AbortError') {
+                        list.style.display = 'none';
+                        defaultState.style.display = 'none';
+                        emptyState.style.display = 'block';
+                    }
+                } finally {
+                    hideLoading();
+                }
+            }
+
+            // Input handler (debounced) + maintien du lien "Voir toute la boutique"
+            const seeAllLink = document.getElementById('searchSeeAll');
+            const boutiqueBaseUrl = "{{ route('boutique') }}";
+            const updateSeeAllLink = (q) => {
+                if (!seeAllLink) return;
+                const trimmed = (q || '').trim();
+                if (trimmed) {
+                    seeAllLink.href = `${boutiqueBaseUrl}?search=${encodeURIComponent(trimmed)}`;
+                    seeAllLink.textContent = `Voir tous les résultats pour "${trimmed}" →`;
+                } else {
+                    seeAllLink.href = boutiqueBaseUrl;
+                    seeAllLink.textContent = 'Voir toute la boutique →';
+                }
+            };
+
+            input.addEventListener('input', (e) => {
+                const q = e.target.value;
+                updateSeeAllLink(q);
+                if (debounceTimer) clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(() => runSearch(q), 220);
+            });
+
+            // Keyboard navigation
+            input.addEventListener('keydown', (e) => {
+                if (!currentResults.length) {
+                    if (e.key === 'Enter' && input.value.trim()) {
+                        // Va direct à la boutique avec le filtre search appliqué
+                        window.location.href = `${boutiqueBaseUrl}?search=${encodeURIComponent(input.value.trim())}`;
+                    }
+                    return;
+                }
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    activeIndex = (activeIndex + 1) % currentResults.length;
+                    highlightActive();
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    activeIndex = (activeIndex - 1 + currentResults.length) % currentResults.length;
+                    highlightActive();
+                } else if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const link = list.querySelector(`[data-result-index="${activeIndex}"]`);
+                    if (link) window.location.href = link.getAttribute('href');
+                }
+            });
+
+            // Triggers
+            // - data-search-close      → ferme le modal
+            // - data-search-suggestion → pré-remplit + lance la recherche (et ouvre si fermé)
+            // - data-search-trigger    → ouvre le modal
+            document.addEventListener('click', (e) => {
+                const closeBtn = e.target.closest('[data-search-close]');
+                if (closeBtn) { e.preventDefault(); close(); return; }
+
+                const suggest = e.target.closest('[data-search-suggestion]');
+                if (suggest) {
+                    e.preventDefault();
+                    const isOpen = modal.style.display === 'block';
+                    if (!isOpen) open();
+                    input.value = suggest.dataset.searchSuggestion;
+                    runSearch(input.value);
+                    setTimeout(() => input.focus(), 100);
+                    return;
+                }
+
+                const trigger = e.target.closest('[data-search-trigger]');
+                if (trigger) { e.preventDefault(); open(); }
+            });
+
+            // Ctrl+K / Cmd+K + ESC
+            document.addEventListener('keydown', (e) => {
+                const isOpen = modal.style.display !== 'none' && modal.style.display !== '';
+                if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+                    e.preventDefault();
+                    isOpen ? close() : open();
+                } else if (e.key === '/' && !isOpen) {
+                    const tag = (document.activeElement && document.activeElement.tagName) || '';
+                    if (!['INPUT', 'TEXTAREA', 'SELECT'].includes(tag)) {
+                        e.preventDefault();
+                        open();
+                    }
+                } else if (e.key === 'Escape' && isOpen) {
+                    e.preventDefault();
+                    close();
+                }
+            });
+        })();
+    </script>
+    {{-- ===================== /Global Search Modal ===================== --}}
+
+    <!-- Checkout/Payment Modal -->
+    <div x-data="checkoutModal()"
+         x-show="isOpen"
+         x-on:open-checkout-modal.window="openModal()"
+         x-on:keydown.escape.window="closeModal()"
+         class="relative z-[60]"
+         aria-labelledby="modal-title" 
+         role="dialog" 
+         aria-modal="true"
+         style="display: none;">
+        
+        <!-- Background backdrop -->
+        <div x-show="isOpen"
+             x-transition:enter="ease-out duration-300"
+             x-transition:enter-start="opacity-0"
+             x-transition:enter-end="opacity-100"
+             x-transition:leave="ease-in duration-200"
+             x-transition:leave-start="opacity-100"
+             x-transition:leave-end="opacity-0"
+             class="fixed inset-0 bg-gray-900/75 backdrop-blur-sm transition-opacity" 
+             @click="closeModal()"></div>
+
+        <div class="fixed inset-0 z-10 w-screen overflow-y-auto">
+            <div class="flex min-h-full items-center justify-center p-4 text-center sm:p-0">
                 
-                <!-- Formulaire d'Inscription -->
-                <div id="register-content" class="tab-content">
-                    <form id="registerForm" action="#" method="POST">
-                        @csrf
-                        <div class="form-group">
-                            <label class="form-label" for="register-name">
-                                <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
-                                </svg>
-                                Nom complet
-                            </label>
-                            <input type="text" id="register-name" name="name" class="form-input" placeholder="Votre nom complet" required>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label class="form-label" for="register-email">
-                                <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
-                                </svg>
-                                Adresse e-mail
-                            </label>
-                            <input type="email" id="register-email" name="email" class="form-input" placeholder="votre.email@exemple.com" required>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label class="form-label" for="register-password">
-                                <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 0h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
-                                </svg>
-                                Mot de passe
-                            </label>
-                            <input type="password" id="register-password" name="password" class="form-input" placeholder="••••••••" required>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label class="form-label" for="register-password-confirm">
-                                <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                                </svg>
-                                Confirmer le mot de passe
-                            </label>
-                            <input type="password" id="register-password-confirm" name="password_confirmation" class="form-input" placeholder="••••••••" required>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label class="flex items-center">
-                                <input type="checkbox" name="terms" class="mr-2 rounded border-gray-300 text-kardafrica-primary focus:ring-kardafrica-primary" required>
-                                <span class="text-sm text-gray-600">J'accepte les <a href="#" class="form-link">conditions d'utilisation</a></span>
-                            </label>
-                        </div>
-                        
-                        <button type="submit" class="form-button">Créer mon compte</button>
-                    </form>
+                <!-- Modal panel -->
+                <div x-show="isOpen"
+                     x-transition:enter="ease-out duration-300"
+                     x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                     x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
+                     x-transition:leave="ease-in duration-200"
+                     x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
+                     x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                     class="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-2xl transition-all sm:my-8 w-full max-w-4xl h-[85vh]">
                     
-                    <div class="form-footer">
-                        <p class="text-sm text-gray-600">
-                            Déjà un compte ? 
-                            <a href="#" class="form-link" data-switch-tab="login">Se connecter</a>
-                        </p>
+                    <!-- Close button -->
+                    <button @click="closeModal()" class="absolute top-4 right-4 z-50 bg-white/80 backdrop-blur rounded-full p-2 text-gray-500 hover:text-gray-700 hover:bg-white shadow-sm transition-all">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+
+                    <!-- Loading State -->
+                    <div x-show="loading" class="absolute inset-0 flex flex-col items-center justify-center bg-white z-40 p-8 text-center">
+                        <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-kardafrica-primary mb-6"></div>
+                        <h3 class="text-xl font-bold text-gray-900 mb-2">Redirection vers E-Billing...</h3>
+                        <p class="text-gray-500 font-medium max-w-md mx-auto">Veuillez patienter, vous allez être redirigé vers le portail de paiement sécurisé pour finaliser votre transaction.</p>
+                        <p class="text-sm text-gray-400 mt-8">Ne fermez pas cette fenêtre.</p>
+                    </div>
+
+                    <!-- Error State -->
+                    <div x-show="!loading && error" class="absolute inset-0 flex flex-col items-center justify-center bg-white z-30 p-8 text-center">
+                        <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4 text-red-600">
+                            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                            </svg>
+                        </div>
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">Erreur d'initialisation</h3>
+                        <p x-text="error" class="text-gray-500 mb-6"></p>
+                        <button @click="closeModal()" class="px-6 py-2 bg-gray-900 text-white rounded-xl font-medium hover:bg-gray-800 transition-colors">
+                            Fermer
+                        </button>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Script pour la fonctionnalité du modal d'authentification -->
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const authModal = document.getElementById('authModal');
-            const closeAuthModal = document.getElementById('closeAuthModal');
-            const tabs = document.querySelectorAll('.modal-tab');
-            const tabContents = document.querySelectorAll('.tab-content');
-            
-            // Fonction pour ouvrir le modal
-            function openAuthModal() {
-                if (authModal) {
-                authModal.classList.add('show');
-                document.body.style.overflow = 'hidden';
-                }
-            }
-            
-            // Fonction pour fermer le modal
-            function closeAuthModalFunc() {
-                if (authModal) {
-                authModal.classList.remove('show');
-                document.body.style.overflow = 'auto';
-                }
-            }
-            
-            // Fonction pour changer d'onglet
-            function switchTab(tabName) {
-                // Retirer la classe active de tous les onglets
-                tabs.forEach(tab => tab.classList.remove('active'));
-                tabContents.forEach(content => content.classList.remove('active'));
-                
-                // Ajouter la classe active au bon onglet
-                const targetTab = document.querySelector(`[data-tab="${tabName}"]`);
-                const targetContent = document.getElementById(`${tabName}-content`);
-                if (targetTab) targetTab.classList.add('active');
-                if (targetContent) targetContent.classList.add('active');
-            }
-            
-            // Gérer le clic sur les onglets
-            tabs.forEach(tab => {
-                tab.addEventListener('click', function() {
-                    const tabName = this.getAttribute('data-tab');
-                    switchTab(tabName);
-                });
-            });
-            
-            // Gérer le lien de basculement dans le formulaire
-            document.querySelectorAll('[data-switch-tab]').forEach(link => {
-                link.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    const tabName = this.getAttribute('data-switch-tab');
-                    switchTab(tabName);
-                });
-            });
-            
-            // Ouvrir le modal quand on clique sur le bouton connexion
-            document.addEventListener('click', function(e) {
-                // Vérifier si c'est un bouton de connexion (desktop ou mobile)
-                if ((e.target.textContent && e.target.textContent.includes('👤 Connexion')) ||
-                    (e.target.closest('button') && e.target.closest('button').textContent.includes('👤 Connexion')) ||
-                    (e.target.closest('a') && e.target.closest('a').textContent.includes('👤 Connexion')) ||
-                    (e.target.textContent && e.target.textContent.includes('Se connecter'))) {
-                    e.preventDefault();
-                    openAuthModal();
-                }
-            });
-            
-            // Fermer le modal
-            if (closeAuthModal) {
-            closeAuthModal.addEventListener('click', closeAuthModalFunc);
-            }
-            
-            // Fermer le modal en cliquant à l'extérieur
-            if (authModal) {
-            authModal.addEventListener('click', function(e) {
-                if (e.target === authModal) {
-                    closeAuthModalFunc();
-                }
-            });
-            }
-            
-            // Fermer le modal avec la touche Échap
-            document.addEventListener('keydown', function(e) {
-                if (e.key === 'Escape' && authModal && authModal.classList.contains('show')) {
-                    closeAuthModalFunc();
-                }
-            });
-            
-            // Gérer la soumission des formulaires
-            const loginForm = document.getElementById('loginForm');
-            if (loginForm) {
-                loginForm.addEventListener('submit', function(e) {
-                e.preventDefault();
-                
-                // Simuler une connexion réussie
-                alert('Connexion réussie ! (simulation)');
-                closeAuthModalFunc();
-            });
-            }
-            
-            const registerForm = document.getElementById('registerForm');
-            if (registerForm) {
-                registerForm.addEventListener('submit', function(e) {
-                e.preventDefault();
-                
-                // Vérifier que les mots de passe correspondent
-                const password = document.getElementById('register-password').value;
-                const confirmPassword = document.getElementById('register-password-confirm').value;
-                
-                if (password !== confirmPassword) {
-                    alert('Les mots de passe ne correspondent pas !');
-                    return;
-                }
-                
-                // Simuler une inscription réussie
-                alert('Inscription réussie ! (simulation)');
-                closeAuthModalFunc();
-            });
-            }
+        document.addEventListener('alpine:init', () => {
+            Alpine.data('checkoutModal', () => ({
+                isOpen: false,
+                loading: false,
+                iframeUrl: '',
+                error: null,
+                user: null,
 
-            // Exposer la fonction globalement pour le menu mobile
-            window.openAuthModal = openAuthModal;
+                async openModal() {
+                    // Check user
+                    const user = window.currentUser;
+                    if (!user) {
+                        if (typeof openAuthModal === 'function') {
+                            openAuthModal();
+                        } else {
+                            window.location.href = '/login';
+                        }
+                        return;
+                    }
+                    this.user = user;
+                    this.isOpen = true;
+                    this.loading = true;
+                    this.error = null;
+                    
+                    try {
+                        // Demarre le paiement : creation de l'Order + appel futursowax cote serveur
+                        const response = await fetch('{{ route("checkout.start") }}', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                                'X-Requested-With': 'XMLHttpRequest',
+                            },
+                            body: JSON.stringify({
+                                name:  this.user.name,
+                                email: this.user.email,
+                                phone: this.user.phone,
+                            }),
+                        });
+
+                        // Securite : si on recoit du HTML (redirection auth) au lieu de JSON
+                        const contentType = response.headers.get('content-type') || '';
+                        if (!contentType.includes('application/json')) {
+                            if (response.status === 401 || response.status === 419) {
+                                window.location.href = '/login?redirect=checkout';
+                                return;
+                            }
+                            throw new Error('Reponse inattendue du serveur (status ' + response.status + ').');
+                        }
+
+                        const data = await response.json();
+
+                        if (response.ok && data.success) {
+                            // Redirige vers le portail de paiement futursowax
+                            window.location.href = data.portal_url;
+                        } else {
+                            throw new Error(data.message || 'Impossible d\'initialiser le paiement.');
+                        }
+
+                    } catch (error) {
+                        console.error('Checkout error:', error);
+                        this.error = error.message;
+                        this.loading = false;
+                    }
+                },
+
+                closeModal() {
+                    this.isOpen = false;
+                    this.iframeUrl = '';
+                    // Reload page on close if payment might have succeeded? 
+                    // Or let user check status manually.
+                    // Ideally, we listen for a message from the iframe, but cross-origin might block it.
+                }
+            }));
+        });
+
+
+        // Global bridge functions
+        window.openCheckoutModal = function() {
+            window.dispatchEvent(new CustomEvent('open-checkout-modal'));
+        };
+
+        window.closeCheckoutModal = function() {
+            window.dispatchEvent(new CustomEvent('keydown', { key: 'Escape' })); // Mock escape to close or just rely on Alpine
+            // Better: Dispatch a custom close event if we added listener, but for now user action closes it.
+        };
+        
+        // Deprecated/Compatibility
+        window.startPayment = function() {
+            window.openCheckoutModal();
+        };
+
+        // ===== Newsletter form (footer) =====
+        document.addEventListener('alpine:init', () => {
+            Alpine.data('newsletterForm', () => ({
+                email: '',
+                loading: false,
+                success: false,
+                error: false,
+                message: '',
+
+                async submit() {
+                    if (!this.email) return;
+                    this.loading = true;
+                    this.error = false;
+                    this.success = false;
+                    this.message = '';
+                    try {
+                        const res = await fetch('{{ route('newsletter.subscribe') }}', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                                'X-Requested-With': 'XMLHttpRequest',
+                            },
+                            body: JSON.stringify({ email: this.email, source: 'footer' }),
+                        });
+                        const ct = res.headers.get('content-type') || '';
+                        if (!ct.includes('application/json')) {
+                            throw new Error('Reponse inattendue');
+                        }
+                        const data = await res.json();
+                        if (res.ok && data.success) {
+                            this.success = true;
+                            this.message = data.message;
+                        } else {
+                            this.error = true;
+                            this.message = data.message || (data.errors?.email?.[0]) || 'Une erreur est survenue.';
+                        }
+                    } catch (e) {
+                        this.error = true;
+                        this.message = e.message || 'Erreur réseau.';
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+            }));
         });
     </script>
+
+    {{-- ================================================================
+         PASSWORD GATE MODAL (gate les actions sensibles type reveal code/PIN)
+         Usage cote client :
+            window.requireUnlock(callback)
+         Si l'utilisateur a deja entre son mot de passe dans les 5 dernieres minutes,
+         le callback est execute immediatement. Sinon, ouvre une modal qui demande
+         le mot de passe et appelle le callback en cas de succes.
+         ================================================================ --}}
+    @auth
+    <div x-data="passwordGate()"
+         x-show="open"
+         x-transition.opacity
+         @keydown.escape.window="close()"
+         @open-password-gate.window="openWith($event.detail?.callback)"
+         class="fixed inset-0 z-[1010] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+         style="display:none;">
+
+        <div @click.outside="close()"
+             class="bg-white rounded-2xl shadow-pop w-full max-w-sm overflow-hidden">
+
+            <div class="px-5 py-4 border-b border-slate-100 flex items-center gap-3 bg-gradient-to-br from-slate-50 to-white">
+                <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-[#4ECDC4] to-[#44A08D] text-white flex items-center justify-center shadow-md shadow-[#44A08D]/20">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <h3 class="font-display text-base font-bold text-slate-900 leading-tight">Confirmation requise</h3>
+                    <p class="text-[11px] text-slate-500 mt-0.5">Entrez votre mot de passe pour révéler</p>
+                </div>
+                <button @click="close()" type="button" class="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition" aria-label="Fermer">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+
+            <form @submit.prevent="verify()" class="p-5" data-no-loader>
+                <label class="block text-[10px] uppercase tracking-wider font-bold text-slate-400 mb-2">Mot de passe</label>
+                <div class="relative">
+                    <input :type="passwordVisible ? 'text' : 'password'"
+                           x-model="password"
+                           x-ref="passwordInput"
+                           autocomplete="current-password"
+                           placeholder="••••••••"
+                           class="w-full pl-3 pr-10 py-2.5 rounded-lg border border-slate-200 bg-slate-50 text-sm text-slate-900 placeholder-slate-400 focus:bg-white focus:border-[#44A08D] focus:ring-2 focus:ring-[#44A08D]/20 focus:outline-none transition">
+                    <button type="button" @click="passwordVisible = !passwordVisible" class="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded text-slate-400 hover:text-slate-700 transition" tabindex="-1">
+                        <svg x-show="!passwordVisible" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                        <svg x-show="passwordVisible" x-cloak class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.542 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/></svg>
+                    </button>
+                </div>
+                <p x-show="error" x-cloak class="mt-2 text-xs text-rose-600 flex items-center gap-1.5">
+                    <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                    <span x-text="error"></span>
+                </p>
+
+                <div class="flex items-center gap-2 mt-4">
+                    <button type="button" @click="close()" class="flex-1 px-4 py-2.5 rounded-lg border border-slate-200 text-slate-700 text-sm font-semibold hover:bg-slate-50 transition active:scale-95">
+                        Annuler
+                    </button>
+                    <button type="submit" :disabled="loading || !password"
+                            class="flex-1 inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg bg-[#44A08D] hover:bg-[#3d9180] disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-bold shadow-md shadow-[#44A08D]/20 transition active:scale-95">
+                        <svg x-show="loading" x-cloak class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                        </svg>
+                        <span x-show="!loading">Confirmer</span>
+                        <span x-show="loading" x-cloak>Vérification...</span>
+                    </button>
+                </div>
+
+                <p class="mt-3 text-[10px] text-slate-400 text-center">
+                    Verrouillage automatique après 5 minutes d'inactivité.
+                </p>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('alpine:init', () => {
+            Alpine.data('passwordGate', () => ({
+                open: false,
+                password: '',
+                passwordVisible: false,
+                loading: false,
+                error: null,
+                pendingCallback: null,
+
+                openWith(callback) {
+                    this.pendingCallback = typeof callback === 'function' ? callback : null;
+                    this.password = '';
+                    this.error = null;
+                    this.passwordVisible = false;
+                    this.open = true;
+                    this.$nextTick(() => this.$refs.passwordInput?.focus());
+                },
+
+                close() {
+                    this.open = false;
+                    this.password = '';
+                    this.error = null;
+                    this.pendingCallback = null;
+                },
+
+                async verify() {
+                    if (!this.password) return;
+                    this.loading = true;
+                    this.error = null;
+                    try {
+                        const res = await fetch('{{ route('verify-password') }}', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                                'X-Requested-With': 'XMLHttpRequest',
+                            },
+                            body: JSON.stringify({ password: this.password }),
+                        });
+                        const ct = res.headers.get('content-type') || '';
+                        if (!ct.includes('application/json')) {
+                            throw new Error('Reponse inattendue (status ' + res.status + ')');
+                        }
+                        const data = await res.json();
+                        if (res.ok && data.ok) {
+                            // Unlock pour 5 minutes
+                            const expireAt = Date.now() + 5 * 60 * 1000;
+                            sessionStorage.setItem('cards-unlock-exp', String(expireAt));
+                            window.dispatchEvent(new CustomEvent('cards-unlocked'));
+                            const cb = this.pendingCallback;
+                            this.close();
+                            if (cb) cb();
+                        } else {
+                            this.error = data.message || 'Mot de passe incorrect.';
+                        }
+                    } catch (e) {
+                        this.error = e.message || 'Erreur lors de la verification.';
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+            }));
+        });
+
+        // Helpers globaux
+        window.cardsAreUnlocked = function () {
+            const exp = sessionStorage.getItem('cards-unlock-exp');
+            return exp && parseInt(exp, 10) > Date.now();
+        };
+        window.requireUnlock = function (callback) {
+            if (window.cardsAreUnlocked()) {
+                if (typeof callback === 'function') callback();
+                return;
+            }
+            window.dispatchEvent(new CustomEvent('open-password-gate', { detail: { callback } }));
+        };
+    </script>
+    @endauth
 </body>
 </html> 

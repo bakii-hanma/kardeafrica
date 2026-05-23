@@ -1,0 +1,65 @@
+{
+  "name": "Kardafrica Vendeur",
+  "short_name": "Kardafrica V",
+  "description": "Portail vendeur Kardafrica — vendre des cartes cadeaux, encaisser cash, gérer ses commissions et remises.",
+  "start_url": "/vendor/dashboard",
+  "scope": "/vendor/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FAFAF7",
+  "theme_color": "#44A08D",
+  "lang": "fr-FR",
+  "dir": "ltr",
+  "categories": ["business", "finance", "productivity"],
+  "icons": [
+    {
+      "src": "/assets/logo/FAVCON-KARDAFRICA-.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/logo/FAVCON-KARDAFRICA-.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/logo/FAVCON-KARDAFRICA-.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Nouvelle vente",
+      "short_name": "Vendre",
+      "description": "Créer une vente client en quelques clics",
+      "url": "/vendor/sell",
+      "icons": [{ "src": "/assets/logo/FAVCON-KARDAFRICA-.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Mes ventes",
+      "short_name": "Ventes",
+      "description": "Historique et statut des ventes",
+      "url": "/vendor/orders",
+      "icons": [{ "src": "/assets/logo/FAVCON-KARDAFRICA-.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Encaisser cash",
+      "short_name": "Cash",
+      "description": "Commandes cash en attente",
+      "url": "/vendor/cash",
+      "icons": [{ "src": "/assets/logo/FAVCON-KARDAFRICA-.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Remettre cash",
+      "short_name": "Remise",
+      "description": "Reverser le cash via E-Billing",
+      "url": "/vendor/remittance",
+      "icons": [{ "src": "/assets/logo/FAVCON-KARDAFRICA-.png", "sizes": "192x192" }]
+    }
+  ],
+  "prefer_related_applications": false
+}
