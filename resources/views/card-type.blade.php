@@ -83,6 +83,7 @@
                             'countryCode' => $cardType['countryCode'] ?? null,
                             'currency'    => $cardType['products'][0]['price']['currencyCode'] ?? null,
                             'compact'     => false,
+                            'fill'        => true,   // remplit le parent (aspect-[1.55])
                             'logoUrl'     => $cardType['logoUrl'] ?? null,
                         ])
                     </div>
