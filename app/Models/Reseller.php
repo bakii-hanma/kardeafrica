@@ -13,7 +13,9 @@ class Reseller extends Authenticatable
 
     protected $fillable = [
         'vendor_code',
+        'slug',                  // Phase 1 Carte Gabon — vitrine publique
         'name',
+        'business_name', 'business_type', 'description',
         'phone',
         'email',
         'password',
@@ -27,6 +29,14 @@ class Reseller extends Authenticatable
         'total_volume',
         'is_active',
         'last_login_at',
+        // Carte Gabon : géolocalisation
+        'address', 'city', 'province', 'geo_lat', 'geo_lng',
+        // Carte Gabon : visuels
+        'logo_url', 'cover_url',
+        // Carte Gabon : KYC
+        'kyc_status', 'kyc_documents', 'kyc_approved_at', 'kyc_rejection_reason',
+        // Carte Gabon : payout
+        'mobile_money_provider', 'mobile_money_account', 'whatsapp_number',
     ];
 
     protected $hidden = [
@@ -48,6 +58,11 @@ class Reseller extends Authenticatable
             'total_volume'              => 'decimal:2',
             'is_active'                 => 'boolean',
             'last_login_at'             => 'datetime',
+            // Carte Gabon
+            'geo_lat'                   => 'decimal:7',
+            'geo_lng'                   => 'decimal:7',
+            'kyc_documents'             => 'array',
+            'kyc_approved_at'           => 'datetime',
         ];
     }
 
@@ -65,6 +80,34 @@ class Reseller extends Authenticatable
     public function cashRemittances()
     {
         return $this->hasMany(ResellerCashRemittance::class)->latest();
+    }
+
+    // ---- Carte Gabon (Phase 1) ----
+
+    public function merchantCards()
+    {
+        return $this->hasMany(MerchantCard::class);
+    }
+
+    public function merchantCardPurchases()
+    {
+        return $this->hasMany(MerchantCardPurchase::class);
+    }
+
+    public function merchantRedemptions()
+    {
+        return $this->hasMany(MerchantCardRedemption::class);
+    }
+
+    public function merchantUsers()
+    {
+        return $this->hasMany(MerchantUser::class);
+    }
+
+    /** True si ce vendor a une activité "Carte Gabon" (= KYC validé) */
+    public function isApprovedMerchant(): bool
+    {
+        return $this->kyc_status === 'approved' && $this->is_active;
     }
 
     // ---- Helpers ----
