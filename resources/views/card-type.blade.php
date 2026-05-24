@@ -75,84 +75,16 @@
                      :class="{'rotate-y-180': isFlipped}"
                      @click="isFlipped = !isFlipped">
 
-                    {{-- ===== FRONT ===== --}}
+                    {{-- ===== FRONT : design hybride (= proposition mai 2026) ===== --}}
                     <div class="absolute inset-0 backface-hidden rounded-[28px] shadow-pop overflow-hidden bg-white animate-float">
-
-                        {{-- Top section : brand color --}}
-                        <div style="background-color: {{ $brandColor }}; height: 60%;" class="p-6 relative overflow-hidden">
-
-                            {{-- Pattern emboss --}}
-                            <svg class="absolute inset-0 w-full h-full opacity-[0.08]" aria-hidden="true">
-                                <defs>
-                                    <pattern id="card-pattern-{{ md5($name) }}" width="40" height="40" patternUnits="userSpaceOnUse">
-                                        <circle cx="20" cy="20" r="16" fill="none" stroke="{{ $textColor }}" stroke-width="1.5"/>
-                                    </pattern>
-                                </defs>
-                                <rect width="100%" height="100%" fill="url(#card-pattern-{{ md5($name) }})"/>
-                            </svg>
-
-                            {{-- Glow accent --}}
-                            <div class="absolute -top-12 -right-12 w-48 h-48 rounded-full" style="background-color: {{ $textColor }}; opacity: 0.12; filter: blur(40px);"></div>
-
-                            <div class="relative z-10 flex flex-col h-full justify-between">
-                                <div>
-                                    <span style="color: {{ $textColor }}" class="opacity-70 font-bold text-[10px] tracking-[0.25em] uppercase">Gift Card</span>
-                                    <h2 style="color: {{ $textColor }}" class="font-display font-bold text-3xl md:text-4xl tracking-tight mt-1.5 leading-tight truncate">
-                                        {{ explode(' ', $cardType['name'])[0] }}
-                                    </h2>
-                                </div>
-
-                                {{-- Chip + numero ficitf "carte bancaire" --}}
-                                <div class="flex items-end justify-between">
-                                    <div class="font-mono opacity-90" style="color: {{ $textColor }}">
-                                        <div class="text-[10px] opacity-60 mb-0.5">CARDHOLDER</div>
-                                        <div class="text-xs font-semibold tracking-wider">VOTRE NOM</div>
-                                    </div>
-                                    <div class="w-12 h-9 rounded-md bg-gradient-to-br from-yellow-200/90 to-yellow-400/70 border border-yellow-300/40 shadow-inner relative overflow-hidden">
-                                        <div class="absolute inset-1 grid grid-cols-3 grid-rows-3 gap-px opacity-40">
-                                            @for ($i = 0; $i < 9; $i++)
-                                                <div class="bg-yellow-700/30 rounded-[1px]"></div>
-                                            @endfor
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {{-- Bottom section : logo + name + price range --}}
-                        <div class="h-[40%] bg-white relative">
-                            {{-- Floating logo medallion --}}
-                            <div class="absolute -top-8 left-6 w-16 h-16 rounded-full bg-white ring-4 ring-white shadow-lg flex items-center justify-center overflow-hidden border border-slate-100 z-20">
-                                @if(!empty($cardType['logoUrl']))
-                                    <img src="{{ $cardType['logoUrl'] }}" alt="Logo" class="w-full h-full object-cover">
-                                @else
-                                    <span class="font-display text-2xl font-bold" style="color: {{ $brandColor }}">{{ strtoupper(substr($name, 0, 1)) }}</span>
-                                @endif
-                            </div>
-
-                            <div class="flex flex-col justify-between h-full pt-9 pb-5 px-6">
-                                <div class="flex items-start justify-between gap-3">
-                                    <h3 class="font-semibold text-slate-900 text-base line-clamp-1">{{ $cardType['name'] }}</h3>
-                                    <div class="px-2 py-1 rounded-md bg-emerald-50 border border-emerald-100 shrink-0">
-                                        <span class="text-emerald-700 font-bold text-[10px] tabular-nums" x-text="priceRange"></span>
-                                    </div>
-                                </div>
-
-                                {{-- Progress bar (dynamique selon le produit selectionne) --}}
-                                <div class="mt-auto">
-                                    <div class="flex justify-between text-[10px] text-slate-400 mb-1.5">
-                                        <span>MIN</span>
-                                        <span class="text-slate-700 font-semibold" x-text="selectedProduct ? formatPrice(selectedProduct.price.min, selectedProduct.price.currencyCode) : ''"></span>
-                                        <span>MAX</span>
-                                    </div>
-                                    <div class="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
-                                        <div style="background-color: {{ $brandColor }};"
-                                             :style="'width: ' + progressWidth + '%'"
-                                             class="h-full rounded-full transition-all duration-500"></div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                        @include('partials._gift-card-visual', [
+                            'brandLabel'  => $cardType['name'] ?? $name,
+                            'brandColor'  => $brandColor,
+                            'countryCode' => $cardType['countryCode'] ?? null,
+                            'currency'    => $cardType['products'][0]['price']['currencyCode'] ?? null,
+                            'compact'     => false,
+                            'logoUrl'     => $cardType['logoUrl'] ?? null,
+                        ])
                     </div>
 
                     {{-- ===== BACK ===== --}}
