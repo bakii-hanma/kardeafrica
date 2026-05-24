@@ -16,7 +16,7 @@ class AdminUserSeeder extends Seeder
      *   ADMIN_EMAIL=admin@kardafrica.com
      *   ADMIN_PASSWORD=motdepasse-fort
      *   ADMIN_NAME="Admin KardAfrica"
-     *   ADMIN_PHONE=+24100000000
+     *   ADMIN_PHONE=+24106871309
      *
      * Lancement :  php artisan db:seed --class=AdminUserSeeder --force
      */
@@ -25,7 +25,7 @@ class AdminUserSeeder extends Seeder
         $email    = env('ADMIN_EMAIL',    'admin@kardafrica.com');
         $password = env('ADMIN_PASSWORD', 'KardAfrica@2026');
         $name     = env('ADMIN_NAME',     'Admin KardAfrica');
-        $phone    = env('ADMIN_PHONE',    '+24100000000');
+        $phone    = env('ADMIN_PHONE',    '+24106871309');
 
         // Note : le cast 'password' => 'hashed' (User::casts) hashe automatiquement
         $user = User::updateOrCreate(

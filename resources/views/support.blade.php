@@ -259,7 +259,7 @@
                             <div class="cta-sub" style="font-size: 12px; color: #64748B; margin-top: 2px;">Réponse sous 1h</div>
                         </div>
                     </a>
-                    <a href="https://wa.me/24100000000" target="_blank" rel="noopener"
+                    <a href="https://wa.me/24106871309" target="_blank" rel="noopener"
                        style="display: flex; align-items: flex-start; gap: 12px;
                               padding: 16px; border-radius: 16px;
                               background: #F8FAFC; text-decoration: none; transition: all .2s;"
