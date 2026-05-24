@@ -6,7 +6,8 @@
       - $countryCode : ?string (ex: 'FR', 'BE')
       - $currency    : ?string (ex: 'EUR') — affiché si ≠ XAF
       - $compact     : ?bool   (default: false) — padding réduit
-      - $hashId      : ?string (default: md5(brand)) — pour différencier les SVG ids
+      - $logoUrl     : ?string — image officielle afrikard, utilisée en background
+                                 watermark (= remplit le rôle de "image de fond")
 
     Utilisé par :
       - resources/views/components/product-card.blade.php (catalogue)
@@ -18,7 +19,11 @@
         ? \App\Support\BrandStyle::style($_brandKey)
         : \App\Support\BrandStyle::fallback($brandColor ?? '#1F2937');
     [$_flag, $_regionLabel] = \App\Support\BrandStyle::region($countryCode ?? null);
-    $_compact = $compact ?? false;
+    $_compact     = $compact ?? false;
+    $_logoUrl     = $logoUrl ?? null;
+    // Si on a un logoUrl ET pas de SVG inline (= marque inconnue), on push
+    // un peu plus l'opacité du watermark pour qu'il soit clairement visible.
+    $_logoOpacity = !empty($_brandStyle['logo']) ? '0.18' : '0.40';
 @endphp
 
 <div class="gc-hybrid {{ $_compact ? 'gc-hybrid--compact' : '' }}"
@@ -27,6 +32,14 @@
     {{-- Glow d'ambiance --}}
     @if(!empty($_brandStyle['glow']))
         <div class="gc-glow" style="background: {{ $_brandStyle['glow'] }};"></div>
+    @endif
+
+    {{-- Image officielle de la marque en watermark (= "image en fond")
+         Sert pour TOUTES les marques (pas juste les 9 SVG hardcodés).
+         Positionnée à droite, centrée verticalement, contain — ne déforme pas. --}}
+    @if($_logoUrl)
+        <div class="gc-bg-watermark" aria-hidden="true"
+             style="background-image: url('{{ $_logoUrl }}'); opacity: {{ $_logoOpacity }};"></div>
     @endif
 
     {{-- Frame top : KardAfrica + ✓ Vérifié --}}

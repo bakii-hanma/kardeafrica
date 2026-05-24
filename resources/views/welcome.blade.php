@@ -124,6 +124,7 @@
                                         'countryCode' => $card['countryCode'] ?? null,
                                         'currency'    => $card['currency'],
                                         'compact'     => true,
+                                        'logoUrl'     => $card['logoUrl'] ?? null,
                                     ])
                                 </div>
                             @endforeach

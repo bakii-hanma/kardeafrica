@@ -1,7 +1,7 @@
 @props([
     'name'          => '',
     'brandLabel'    => null,       // Texte big sur le visuel (ex: "Netflix") — défaut: 1er mot de $name
-    'logoUrl'       => null,       // ⚠️ Non utilisé par le design hybride (SVG inline). Conservé pour compat.
+    'logoUrl'       => null,       // Image officielle afrikard — utilisée en watermark sur le visuel
     'brandColor'    => '#1F2937',  // Fallback si la marque n'est pas dans le registre
     'price'         => 0,
     'currency'      => 'XAF',
@@ -48,6 +48,7 @@
         'countryCode' => $countryCode,
         'currency'    => $currency,
         'compact'     => $compact,
+        'logoUrl'     => $logoUrl,
     ])
 
     @unless($compact)
@@ -115,6 +116,21 @@
 
     /* Glow par-dessus le gradient */
     .gc-glow { position: absolute; inset: 0; pointer-events: none; }
+
+    /* Watermark : image officielle de la marque (logoUrl afrikard).
+       Positionnée à droite/centre, contain, opacité gérée par inline style.
+       z-index 0 = derrière tout sauf le gradient.
+       mix-blend-mode pour mieux s'intégrer aux gradients sombres. */
+    .gc-bg-watermark {
+        position: absolute;
+        inset: 0;
+        background-repeat: no-repeat;
+        background-position: 78% center;
+        background-size: 55% auto;
+        pointer-events: none;
+        z-index: 0;
+        filter: drop-shadow(0 2px 8px rgba(0,0,0,0.15));
+    }
 
     /* ===== Frame top : KardAfrica + Vérifié ===== */
     .gc-frame-top {
