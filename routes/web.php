@@ -22,6 +22,7 @@ use App\Http\Controllers\Vendor\ProfileController    as VendorProfileController;
 use App\Http\Controllers\Vendor\SaleController       as VendorSaleController;
 use App\Http\Controllers\Vendor\CashOrderController  as VendorCashOrderController;
 use App\Http\Controllers\Vendor\RemittanceController as VendorRemittanceController;
+use App\Http\Controllers\Vendor\MerchantCardController as VendorMerchantCardController;
 use App\Http\Controllers\ClaimController;
 
 // Route d'accueil avec les produits populaires
@@ -187,6 +188,14 @@ Route::prefix('vendor')->group(function () {
         Route::post('/cash/{order}/reject',          [VendorCashOrderController::class, 'reject'])->name('vendor.cash.reject');
 
         Route::get('/profile',          [VendorProfileController::class, 'show'])->name('vendor.profile');
+
+        // Carte Gabon — cartes-cadeau créées par le marchand lui-même
+        Route::get('/cartes-cadeau',                       [VendorMerchantCardController::class, 'index'])->name('vendor.merchant-cards.index');
+        Route::get('/cartes-cadeau/nouvelle',              [VendorMerchantCardController::class, 'create'])->name('vendor.merchant-cards.create');
+        Route::post('/cartes-cadeau',                      [VendorMerchantCardController::class, 'store'])->name('vendor.merchant-cards.store');
+        Route::get('/cartes-cadeau/{merchantCard}/edit',   [VendorMerchantCardController::class, 'edit'])->name('vendor.merchant-cards.edit');
+        Route::put('/cartes-cadeau/{merchantCard}',        [VendorMerchantCardController::class, 'update'])->name('vendor.merchant-cards.update');
+        Route::delete('/cartes-cadeau/{merchantCard}',     [VendorMerchantCardController::class, 'destroy'])->name('vendor.merchant-cards.destroy');
 
         // E-Billing payment flow (return depuis le portail + vérification)
         Route::get('/payment/return',   [VendorSaleController::class, 'paymentReturn'])->name('vendor.payment.return');
