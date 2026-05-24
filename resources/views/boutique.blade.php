@@ -523,57 +523,9 @@
                         </div>
                     </div>
 
-                    {{-- ===== Section : Région ===== --}}
-                    <div x-data="{ open: true }" class="border-b border-slate-100">
-                        <button @click="open = !open" type="button" class="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-slate-50/50 transition">
-                            <span class="flex items-center gap-2 text-sm font-semibold text-slate-900">
-                                Région
-                                @if(count($selectedRegions))
-                                    <span class="px-1.5 py-0.5 rounded-md bg-teal-50 text-[#44A08D] text-[10px] font-bold">{{ count($selectedRegions) }}</span>
-                                @endif
-                            </span>
-                            <svg class="w-4 h-4 text-slate-400 transition-transform" :class="open && 'rotate-180'" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
-                        </button>
-                        <div x-show="open" x-collapse class="px-3 pb-4 space-y-0.5">
-                            @foreach($regionList as [$rcode, $rlabel, $remoji])
-                                @php $isActive = in_array($rcode, $selectedRegions, true); @endphp
-                                <label class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-50 cursor-pointer transition group">
-                                    <input type="checkbox" name="region[]" value="{{ $rcode }}"
-                                           onchange="this.form.submit()"
-                                           {{ $isActive ? 'checked' : '' }}
-                                           class="w-4 h-4 rounded border-slate-300 text-[#44A08D] focus:ring-[#44A08D] focus:ring-offset-0">
-                                    <span class="text-base leading-none">{{ $remoji }}</span>
-                                    <span class="text-sm text-slate-700 group-hover:text-slate-900 transition">{{ $rlabel }}</span>
-                                </label>
-                            @endforeach
-                        </div>
-                    </div>
-
-                    {{-- ===== Section : Pays ===== --}}
-                    <div x-data="{ open: true }">
-                        <button @click="open = !open" type="button" class="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-slate-50/50 transition">
-                            <span class="flex items-center gap-2 text-sm font-semibold text-slate-900">
-                                Pays disponibles
-                                @if(count($selectedCountries ?? []))
-                                    <span class="px-1.5 py-0.5 rounded-md bg-teal-50 text-[#44A08D] text-[10px] font-bold">{{ count($selectedCountries) }}</span>
-                                @endif
-                            </span>
-                            <svg class="w-4 h-4 text-slate-400 transition-transform" :class="open && 'rotate-180'" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
-                        </button>
-                        <div x-show="open" x-collapse class="px-3 pb-4 space-y-0.5">
-                            @foreach ($countryList as [$code, $label])
-                                @php $isActive = in_array($code, $selectedCountries ?? []); @endphp
-                                <label class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-50 cursor-pointer transition group">
-                                    <input type="checkbox" name="country[]" value="{{ $code }}"
-                                           onchange="this.form.submit()"
-                                           {{ $isActive ? 'checked' : '' }}
-                                           class="w-4 h-4 rounded border-slate-300 text-[#44A08D] focus:ring-[#44A08D] focus:ring-offset-0">
-                                    <span class="font-mono text-[10px] text-slate-500 px-1.5 py-0.5 rounded bg-slate-100 group-hover:bg-slate-200 transition">{{ $code }}</span>
-                                    <span class="text-sm text-slate-700 group-hover:text-slate-900 transition">{{ $label }}</span>
-                                </label>
-                            @endforeach
-                        </div>
-                    </div>
+                    {{-- Sections "Région" et "Pays disponibles" retirées sur demande user
+                         (mai 2026). Les filtres Region restent disponibles via les
+                         quick-pills en haut de la boutique. --}}
 
                     {{-- Footer mobile : sticky "Voir les résultats" --}}
                     <div class="lg:hidden sticky bottom-0 left-0 right-0 z-10 px-4 py-3 bg-white border-t border-slate-100 flex gap-2">
