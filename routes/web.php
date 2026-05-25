@@ -23,6 +23,7 @@ use App\Http\Controllers\Vendor\SaleController       as VendorSaleController;
 use App\Http\Controllers\Vendor\CashOrderController  as VendorCashOrderController;
 use App\Http\Controllers\Vendor\RemittanceController as VendorRemittanceController;
 use App\Http\Controllers\Vendor\MerchantCardController as VendorMerchantCardController;
+use App\Http\Controllers\GabonController;
 use App\Http\Controllers\ClaimController;
 
 // Route d'accueil avec les produits populaires
@@ -71,6 +72,16 @@ Route::middleware('auth')->group(function () {
 
 // Webhook callback E-Billing (cote web pour conserver le nom de route 'payment.callback')
 Route::any('/payment/callback', [App\Http\Controllers\PaymentController::class, 'handleCallback'])->name('payment.callback');
+
+// ================================================================
+// MARKETPLACE PUBLIC : cartes-cadeau marchand (Phase 3)
+// ================================================================
+Route::prefix('gabon')->group(function () {
+    Route::get('/',                          [GabonController::class, 'index'])->name('gabon.index');
+    Route::get('/categorie/{slug}',          [GabonController::class, 'category'])->name('gabon.category');
+    Route::get('/marchand/{slug}',           [GabonController::class, 'merchant'])->name('gabon.merchant');
+    Route::get('/carte/{merchantCard}',      [GabonController::class, 'card'])->name('gabon.card');
+});
 
 // Routes pour les produits de l'API
 Route::get('/boutique', [ProductController::class, 'boutique'])->name('boutique');

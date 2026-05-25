@@ -1563,6 +1563,12 @@
                        class="px-3.5 py-2 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-white/[0.06] transition">
                         Comment ça marche
                     </a>
+
+                    <a href="{{ route('gabon.index') }}"
+                       class="px-3.5 py-2 rounded-lg text-sm font-bold text-white bg-gradient-to-r from-[#44A08D] to-[#4ECDC4] hover:from-[#0F4F44] hover:to-[#44A08D] transition flex items-center gap-1.5 shadow-lg shadow-teal-500/20">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
+                        Carte Gabon
+                    </a>
                 </div>
 
                 <!-- Controles a droite : recherche, panier, user -->
@@ -1874,6 +1880,13 @@
                         @endforeach
                     </div>
                 </div>
+
+                <a href="{{ route('gabon.index') }}" class="sidebar-item flex items-center gap-3 px-3 py-3 rounded-xl text-white bg-gradient-to-r from-[#44A08D] to-[#4ECDC4] hover:from-[#0F4F44] hover:to-[#44A08D] transition group shadow-lg shadow-teal-500/20">
+                    <div class="w-9 h-9 rounded-lg bg-white/20 flex items-center justify-center text-white transition">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
+                    </div>
+                    <span class="font-bold text-sm">Carte Gabon</span>
+                </a>
 
                 <a href="{{ url('/#how-it-works') }}" class="sidebar-item flex items-center gap-3 px-3 py-3 rounded-xl text-slate-700 hover:bg-slate-50 hover:text-[#44A08D] transition group">
                     <div class="w-9 h-9 rounded-lg bg-slate-100 group-hover:bg-teal-50 flex items-center justify-center text-slate-600 group-hover:text-[#44A08D] transition">
