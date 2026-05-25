@@ -142,49 +142,127 @@
 
     /* ============ Visual upload ============ */
     .mcf-upload {
+        display: block;
         position: relative;
         border: 2px dashed #CBD5E1;
-        border-radius: 14px;
+        border-radius: 16px;
         padding: 24px 20px;
         text-align: center;
         cursor: pointer;
-        transition: border-color .15s, background .15s;
-        background: #F8FAFC;
+        transition: border-color .2s, background .2s, box-shadow .2s;
+        background:
+            linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%);
+        overflow: hidden;
     }
-    .mcf-upload:hover { border-color: #44A08D; background: #F0FDFA; }
+    .mcf-upload::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background:
+            radial-gradient(circle at 20% 20%, rgba(68,160,141,.06) 0%, transparent 50%),
+            radial-gradient(circle at 80% 80%, rgba(78,205,196,.05) 0%, transparent 50%);
+        pointer-events: none;
+    }
+    .mcf-upload:hover {
+        border-color: #44A08D;
+        background: linear-gradient(135deg, #F0FDFA 0%, #ECFDF5 100%);
+        box-shadow: inset 0 0 0 1px rgba(68,160,141,.10);
+    }
     .mcf-upload input[type="file"] {
         position: absolute; inset: 0;
-        opacity: 0; cursor: pointer; width: 100%; height: 100%;
+        opacity: 0; cursor: pointer;
+        width: 100%; height: 100%;
+        z-index: 2;
+    }
+
+    /* État avec preview */
+    .mcf-upload--filled {
+        padding: 16px;
+        background: white;
+        border-style: solid;
+        border-color: #BBF7D0;
     }
     .mcf-upload-preview {
         display: block;
-        margin: 0 auto 10px;
-        max-width: 320px; width: 100%;
+        margin: 0 auto;
+        max-width: 360px; width: 100%;
         aspect-ratio: 1.55;
         object-fit: cover;
         border-radius: 12px;
         background: #F1F5F9;
-        box-shadow: 0 6px 20px -6px rgba(15,23,42,.20);
+        box-shadow: 0 10px 24px -8px rgba(15,23,42,.20);
     }
+    .mcf-upload-overlay {
+        position: relative;
+        margin-top: 12px;
+        display: flex; align-items: center; justify-content: center; gap: 10px;
+        font-size: 12px;
+    }
+    .mcf-upload-overlay-status {
+        display: inline-flex; align-items: center; gap: 5px;
+        color: #059669; font-weight: 800;
+    }
+    .mcf-upload-overlay-status svg { width: 14px; height: 14px; }
+
+    /* État vide */
     .mcf-upload-empty {
+        position: relative;
         display: inline-flex; align-items: center; justify-content: center;
-        width: 56px; height: 56px;
-        background: linear-gradient(135deg,#ECFDF5,#D1FAE5);
-        color: #44A08D;
-        border-radius: 50%; margin-bottom: 10px;
+        width: 64px; height: 64px;
+        background: linear-gradient(135deg,#44A08D,#4ECDC4);
+        color: white;
+        border-radius: 18px;
+        margin-bottom: 14px;
+        box-shadow: 0 8px 20px -6px rgba(78,205,196,.45),
+                    inset 0 1px 0 rgba(255,255,255,.30);
     }
-    .mcf-upload-empty svg { width: 26px; height: 26px; }
-    .mcf-upload-text { font-size: 14px; font-weight: 800; color: #0F172A; }
-    .mcf-upload-hint { font-size: 11px; color: #94A3B8; margin-top: 4px; }
+    .mcf-upload-empty svg { width: 28px; height: 28px; }
+    .mcf-upload-text {
+        font-family: 'Space Grotesk','Inter',sans-serif;
+        font-size: 15px; font-weight: 800; color: #0F172A;
+        letter-spacing: -0.01em;
+    }
+    .mcf-upload-text strong { color: #44A08D; }
+    .mcf-upload-hint {
+        font-size: 11px; color: #64748B; margin-top: 5px;
+        display: inline-flex; align-items: center; gap: 6px;
+    }
+    .mcf-upload-hint svg { width: 11px; height: 11px; color: #94A3B8; }
     .mcf-upload-cta {
-        display: inline-block;
-        margin-top: 8px;
-        font-size: 12px; font-weight: 700; color: #44A08D;
-        padding: 5px 12px;
-        background: white;
-        border: 1px solid #BBF7D0;
+        display: inline-flex; align-items: center; gap: 6px;
+        margin-top: 12px;
+        font-size: 12px; font-weight: 700; color: white;
+        padding: 7px 16px;
+        background: linear-gradient(135deg,#44A08D,#4ECDC4);
         border-radius: 9999px;
+        box-shadow: 0 4px 10px -3px rgba(78,205,196,.40),
+                    inset 0 1px 0 rgba(255,255,255,.25);
     }
+    .mcf-upload-cta svg { width: 13px; height: 13px; }
+    .mcf-upload-cta--change {
+        background: white;
+        color: #44A08D;
+        border: 1.5px solid #BBF7D0;
+        box-shadow: none;
+    }
+
+    /* Specs pills sous le bouton */
+    .mcf-upload-specs {
+        position: relative;
+        display: flex; flex-wrap: wrap; gap: 6px;
+        justify-content: center;
+        margin-top: 14px;
+    }
+    .mcf-upload-specs span {
+        display: inline-flex; align-items: center; gap: 4px;
+        padding: 3px 9px;
+        background: rgba(255,255,255,.7);
+        border: 1px solid #E2E8F0;
+        border-radius: 9999px;
+        font-size: 10px; font-weight: 700; color: #475569;
+        letter-spacing: .02em;
+    }
+    .mcf-upload-specs span svg { width: 10px; height: 10px; color: #94A3B8; }
 
     /* ============ Denominations chips ============ */
     .mcf-denoms {
@@ -493,23 +571,52 @@
                         </div>
                     </div>
 
-                    <label class="mcf-upload">
+                    <label class="mcf-upload" :class="visualPreview ? 'mcf-upload--filled' : ''">
                         <input type="file" name="visual" accept="image/jpeg,image/png,image/webp" @change="onFileChange($event)">
-                        <template x-if="visualPreview">
-                            <img :src="visualPreview" class="mcf-upload-preview" alt="Aperçu">
-                        </template>
+
+                        {{-- État vide --}}
                         <template x-if="!visualPreview">
-                            <div>
+                            <div style="position:relative;">
                                 <div class="mcf-upload-empty">
-                                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+                                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
                                 </div>
-                                <div class="mcf-upload-text">Clique pour choisir un visuel</div>
-                                <div class="mcf-upload-hint">Format recommandé : 1550 × 1000 px · ratio paysage</div>
-                                <span class="mcf-upload-cta">Parcourir mes fichiers</span>
+                                <div class="mcf-upload-text">
+                                    Glisse ton visuel ici ou <strong>clique</strong>
+                                </div>
+                                <div class="mcf-upload-hint">
+                                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                    Une belle photo donne envie d'acheter
+                                </div>
+                                <span class="mcf-upload-cta">
+                                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
+                                    Parcourir mes fichiers
+                                </span>
+                                <div class="mcf-upload-specs">
+                                    <span>
+                                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/></svg>
+                                        1550 × 1000 px
+                                    </span>
+                                    <span>JPG · PNG · WebP</span>
+                                    <span>Max 3 Mo</span>
+                                </div>
                             </div>
                         </template>
+
+                        {{-- État rempli --}}
                         <template x-if="visualPreview">
-                            <span class="mcf-upload-cta">Changer le visuel</span>
+                            <div style="position:relative;">
+                                <img :src="visualPreview" class="mcf-upload-preview" alt="Aperçu du visuel">
+                                <div class="mcf-upload-overlay">
+                                    <span class="mcf-upload-overlay-status">
+                                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                                        Visuel chargé
+                                    </span>
+                                    <span class="mcf-upload-cta mcf-upload-cta--change">
+                                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                                        Changer
+                                    </span>
+                                </div>
+                            </div>
                         </template>
                     </label>
                     @error('visual') <p class="mcf-error">{{ $message }}</p> @enderror
