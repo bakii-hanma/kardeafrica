@@ -277,14 +277,15 @@
              CATEGORIES — bento gradient cards (one signature color per cat)
              ================================================================ --}}
         @php
-            // Mapping: category name keyword -> [icon key, gradient classes, decorative pattern color]
+            // Mapping: category name keyword -> [icon key, gradient classes, decorative pattern color, bg image]
+            // Les images sont uploadées sous public_html/assets/banner/universes/
             $categoryStyles = [
-                'divertissement' => ['icon' => 'film',         'gradient' => 'from-rose-500 via-rose-600 to-pink-700',     'glow' => 'bg-rose-400/40'],
-                'jeu'            => ['icon' => 'gamepad',      'gradient' => 'from-violet-500 via-purple-600 to-indigo-700','glow' => 'bg-violet-400/40'],
-                'musique'        => ['icon' => 'music',        'gradient' => 'from-emerald-500 via-teal-600 to-cyan-700',  'glow' => 'bg-emerald-400/40'],
-                'shopping'       => ['icon' => 'shopping-bag', 'gradient' => 'from-amber-500 via-orange-600 to-red-600',   'glow' => 'bg-amber-400/40'],
-                'voyage'         => ['icon' => 'plane',        'gradient' => 'from-fuchsia-500 via-pink-600 to-rose-700',  'glow' => 'bg-fuchsia-400/40'],
-                'daywatch'       => ['icon' => 'tv',           'gradient' => 'from-sky-500 via-blue-600 to-indigo-700',    'glow' => 'bg-sky-400/40'],
+                'divertissement' => ['icon' => 'film',         'gradient' => 'from-rose-500 via-rose-600 to-pink-700',     'glow' => 'bg-rose-400/40',   'bg' => 'assets/banner/universes/divertissement.jpg'],
+                'jeu'            => ['icon' => 'gamepad',      'gradient' => 'from-violet-500 via-purple-600 to-indigo-700','glow' => 'bg-violet-400/40','bg' => 'assets/banner/universes/jeu.jpg'],
+                'musique'        => ['icon' => 'music',        'gradient' => 'from-emerald-500 via-teal-600 to-cyan-700',  'glow' => 'bg-emerald-400/40','bg' => 'assets/banner/universes/musique.jpg'],
+                'shopping'       => ['icon' => 'shopping-bag', 'gradient' => 'from-amber-500 via-orange-600 to-red-600',   'glow' => 'bg-amber-400/40',  'bg' => 'assets/banner/universes/shopping.jpg'],
+                'voyage'         => ['icon' => 'plane',        'gradient' => 'from-fuchsia-500 via-pink-600 to-rose-700',  'glow' => 'bg-fuchsia-400/40','bg' => 'assets/banner/universes/voyage.jpg'],
+                'daywatch'       => ['icon' => 'tv',           'gradient' => 'from-sky-500 via-blue-600 to-indigo-700',    'glow' => 'bg-sky-400/40',    'bg' => 'assets/banner/universes/daywatch.jpg'],
             ];
 
             $styleFor = function ($name) use ($categoryStyles) {
@@ -292,7 +293,7 @@
                 foreach ($categoryStyles as $kw => $style) {
                     if (str_contains($n, $kw)) return $style;
                 }
-                return ['icon' => 'tag', 'gradient' => 'from-slate-600 via-slate-700 to-slate-800', 'glow' => 'bg-slate-400/40'];
+                return ['icon' => 'tag', 'gradient' => 'from-slate-600 via-slate-700 to-slate-800', 'glow' => 'bg-slate-400/40', 'bg' => 'assets/banner/universes/default.jpg'];
             };
         @endphp
 
@@ -311,13 +312,20 @@
             {{-- Bento grid : 1 anchor "Tout" (col-span-2 sur lg) + 6 categories --}}
             <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4 auto-rows-[140px] md:auto-rows-[160px]">
 
-                {{-- Anchor "Tout" : col-span-2 sur lg, fond noir charter --}}
+                {{-- Anchor "Tout" : col-span-2 sur lg, fond noir charter + photo cartes flottantes --}}
                 <a href="{{ route('boutique') }}"
                    class="group relative col-span-2 sm:col-span-3 lg:col-span-2 lg:row-span-2 lg:auto-rows-auto overflow-hidden rounded-3xl bg-gradient-to-br from-[#1F2937] via-[#0F172A] to-[#1F2937] p-6 md:p-8 transition-all duration-300 hover:scale-[1.01] active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4ECDC4]">
 
+                    {{-- Photo de fond : cartes flottantes --}}
+                    <div class="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-105"
+                         style="background-image: url('{{ asset('assets/banner/universes/default.jpg') }}');"></div>
+
+                    {{-- Overlay : dégradé sombre pour la lisibilité --}}
+                    <div class="absolute inset-0 bg-gradient-to-br from-[#0F172A]/85 via-[#0F172A]/70 to-[#0F172A]/95"></div>
+
                     {{-- Glow background --}}
-                    <div class="absolute -top-16 -right-16 w-64 h-64 bg-[#44A08D]/30 rounded-full blur-3xl group-hover:bg-[#44A08D]/40 transition-colors"></div>
-                    <div class="absolute -bottom-12 -left-12 w-48 h-48 bg-[#4ECDC4]/20 rounded-full blur-3xl"></div>
+                    <div class="absolute -top-16 -right-16 w-64 h-64 bg-[#44A08D]/30 rounded-full blur-3xl group-hover:bg-[#44A08D]/40 transition-colors mix-blend-screen"></div>
+                    <div class="absolute -bottom-12 -left-12 w-48 h-48 bg-[#4ECDC4]/20 rounded-full blur-3xl mix-blend-screen"></div>
 
                     {{-- Pattern de cercles (style carte) --}}
                     <svg class="absolute inset-0 w-full h-full opacity-[0.04]" aria-hidden="true">
@@ -349,18 +357,25 @@
                     </div>
                 </a>
 
-                {{-- Categories : chacune avec sa couleur signature --}}
+                {{-- Categories : chacune avec sa couleur signature + photo de fond --}}
                 @if(isset($categories) && count($categories) > 0)
                     @foreach($categories as $category)
                         @php $style = $styleFor($category['name']); @endphp
                         <a href="{{ route('category', $category['id']) }}"
                            class="group relative overflow-hidden rounded-2xl bg-gradient-to-br {{ $style['gradient'] }} p-4 md:p-5 transition-all duration-300 hover:scale-[1.02] hover:shadow-xl active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50">
 
-                            {{-- Glow accent --}}
-                            <div class="absolute -top-8 -right-8 w-32 h-32 {{ $style['glow'] }} rounded-full blur-2xl group-hover:scale-110 transition-transform duration-500"></div>
+                            {{-- Photo de fond (l'image se charge par-dessus le gradient → fallback si 404) --}}
+                            <div class="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-110"
+                                 style="background-image: url('{{ asset($style['bg']) }}');"></div>
+
+                            {{-- Overlay sombre pour la lisibilité du texte (gradient bottom heavy) --}}
+                            <div class="absolute inset-0 bg-gradient-to-b from-black/20 via-black/35 to-black/75"></div>
+
+                            {{-- Glow accent (par-dessus l'image) --}}
+                            <div class="absolute -top-8 -right-8 w-32 h-32 {{ $style['glow'] }} rounded-full blur-2xl group-hover:scale-110 transition-transform duration-500 mix-blend-screen"></div>
 
                             {{-- Pattern de cercles subtil --}}
-                            <svg class="absolute inset-0 w-full h-full opacity-[0.08] pointer-events-none" aria-hidden="true">
+                            <svg class="absolute inset-0 w-full h-full opacity-[0.06] pointer-events-none" aria-hidden="true">
                                 <defs>
                                     <pattern id="dots-{{ $category['id'] }}" width="24" height="24" patternUnits="userSpaceOnUse">
                                         <circle cx="2" cy="2" r="1" fill="white"/>
