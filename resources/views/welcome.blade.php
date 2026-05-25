@@ -320,12 +320,12 @@
                     <div class="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-105"
                          style="background-image: url('{{ asset('assets/banner/universes/default.jpg') }}');"></div>
 
-                    {{-- Overlay : dégradé sombre pour la lisibilité --}}
-                    <div class="absolute inset-0 bg-gradient-to-br from-[#0F172A]/85 via-[#0F172A]/70 to-[#0F172A]/95"></div>
+                    {{-- Voile noir uniquement à gauche (où se trouve le texte) — l'image reste visible à droite --}}
+                    <div class="absolute inset-y-0 left-0 w-3/4 bg-gradient-to-r from-[#0F172A]/90 via-[#0F172A]/55 to-transparent pointer-events-none"></div>
 
-                    {{-- Glow background --}}
-                    <div class="absolute -top-16 -right-16 w-64 h-64 bg-[#44A08D]/30 rounded-full blur-3xl group-hover:bg-[#44A08D]/40 transition-colors mix-blend-screen"></div>
-                    <div class="absolute -bottom-12 -left-12 w-48 h-48 bg-[#4ECDC4]/20 rounded-full blur-3xl mix-blend-screen"></div>
+                    {{-- Glow background (mix-blend-screen → s'ajoute à l'image au lieu de la masquer) --}}
+                    <div class="absolute -top-16 -right-16 w-64 h-64 bg-[#44A08D]/30 rounded-full blur-3xl group-hover:bg-[#44A08D]/40 transition-colors mix-blend-screen pointer-events-none"></div>
+                    <div class="absolute -bottom-12 -left-12 w-48 h-48 bg-[#4ECDC4]/20 rounded-full blur-3xl mix-blend-screen pointer-events-none"></div>
 
                     {{-- Pattern de cercles (style carte) --}}
                     <svg class="absolute inset-0 w-full h-full opacity-[0.04]" aria-hidden="true">
@@ -357,32 +357,22 @@
                     </div>
                 </a>
 
-                {{-- Categories : chacune avec sa couleur signature + photo de fond --}}
+                {{-- Categories : photo de fond + tint léger de la couleur signature --}}
                 @if(isset($categories) && count($categories) > 0)
                     @foreach($categories as $category)
                         @php $style = $styleFor($category['name']); @endphp
                         <a href="{{ route('category', $category['id']) }}"
                            class="group relative overflow-hidden rounded-2xl bg-gradient-to-br {{ $style['gradient'] }} p-4 md:p-5 transition-all duration-300 hover:scale-[1.02] hover:shadow-xl active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50">
 
-                            {{-- Photo de fond (l'image se charge par-dessus le gradient → fallback si 404) --}}
-                            <div class="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-110"
+                            {{-- Photo de fond plein cadre (le gradient sous reste en fallback si 404) --}}
+                            <div class="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-110"
                                  style="background-image: url('{{ asset($style['bg']) }}');"></div>
 
-                            {{-- Overlay sombre pour la lisibilité du texte (gradient bottom heavy) --}}
-                            <div class="absolute inset-0 bg-gradient-to-b from-black/20 via-black/35 to-black/75"></div>
+                            {{-- Voile sombre uniquement sur la moitié basse (lisibilité du label) --}}
+                            <div class="absolute inset-x-0 bottom-0 h-3/4 bg-gradient-to-t from-black/85 via-black/45 to-transparent pointer-events-none"></div>
 
-                            {{-- Glow accent (par-dessus l'image) --}}
-                            <div class="absolute -top-8 -right-8 w-32 h-32 {{ $style['glow'] }} rounded-full blur-2xl group-hover:scale-110 transition-transform duration-500 mix-blend-screen"></div>
-
-                            {{-- Pattern de cercles subtil --}}
-                            <svg class="absolute inset-0 w-full h-full opacity-[0.06] pointer-events-none" aria-hidden="true">
-                                <defs>
-                                    <pattern id="dots-{{ $category['id'] }}" width="24" height="24" patternUnits="userSpaceOnUse">
-                                        <circle cx="2" cy="2" r="1" fill="white"/>
-                                    </pattern>
-                                </defs>
-                                <rect width="100%" height="100%" fill="url(#dots-{{ $category['id'] }})"/>
-                            </svg>
+                            {{-- Glow accent — mix-blend-screen pour s'intégrer sans masquer l'image --}}
+                            <div class="absolute -top-8 -right-8 w-32 h-32 {{ $style['glow'] }} rounded-full blur-2xl group-hover:scale-110 transition-transform duration-500 mix-blend-screen pointer-events-none"></div>
 
                             <div class="relative h-full flex flex-col justify-between">
                                 <div class="w-10 h-10 rounded-xl bg-white/15 backdrop-blur-sm border border-white/20 flex items-center justify-center text-white group-hover:bg-white/25 group-hover:rotate-6 transition-all duration-300">
