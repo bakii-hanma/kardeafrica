@@ -485,7 +485,7 @@
 <div class="mcf-wrap"
      x-data="merchantCardForm({
         initialDenoms: {{ json_encode(old('denominations', $card->denominations ?? [])) }},
-        initialVisual: @js($card->visual_url ? \Storage::url($card->visual_url) : null),
+        initialVisual: @js($card->visual_url ? asset($card->visual_url) : null),
         initialCustom: {{ old('allow_custom_amount', $card->allow_custom_amount) ? 'true' : 'false' }},
         initialName:   @js(old('name', $card->name)),
         initialValidity: {{ (int) old('validity_months', $card->validity_months ?? 12) }},

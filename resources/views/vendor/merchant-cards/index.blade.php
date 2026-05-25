@@ -221,7 +221,7 @@
                 <div class="mc-card">
                     <div class="mc-card-visual">
                         @if($card->visual_url)
-                            <img src="{{ Storage::url($card->visual_url) }}" alt="{{ $card->name }}">
+                            <img src="{{ asset($card->visual_url) }}" alt="{{ $card->name }}">
                         @else
                             <span class="mc-card-visual-placeholder">Aucun visuel</span>
                         @endif

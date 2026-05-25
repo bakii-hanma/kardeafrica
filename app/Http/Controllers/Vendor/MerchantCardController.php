@@ -6,8 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Models\MerchantCard;
 use App\Support\MerchantSlug;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 /**
@@ -92,10 +93,7 @@ class MerchantCardController extends Controller
         $card->total_revenue = 0;
 
         if ($request->hasFile('visual')) {
-            $card->visual_url = $request->file('visual')->store(
-                'merchant-cards/'.$reseller->id,
-                'public'
-            );
+            $card->visual_url = $this->storeVisual($request->file('visual'), $reseller->id);
         }
 
         $card->save();
@@ -123,14 +121,8 @@ class MerchantCardController extends Controller
         $data = $this->validated($request);
 
         if ($request->hasFile('visual')) {
-            // Supprimer l'ancien visuel pour libérer l'espace
-            if ($merchantCard->visual_url) {
-                Storage::disk('public')->delete($merchantCard->visual_url);
-            }
-            $data['visual_url'] = $request->file('visual')->store(
-                'merchant-cards/'.$merchantCard->reseller_id,
-                'public'
-            );
+            $this->deleteVisual($merchantCard->visual_url);
+            $data['visual_url'] = $this->storeVisual($request->file('visual'), $merchantCard->reseller_id);
         }
 
         // Toute modification d'une carte déjà active la repasse en attente
@@ -160,9 +152,7 @@ class MerchantCardController extends Controller
                 ->with('success', 'Carte désactivée (impossible de supprimer : des achats existent).');
         }
 
-        if ($merchantCard->visual_url) {
-            Storage::disk('public')->delete($merchantCard->visual_url);
-        }
+        $this->deleteVisual($merchantCard->visual_url);
         $merchantCard->delete();
 
         return redirect()
@@ -179,6 +169,41 @@ class MerchantCardController extends Controller
     {
         $reseller = Auth::guard('vendor')->user();
         abort_if($card->reseller_id !== $reseller->id, 403);
+    }
+
+    /**
+     * Stocke le visuel directement sous public/merchant-cards/{reseller_id}/.
+     *
+     * Pourquoi pas Storage::disk('public') + symlink ? Sur l'hébergement
+     * mutualisé SiteGround, nginx renvoie 403 sur tous les chemins /storage/*
+     * (même avec le bon symlink + perms 644). Écrire directement dans /public
+     * contourne le problème — pas de symlink, pas de proxy, fichier servi
+     * comme n'importe quel asset.
+     *
+     * @return string  chemin relatif à public/, ex : "merchant-cards/1/abc.jpg"
+     */
+    private function storeVisual(UploadedFile $file, int $resellerId): string
+    {
+        $relDir = 'merchant-cards/'.$resellerId;
+        $absDir = public_path($relDir);
+        if (!is_dir($absDir)) {
+            @mkdir($absDir, 0755, true);
+        }
+
+        $filename = Str::random(40).'.'.strtolower($file->getClientOriginalExtension() ?: 'jpg');
+        $file->move($absDir, $filename);
+
+        return $relDir.'/'.$filename;
+    }
+
+    /** Supprime un fichier visuel — accepte un chemin (peut être null) */
+    private function deleteVisual(?string $relPath): void
+    {
+        if (!$relPath) return;
+        $abs = public_path($relPath);
+        if (is_file($abs)) {
+            @unlink($abs);
+        }
     }
 
     /**
