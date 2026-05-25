@@ -172,20 +172,22 @@ class MerchantCardController extends Controller
     }
 
     /**
-     * Stocke le visuel directement sous public/merchant-cards/{reseller_id}/.
+     * Stocke le visuel directement à la racine du doc root (= base_path() ici,
+     * sur ce déploiement SiteGround où le doc root est public_html/ et non
+     * public_html/public/). asset('merchant-cards/...') retourne donc une URL
+     * web-accessible.
      *
-     * Pourquoi pas Storage::disk('public') + symlink ? Sur l'hébergement
-     * mutualisé SiteGround, nginx renvoie 403 sur tous les chemins /storage/*
-     * (même avec le bon symlink + perms 644). Écrire directement dans /public
-     * contourne le problème — pas de symlink, pas de proxy, fichier servi
-     * comme n'importe quel asset.
+     * Pourquoi pas Storage::disk('public') + symlink ? Sur cet hébergement,
+     * nginx renvoie 403 sur tous les chemins /storage/* (même avec storage:link
+     * OK + perms 644). Écrire directement à la racine du doc root contourne
+     * le problème.
      *
-     * @return string  chemin relatif à public/, ex : "merchant-cards/1/abc.jpg"
+     * @return string  chemin relatif au doc root, ex : "merchant-cards/1/abc.jpg"
      */
     private function storeVisual(UploadedFile $file, int $resellerId): string
     {
         $relDir = 'merchant-cards/'.$resellerId;
-        $absDir = public_path($relDir);
+        $absDir = base_path($relDir);
         if (!is_dir($absDir)) {
             @mkdir($absDir, 0755, true);
         }
@@ -200,7 +202,7 @@ class MerchantCardController extends Controller
     private function deleteVisual(?string $relPath): void
     {
         if (!$relPath) return;
-        $abs = public_path($relPath);
+        $abs = base_path($relPath);
         if (is_file($abs)) {
             @unlink($abs);
         }
