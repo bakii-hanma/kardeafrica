@@ -268,7 +268,7 @@
         {{-- =========== SECTION 1 : Identité =========== --}}
         <div class="mcf-section">
             <h2 class="mcf-section-title">1. Identité de la carte</h2>
-            <p class="mcf-section-hint">Le nom et la catégorie qui s'afficheront aux clients sur Carte&nbsp;Gabon.</p>
+            <p class="mcf-section-hint">Le nom et la catégorie qui s'afficheront aux clients sur Kardafrica.</p>
 
             <div class="mcf-field">
                 <label class="mcf-label" for="name">Nom de la carte <span class="mcf-label-req">*</span></label>
