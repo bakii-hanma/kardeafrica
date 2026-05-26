@@ -10,7 +10,60 @@
 @endphp
 
 @section('content')
-<div style="padding:24px;font-family:'Inter','Figtree',sans-serif;max-width:1180px;margin:0 auto;">
+<div style="padding:24px;font-family:'Inter','Figtree',sans-serif;max-width:1180px;margin:0 auto;" x-data="merchantCardActionModal()">
+
+    {{-- ============ CUSTOM MODAL ============ --}}
+    <div x-show="open" x-cloak @keydown.escape.window="close()"
+         style="position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;padding:20px;">
+        <div x-show="open" x-transition.opacity @click="close()"
+             style="position:absolute;inset:0;background:rgba(15,23,42,0.55);backdrop-filter:blur(4px);"></div>
+
+        <div x-show="open"
+             x-transition:enter="ease-out duration-200"
+             x-transition:enter-start="opacity-0 scale-95"
+             x-transition:enter-end="opacity-100 scale-100"
+             role="dialog" aria-modal="true"
+             style="position:relative;background:white;border-radius:18px;max-width:460px;width:100%;box-shadow:0 25px 50px -12px rgba(15,23,42,0.45);overflow:hidden;">
+
+            <div :style="kind === 'approve' ? 'background:linear-gradient(135deg,#ECFDF5,#D1FAE5);' : 'background:linear-gradient(135deg,#FEE2E2,#FECACA);'"
+                 style="padding:22px 24px 18px;display:flex;align-items:flex-start;gap:14px;">
+                <div :style="kind === 'approve' ? 'background:linear-gradient(135deg,#10B981,#059669);' : 'background:linear-gradient(135deg,#DC2626,#B91C1C);'"
+                     style="width:46px;height:46px;border-radius:14px;display:flex;align-items:center;justify-content:center;color:white;flex-shrink:0;box-shadow:0 6px 14px -4px rgba(0,0,0,0.20),inset 0 1px 0 rgba(255,255,255,0.25);">
+                    <template x-if="kind === 'approve'">
+                        <svg style="width:22px;height:22px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                    </template>
+                    <template x-if="kind === 'reject'">
+                        <svg style="width:22px;height:22px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </template>
+                    <template x-if="kind === 'unpublish'">
+                        <svg style="width:22px;height:22px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/></svg>
+                    </template>
+                </div>
+                <div style="flex:1;min-width:0;">
+                    <h3 style="margin:0 0 4px;font-family:'Space Grotesk','Inter',sans-serif;font-size:17px;font-weight:800;color:#0F172A;line-height:1.25;" x-text="title"></h3>
+                    <p style="margin:0;font-size:13px;color:#475569;line-height:1.5;" x-text="message"></p>
+                </div>
+            </div>
+
+            {{-- Reject reason preview --}}
+            <div x-show="kind === 'reject' && reasonPreview" style="padding:14px 24px;background:#FEF2F2;border-top:1px solid #FECACA;border-bottom:1px solid #FECACA;">
+                <div style="font-size:10px;font-weight:800;color:#B91C1C;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:5px;">Motif qui sera envoyé au marchand</div>
+                <div style="font-size:13px;color:#7F1D1D;line-height:1.5;white-space:pre-line;" x-text="reasonPreview"></div>
+            </div>
+
+            <div style="padding:16px 24px 20px;display:flex;gap:10px;justify-content:flex-end;">
+                <button type="button" @click="close()"
+                        style="padding:11px 20px;background:#F1F5F9;color:#334155;border:0;border-radius:11px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">
+                    Annuler
+                </button>
+                <button type="button" @click="confirmAction()"
+                        :style="kind === 'approve' ? 'background:linear-gradient(135deg,#10B981,#059669);box-shadow:0 8px 18px -6px rgba(16,185,129,0.55),inset 0 1px 0 rgba(255,255,255,0.25);' : 'background:linear-gradient(135deg,#DC2626,#B91C1C);box-shadow:0 8px 18px -6px rgba(220,38,38,0.55),inset 0 1px 0 rgba(255,255,255,0.25);'"
+                        style="padding:11px 20px;color:white;border:0;border-radius:11px;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:6px;">
+                    <span x-text="confirmLabel"></span>
+                </button>
+            </div>
+        </div>
+    </div>
 
     {{-- ============ Crumb + status ============ --}}
     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:18px;">
@@ -77,22 +130,24 @@
                     <p style="margin:0 0 18px;font-size:13px;color:rgba(255,255,255,0.7);position:relative;">Approuver = carte publiée sur /gabon. Refuser = le marchand voit ton motif.</p>
 
                     {{-- Approve --}}
-                    <form action="{{ route('admin.merchant-cards.approve', $card) }}" method="POST" onsubmit="return confirm('Publier cette carte sur Kardafrica ?');" style="position:relative;margin-bottom:10px;">
+                    <form action="{{ route('admin.merchant-cards.approve', $card) }}" method="POST" id="form-approve" style="position:relative;margin-bottom:10px;">
                         @csrf @method('PATCH')
-                        <button type="submit" style="width:100%;display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:13px;background:linear-gradient(135deg,#10B981,#059669);color:white;border:0;border-radius:12px;font-family:'Space Grotesk','Inter',sans-serif;font-size:14px;font-weight:800;cursor:pointer;box-shadow:0 10px 22px -8px rgba(16,185,129,0.6),inset 0 1px 0 rgba(255,255,255,0.25);">
+                        <button type="button" @click="askApprove(@js($card->name))"
+                                style="width:100%;display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:13px;background:linear-gradient(135deg,#10B981,#059669);color:white;border:0;border-radius:12px;font-family:'Space Grotesk','Inter',sans-serif;font-size:14px;font-weight:800;cursor:pointer;box-shadow:0 10px 22px -8px rgba(16,185,129,0.6),inset 0 1px 0 rgba(255,255,255,0.25);">
                             <svg style="width:16px;height:16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
                             Approuver et publier
                         </button>
                     </form>
 
                     {{-- Reject --}}
-                    <form action="{{ route('admin.merchant-cards.reject', $card) }}" method="POST" style="position:relative;" onsubmit="return confirm('Refuser cette carte avec ce motif ?');">
+                    <form action="{{ route('admin.merchant-cards.reject', $card) }}" method="POST" id="form-reject" style="position:relative;">
                         @csrf @method('PATCH')
                         <label style="display:block;font-size:11px;font-weight:700;color:rgba(255,255,255,0.6);margin-bottom:4px;text-transform:uppercase;letter-spacing:.06em;">Motif du refus</label>
-                        <textarea name="rejection_reason" rows="3" required minlength="5" maxlength="500"
+                        <textarea name="rejection_reason" id="reject-reason" rows="3" required minlength="5" maxlength="500"
                                   placeholder="Ex : Visuel de mauvaise qualité, conditions trop restrictives, dénominations trop élevées…"
                                   style="width:100%;padding:10px 12px;background:rgba(255,255,255,0.10);border:1px solid rgba(255,255,255,0.18);border-radius:10px;color:white;font-size:13px;font-family:inherit;outline:none;resize:vertical;margin-bottom:10px;">{{ $card->rejection_reason }}</textarea>
-                        <button type="submit" style="width:100%;display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:13px;background:rgba(220,38,38,0.15);color:#FCA5A5;border:1px solid rgba(220,38,38,0.30);border-radius:12px;font-family:'Space Grotesk','Inter',sans-serif;font-size:14px;font-weight:800;cursor:pointer;">
+                        <button type="button" @click="askReject(@js($card->name))"
+                                style="width:100%;display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:13px;background:rgba(220,38,38,0.15);color:#FCA5A5;border:1px solid rgba(220,38,38,0.30);border-radius:12px;font-family:'Space Grotesk','Inter',sans-serif;font-size:14px;font-weight:800;cursor:pointer;">
                             <svg style="width:16px;height:16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                             Refuser avec ce motif
                         </button>
@@ -114,10 +169,13 @@
                         <svg style="width:13px;height:13px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
                         Voir sur /gabon
                     </a>
-                    <form action="{{ route('admin.merchant-cards.reject', $card) }}" method="POST" style="margin-top:10px;" onsubmit="return confirm('Dépublier cette carte ? Elle sera retirée de /gabon.');">
+                    <form action="{{ route('admin.merchant-cards.reject', $card) }}" method="POST" id="form-unpublish" style="margin-top:10px;">
                         @csrf @method('PATCH')
                         <input type="hidden" name="rejection_reason" value="Dépubliée par l'admin (raison à compléter)">
-                        <button type="submit" style="font-size:11px;color:#B91C1C;background:none;border:0;cursor:pointer;text-decoration:underline;">Dépublier (re-modération)</button>
+                        <button type="button" @click="askUnpublish(@js($card->name))"
+                                style="font-size:11px;color:#B91C1C;background:none;border:0;cursor:pointer;text-decoration:underline;">
+                            Dépublier (re-modération)
+                        </button>
                     </form>
                 </div>
             @endif
@@ -220,4 +278,71 @@
         </div>
     </div>
 </div>
+
+<style>[x-cloak] { display: none !important; }</style>
+
+<script>
+function merchantCardActionModal() {
+    return {
+        open: false,
+        kind: 'approve', // 'approve' | 'reject' | 'unpublish'
+        title: '',
+        message: '',
+        confirmLabel: '',
+        reasonPreview: '',
+        targetFormId: null,
+
+        askApprove(cardName) {
+            this.kind = 'approve';
+            this.title = 'Publier « ' + cardName + ' » ?';
+            this.message = "La carte deviendra immédiatement visible publiquement sur Kardafrica. Le marchand pourra commencer à vendre.";
+            this.confirmLabel = 'Approuver et publier';
+            this.reasonPreview = '';
+            this.targetFormId = 'form-approve';
+            this._show();
+        },
+        askReject(cardName) {
+            const reasonEl = document.getElementById('reject-reason');
+            const reason = reasonEl ? reasonEl.value.trim() : '';
+            if (!reason || reason.length < 5) {
+                if (reasonEl) {
+                    reasonEl.focus();
+                    reasonEl.style.borderColor = '#FCA5A5';
+                    reasonEl.style.background = 'rgba(220,38,38,0.20)';
+                }
+                return;
+            }
+            this.kind = 'reject';
+            this.title = 'Refuser « ' + cardName + ' » ?';
+            this.message = "Le marchand verra ton motif dans son espace vendeur. Il pourra corriger et soumettre à nouveau.";
+            this.confirmLabel = 'Confirmer le refus';
+            this.reasonPreview = reason;
+            this.targetFormId = 'form-reject';
+            this._show();
+        },
+        askUnpublish(cardName) {
+            this.kind = 'unpublish';
+            this.title = 'Dépublier « ' + cardName + ' » ?';
+            this.message = "La carte sera retirée de /gabon et repassera en attente de modération. À utiliser si tu repères un problème après publication.";
+            this.confirmLabel = 'Dépublier';
+            this.reasonPreview = '';
+            this.targetFormId = 'form-unpublish';
+            this._show();
+        },
+        _show() {
+            this.open = true;
+            document.body.style.overflow = 'hidden';
+        },
+        close() {
+            this.open = false;
+            document.body.style.overflow = '';
+        },
+        confirmAction() {
+            const form = document.getElementById(this.targetFormId);
+            if (form) form.submit();
+            this.close();
+        },
+    };
+}
+</script>
 @endsection

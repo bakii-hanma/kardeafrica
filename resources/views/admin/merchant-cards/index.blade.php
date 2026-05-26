@@ -4,7 +4,66 @@
 @section('page-title', 'Modération des cartes-cadeau marchand')
 
 @section('content')
-<div style="padding:24px;font-family:'Inter','Figtree',sans-serif;">
+<div style="padding:24px;font-family:'Inter','Figtree',sans-serif;" x-data="merchantCardsModal()">
+
+    {{-- ============ CUSTOM MODAL ============ --}}
+    <div x-show="open" x-cloak @keydown.escape.window="close()"
+         style="position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;padding:20px;">
+        {{-- Backdrop --}}
+        <div x-show="open" x-transition.opacity @click="close()"
+             style="position:absolute;inset:0;background:rgba(15,23,42,0.55);backdrop-filter:blur(4px);"></div>
+
+        {{-- Dialog --}}
+        <div x-show="open"
+             x-transition:enter="ease-out duration-200"
+             x-transition:enter-start="opacity-0 scale-95"
+             x-transition:enter-end="opacity-100 scale-100"
+             role="dialog" aria-modal="true"
+             style="position:relative;background:white;border-radius:18px;max-width:440px;width:100%;box-shadow:0 25px 50px -12px rgba(15,23,42,0.45);overflow:hidden;">
+
+            {{-- Header with icon --}}
+            <div :style="kind === 'approve' ? 'background:linear-gradient(135deg,#ECFDF5,#D1FAE5);' : 'background:linear-gradient(135deg,#FEE2E2,#FECACA);'"
+                 style="padding:22px 24px 18px;display:flex;align-items:flex-start;gap:14px;">
+                <div :style="kind === 'approve' ? 'background:linear-gradient(135deg,#10B981,#059669);' : 'background:linear-gradient(135deg,#DC2626,#B91C1C);'"
+                     style="width:44px;height:44px;border-radius:14px;display:flex;align-items:center;justify-content:center;color:white;flex-shrink:0;box-shadow:0 6px 14px -4px rgba(0,0,0,0.20),inset 0 1px 0 rgba(255,255,255,0.25);">
+                    <template x-if="kind === 'approve'">
+                        <svg style="width:22px;height:22px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                    </template>
+                    <template x-if="kind !== 'approve'">
+                        <svg style="width:22px;height:22px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                    </template>
+                </div>
+                <div style="flex:1;min-width:0;">
+                    <h3 style="margin:0 0 4px;font-family:'Space Grotesk','Inter',sans-serif;font-size:17px;font-weight:800;color:#0F172A;line-height:1.25;" x-text="title"></h3>
+                    <p style="margin:0;font-size:13px;color:#475569;line-height:1.5;" x-text="message"></p>
+                </div>
+            </div>
+
+            {{-- Card preview --}}
+            <div x-show="cardName" style="padding:14px 24px;background:#F8FAFC;border-top:1px solid #E2E8F0;border-bottom:1px solid #E2E8F0;display:flex;align-items:center;gap:12px;">
+                <div style="width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#1E293B,#0F4F44);display:flex;align-items:center;justify-content:center;color:white;flex-shrink:0;">
+                    <svg style="width:18px;height:18px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
+                </div>
+                <div style="font-size:13px;font-weight:700;color:#0F172A;" x-text="cardName"></div>
+            </div>
+
+            {{-- Actions --}}
+            <div style="padding:16px 24px 20px;display:flex;gap:10px;justify-content:flex-end;">
+                <button type="button" @click="close()"
+                        style="padding:11px 20px;background:#F1F5F9;color:#334155;border:0;border-radius:11px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">
+                    Annuler
+                </button>
+                <button type="button" @click="confirmAction()"
+                        :style="kind === 'approve' ? 'background:linear-gradient(135deg,#10B981,#059669);box-shadow:0 8px 18px -6px rgba(16,185,129,0.55),inset 0 1px 0 rgba(255,255,255,0.25);' : 'background:linear-gradient(135deg,#DC2626,#B91C1C);box-shadow:0 8px 18px -6px rgba(220,38,38,0.55),inset 0 1px 0 rgba(255,255,255,0.25);'"
+                        style="padding:11px 20px;color:white;border:0;border-radius:11px;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:6px;">
+                    <template x-if="kind === 'approve'">
+                        <svg style="width:14px;height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                    </template>
+                    <span x-text="confirmLabel"></span>
+                </button>
+            </div>
+        </div>
+    </div>
 
     {{-- ============ STATS ============ --}}
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:18px;">
@@ -137,9 +196,11 @@
 
                         @if($isPending)
                             <div style="display:flex;gap:6px;margin-top:4px;">
-                                <form action="{{ route('admin.merchant-cards.approve', $card) }}" method="POST" style="flex:1;" onclick="event.stopPropagation();" onsubmit="event.stopPropagation();return confirm('Publier cette carte sur Kardafrica ?');">
+                                <form action="{{ route('admin.merchant-cards.approve', $card) }}" method="POST" id="approve-form-{{ $card->id }}" style="flex:1;" @click.stop>
                                     @csrf @method('PATCH')
-                                    <button type="submit" style="width:100%;display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:8px;background:#10B981;color:white;border:0;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;">
+                                    <button type="button"
+                                            @click.prevent.stop="askApprove({{ $card->id }}, @js($card->name))"
+                                            style="width:100%;display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:8px;background:#10B981;color:white;border:0;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;">
                                         <svg style="width:13px;height:13px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
                                         Approuver
                                     </button>
@@ -172,5 +233,40 @@
 
 <style>
     @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+    [x-cloak] { display: none !important; }
 </style>
+
+<script>
+function merchantCardsModal() {
+    return {
+        open: false,
+        kind: 'approve',
+        title: '',
+        message: '',
+        confirmLabel: '',
+        cardName: '',
+        targetFormId: null,
+
+        askApprove(cardId, cardName) {
+            this.kind = 'approve';
+            this.title = 'Publier cette carte ?';
+            this.message = 'La carte deviendra immédiatement visible publiquement sur Kardafrica.';
+            this.confirmLabel = 'Publier';
+            this.cardName = cardName;
+            this.targetFormId = 'approve-form-' + cardId;
+            this.open = true;
+            document.body.style.overflow = 'hidden';
+        },
+        close() {
+            this.open = false;
+            document.body.style.overflow = '';
+        },
+        confirmAction() {
+            const form = document.getElementById(this.targetFormId);
+            if (form) form.submit();
+            this.close();
+        },
+    };
+}
+</script>
 @endsection
