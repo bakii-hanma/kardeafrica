@@ -130,11 +130,11 @@
     }
     .gabon-cats {
         display: flex; gap: 8px;
-        overflow-x: auto; padding-bottom: 4px;
-        scrollbar-width: thin;
+        overflow-x: auto;
+        scrollbar-width: none;          /* Firefox */
+        -ms-overflow-style: none;       /* IE / Edge legacy */
     }
-    .gabon-cats::-webkit-scrollbar { height: 5px; }
-    .gabon-cats::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 9999px; }
+    .gabon-cats::-webkit-scrollbar { display: none; } /* Chrome / Safari / new Edge */
     .gabon-cat {
         flex-shrink: 0;
         display: inline-flex; align-items: center; gap: 6px;
