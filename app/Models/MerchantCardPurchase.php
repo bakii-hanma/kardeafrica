@@ -35,6 +35,7 @@ class MerchantCardPurchase extends Model
 
     protected $fillable = [
         'merchant_card_id', 'reseller_id',
+        'order_id', 'order_item_id',
         'unique_code', 'qr_payload',
         'buyer_name', 'buyer_phone', 'buyer_email',
         'recipient_name', 'recipient_phone', 'recipient_message',
@@ -76,6 +77,16 @@ class MerchantCardPurchase extends Model
     public function redemptions(): HasMany
     {
         return $this->hasMany(MerchantCardRedemption::class);
+    }
+
+    public function order(): BelongsTo
+    {
+        return $this->belongsTo(Order::class);
+    }
+
+    public function orderItem(): BelongsTo
+    {
+        return $this->belongsTo(OrderItem::class);
     }
 
     // ============================================================

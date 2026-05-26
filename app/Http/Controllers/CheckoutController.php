@@ -53,7 +53,7 @@ class CheckoutController extends Controller
         $externalRef = 'KARD_' . time() . '_' . rand(1000, 9999);
 
         try {
-            $order = DB::transaction(function () use ($cartItems, $subtotal, $externalRef, $user) {
+            $order = DB::transaction(function () use ($cartItems, $subtotal, $externalRef, $user, $validated) {
                 $order = Order::create([
                     'user_id'            => $user->id,
                     'external_reference' => $externalRef,
@@ -64,14 +64,24 @@ class CheckoutController extends Controller
                     'total_amount'       => $subtotal,
                     'currency'           => 'XAF',
                     'payment_method'     => 'ebilling',
-                    'billing_details'    => [],
+                    // On garde le téléphone/email/nom du formulaire pour pouvoir les
+                    // réutiliser plus tard (notamment pour les MerchantCardPurchase
+                    // Carte Gabon, qui ont besoin de buyer_name/phone/email).
+                    'billing_details'    => [
+                        'phone' => $validated['phone'] ?? null,
+                        'email' => $validated['email'] ?? $user->email ?? null,
+                        'name'  => $validated['name']  ?? $user->name  ?? null,
+                    ],
                 ]);
 
                 $svc = app(ProductApiService::class);
                 foreach ($cartItems as $item) {
-                    // Capture la valeur native (EUR/USD/...) au moment de la création
-                    // pour pouvoir livrer plus tard sans dépendre du cache catalogue.
-                    $native = $svc->lookupNativeValue($item->product_id);
+                    // Cartes-cadeau marchand (Carte Gabon) : product_id préfixé "merchant_"
+                    // → pas dans le catalogue afrikard, donc on ne tente pas lookupNativeValue
+                    //   (qui ferait un appel API inutile). Le prix XAF stocké = valeur faciale.
+                    $isMerchant = str_starts_with((string) $item->product_id, 'merchant_');
+                    $native = $isMerchant ? null : $svc->lookupNativeValue($item->product_id);
+
                     OrderItem::create([
                         'order_id'        => $order->id,
                         'product_id'      => $item->product_id,

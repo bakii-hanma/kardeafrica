@@ -2,13 +2,18 @@
 
 namespace App\Jobs;
 
+use App\Models\MerchantCard;
+use App\Models\MerchantCardPurchase;
 use App\Models\Order;
+use App\Models\OrderItem;
 use App\Models\UserCard;
+use App\Support\MerchantCardCode;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -42,27 +47,68 @@ class ProcessCheckoutJob implements ShouldQueue
     {
         Log::info('ProcessCheckoutJob: Debut du traitement', ['order_id' => $this->order->id]);
 
-        // Charger les order items
-        $this->order->load('orderItems');
+        // Charger les order items + user pour l'identité buyer (Carte Gabon)
+        $this->order->load(['orderItems', 'user']);
 
         if ($this->order->orderItems->isEmpty()) {
             Log::error('ProcessCheckoutJob: Aucun item dans la commande', ['order_id' => $this->order->id]);
-            $this->order->update(['notes' => $this->order->notes . ' | Erreur: Aucun item dans la commande']);
+            $this->order->update(['notes' => ($this->order->notes ?? '') . ' | Erreur: Aucun item dans la commande']);
             return;
         }
 
-        // Construire le payload pour le checkout API.
-        // PRIORITÉ : native_value (ex: 10 EUR), résolu à la création de la commande.
-        // Fallback : unit_price (XAF) — utilisé seulement si native_value n'est pas
-        // dispo (anciennes commandes). Dans ce cas afrikard rejettera probablement
-        // car la valeur ne correspond pas — l'utilisateur devra retry manuellement.
+        // ============================================================
+        // Split items : marchand (Carte Gabon, local) vs afrikard (API)
+        // Les items marchand ont un product_id préfixé "merchant_<card_id>_<amount>".
+        // ============================================================
+        $merchantItems = $this->order->orderItems->filter(
+            fn ($i) => str_starts_with((string) $i->product_id, 'merchant_')
+        );
+        $afrikardItems = $this->order->orderItems->reject(
+            fn ($i) => str_starts_with((string) $i->product_id, 'merchant_')
+        );
+
+        // ============================================================
+        // 1) Items marchand : génération LOCALE (pas d'appel afrikard)
+        // ============================================================
+        foreach ($merchantItems as $item) {
+            try {
+                $this->createMerchantPurchase($item);
+            } catch (\Throwable $e) {
+                Log::error('ProcessCheckoutJob: échec création MerchantCardPurchase', [
+                    'order_id'      => $this->order->id,
+                    'order_item_id' => $item->id,
+                    'product_id'    => $item->product_id,
+                    'error'         => $e->getMessage(),
+                ]);
+                // On ne throw PAS : un échec marchand ne doit pas retry toute la commande
+                // (les afrikard pourraient déjà avoir réussi). On log et on continue.
+            }
+        }
+
+        // ============================================================
+        // 2) Items afrikard : appel API (= comportement historique)
+        // ============================================================
+        if ($afrikardItems->isEmpty()) {
+            // Commande 100 % Carte Gabon → on complète sans appel afrikard
+            $this->order->update([
+                'status'       => Order::STATUS_COMPLETED,
+                'completed_at' => now(),
+            ]);
+            Log::info('ProcessCheckoutJob: Commande 100 % marchand complétée localement', [
+                'order_id'        => $this->order->id,
+                'merchant_count'  => $merchantItems->count(),
+                'purchases_count' => MerchantCardPurchase::where('order_id', $this->order->id)->count(),
+            ]);
+            return;
+        }
+
+        // Construire le payload afrikard
         $service = app(\App\Services\ProductApiService::class);
-        $checkoutPayload = $this->order->orderItems->map(function ($item) use ($service) {
+        $checkoutPayload = $afrikardItems->map(function ($item) use ($service) {
             $native = $item->native_value && (float) $item->native_value > 0
                 ? (int) round((float) $item->native_value)
                 : null;
 
-            // Fallback runtime si la commande n'a pas été créée avec native_value
             if ($native === null) {
                 $resolved = $service->resolveNativeValue($item->product_id);
                 $native = $resolved['value'] ?? null;
@@ -75,57 +121,128 @@ class ProcessCheckoutJob implements ShouldQueue
             ];
         })->values()->toArray();
 
-        Log::info('ProcessCheckoutJob: Appel API checkout', [
+        Log::info('ProcessCheckoutJob: Appel API checkout afrikard', [
             'order_id' => $this->order->id,
-            'payload' => $checkoutPayload,
-            'attempt' => $this->attempts(),
+            'payload'  => $checkoutPayload,
+            'attempt'  => $this->attempts(),
         ]);
 
-        // Appeler l'API checkout
         $response = Http::timeout(30)
             ->post(config('services.product_api.base_url') . '/orders/checkout', $checkoutPayload);
 
-        Log::info('ProcessCheckoutJob: Reponse API', [
+        Log::info('ProcessCheckoutJob: Reponse API afrikard', [
             'order_id' => $this->order->id,
-            'status' => $response->status(),
-            'body' => $response->json(),
+            'status'   => $response->status(),
+            'body'     => $response->json(),
         ]);
 
         if ($response->status() === 202 || $response->successful()) {
             $checkoutData = $response->json();
 
-            // Sauvegarder les cartes recues
             $this->saveCards($checkoutData);
 
-            // Marquer la commande comme completee
             $this->order->update([
-                'status' => Order::STATUS_COMPLETED,
+                'status'       => Order::STATUS_COMPLETED,
                 'completed_at' => now(),
-                'billing_details' => [
-                    'checkout_order_id' => $checkoutData['orderId'] ?? null,
+                'billing_details' => array_merge((array) $this->order->billing_details, [
+                    'checkout_order_id'   => $checkoutData['orderId'] ?? null,
                     'checkout_request_id' => $checkoutData['requestId'] ?? null,
-                    'checkout_status' => $checkoutData['status'] ?? null,
-                ],
+                    'checkout_status'     => $checkoutData['status'] ?? null,
+                ]),
             ]);
 
-            Log::info('ProcessCheckoutJob: Commande completee avec succes', [
-                'order_id' => $this->order->id,
-                'cards_count' => UserCard::where('order_id', $this->order->id)->count(),
+            Log::info('ProcessCheckoutJob: Commande complétée avec succès', [
+                'order_id'        => $this->order->id,
+                'cards_count'     => UserCard::where('order_id', $this->order->id)->count(),
+                'purchases_count' => MerchantCardPurchase::where('order_id', $this->order->id)->count(),
             ]);
         } else {
-            // Echec - sera retry automatiquement
-            Log::error('ProcessCheckoutJob: API checkout a echoue', [
+            Log::error('ProcessCheckoutJob: API checkout afrikard a échoué', [
                 'order_id' => $this->order->id,
-                'status' => $response->status(),
-                'body' => $response->body(),
-                'attempt' => $this->attempts(),
+                'status'   => $response->status(),
+                'body'     => $response->body(),
+                'attempt'  => $this->attempts(),
             ]);
 
             throw new \Exception(
-                'Checkout API echoue avec statut ' . $response->status() .
+                'Checkout API échoué avec statut ' . $response->status() .
                 ' pour la commande #' . $this->order->order_number
             );
         }
+    }
+
+    /**
+     * Crée une MerchantCardPurchase localement pour un item Carte Gabon.
+     * product_id format : "merchant_<card_id>_<amount>" (amount optionnel).
+     *
+     * Idempotent : si une purchase existe déjà pour cet order_item_id, on skip.
+     */
+    private function createMerchantPurchase(OrderItem $item): void
+    {
+        // Idempotence (job retry / replay du callback de paiement)
+        if (MerchantCardPurchase::where('order_item_id', $item->id)->exists()) {
+            Log::info('ProcessCheckoutJob: MerchantCardPurchase déjà créée, skip', ['order_item_id' => $item->id]);
+            return;
+        }
+
+        if (!preg_match('/^merchant_(\d+)(?:_(\d+))?$/', (string) $item->product_id, $m)) {
+            throw new \Exception("product_id marchand invalide : {$item->product_id}");
+        }
+
+        $cardId = (int) $m[1];
+        $amount = isset($m[2]) ? (float) $m[2] : (float) $item->unit_price;
+
+        $card = MerchantCard::find($cardId);
+        if (!$card) {
+            throw new \Exception("MerchantCard #{$cardId} introuvable");
+        }
+
+        $user = $this->order->user;
+        $billing = (array) $this->order->billing_details;
+
+        DB::transaction(function () use ($card, $amount, $item, $user, $billing) {
+            // Crée la purchase (qr_payload provisoire — on le finalise juste après
+            // avec l'ID réel, requis par buildQrPayload).
+            $purchase = MerchantCardPurchase::create([
+                'merchant_card_id'  => $card->id,
+                'reseller_id'       => $card->reseller_id,
+                'order_id'          => $this->order->id,
+                'order_item_id'     => $item->id,
+                'unique_code'       => MerchantCardCode::generateUniqueCode(),
+                'qr_payload'        => 'pending-' . uniqid('', true), // placeholder unique
+                'buyer_name'        => $billing['name']  ?? $user->name  ?? 'Client KardAfrica',
+                'buyer_phone'       => $billing['phone'] ?? $user->phone ?? '',
+                'buyer_email'       => $billing['email'] ?? $user->email ?? null,
+                'amount'            => $amount,
+                'remaining_balance' => $amount,
+                'currency'          => 'XAF',
+                'payment_method'    => $this->order->payment_method ?? 'ebilling',
+                'payment_status'    => MerchantCardPurchase::PAYMENT_PAID,
+                'payment_ref'       => $this->order->external_reference,
+                'status'            => MerchantCardPurchase::STATUS_ACTIVE,
+                'delivery_channel'  => ['email', 'orders_page'],
+                'delivered_at'      => now(),
+                'paid_at'           => now(),
+                'expires_at'        => now()->addMonths((int) ($card->validity_months ?? 12)),
+            ]);
+
+            // Maintenant qu'on a l'ID, on génère le vrai QR signé
+            $purchase->update([
+                'qr_payload' => MerchantCardCode::buildQrPayload($purchase->id, $card->reseller_id),
+            ]);
+
+            // Stats marchand
+            $card->increment('total_sold');
+            $card->increment('total_revenue', $amount);
+
+            Log::info('ProcessCheckoutJob: MerchantCardPurchase créée', [
+                'order_id'    => $this->order->id,
+                'purchase_id' => $purchase->id,
+                'card_id'     => $card->id,
+                'amount'      => $amount,
+                'unique_code' => $purchase->unique_code,
+            ]);
+        });
     }
 
     /**

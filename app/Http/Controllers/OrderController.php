@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Jobs\ProcessCheckoutJob;
+use App\Models\MerchantCardPurchase;
 use App\Models\Order;
 use App\Models\Reseller;
 use App\Models\UserCard;
@@ -52,10 +53,15 @@ class OrderController extends Controller
 
         $order->load('orderItems');
 
-        // Load associated user cards
+        // Load associated user cards (afrikard catalog items)
         $userCards = UserCard::where('order_id', $order->id)
             ->where('user_id', Auth::id())
             ->with('orderItem')
+            ->get();
+
+        // Load merchant card purchases (Carte Gabon items)
+        $merchantPurchases = MerchantCardPurchase::where('order_id', $order->id)
+            ->with(['merchantCard', 'reseller'])
             ->get();
 
         if ($request->expectsJson() || $request->is('api/*')) {
@@ -63,10 +69,18 @@ class OrderController extends Controller
                 'success' => true,
                 'order' => $order,
                 'cards' => $userCards->makeVisible(['card_code', 'pin']),
+                'merchant_purchases' => $merchantPurchases->map(fn ($p) => [
+                    'id'           => $p->id,
+                    'unique_code'  => $p->unique_code,
+                    'amount'       => $p->amount,
+                    'merchant'     => $p->reseller->business_name ?? $p->reseller->name,
+                    'expires_at'   => $p->expires_at,
+                    'status'       => $p->status,
+                ]),
             ]);
         }
 
-        return view('orders.show', compact('order', 'userCards'));
+        return view('orders.show', compact('order', 'userCards', 'merchantPurchases'));
     }
 
     /**

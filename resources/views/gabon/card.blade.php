@@ -392,13 +392,40 @@
                 return Number(n || 0).toLocaleString('fr-FR', { useGrouping: true });
             },
 
-            addToCart() {
-                if (!this.currentAmount) return;
-                alert('Carte-cadeau marchand : ' + this.formatFcfa(this.currentAmount) + ' FCFA.\n\nLe paiement futursowax sera activé en Phase 4. Reviens bientôt !');
+            // ====== Mêmes appels que /card-type/{id} ======
+            // Le product_id encode le marchand + montant : "merchant_<card_id>_<amount>"
+            // → permet à ProcessCheckoutJob de générer le code LOCALEMENT (pas via afrikard).
+            cartProductId() {
+                return 'merchant_{{ $card->id }}_' + this.currentAmount;
             },
 
-            buyNow() {
-                this.addToCart();
+            cartProductName() {
+                return @js(($merchant->business_name ?? $merchant->name) . ' — ' . $card->name)
+                       + ' — ' + this.formatFcfa(this.currentAmount) + ' F';
+            },
+
+            cartImageUrl() {
+                return @js($card->visual_url ? asset($card->visual_url) : '');
+            },
+
+            async addToCart() {
+                if (!this.currentAmount) return;
+                // Le montant marchand est déjà en XAF → on n'utilise PAS convertToFCFA().
+                if (typeof window.addToCart === 'function') {
+                    await window.addToCart(
+                        this.cartProductId(),
+                        this.cartProductName(),
+                        this.currentAmount,
+                        this.cartImageUrl()
+                    );
+                } else {
+                    console.error('Global addToCart function not found');
+                }
+            },
+
+            async buyNow() {
+                await this.addToCart();
+                window.location.href = "{{ route('cart.index') }}";
             },
         };
     }
