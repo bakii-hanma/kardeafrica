@@ -66,9 +66,8 @@
             </div>
 
             {{-- Quick filter pills : Catégories --}}
-            <div class="pb-3 -mx-4 sm:mx-0 px-4 sm:px-0 overflow-x-auto" style="scrollbar-width:none;-ms-overflow-style:none;">
-                <style>.gabon-pills::-webkit-scrollbar { display: none; }</style>
-                <div class="flex items-center gap-2 min-w-max sm:min-w-0 sm:flex-wrap gabon-pills">
+            <div class="pb-3">
+                <div class="flex items-center gap-2 flex-wrap">
                     <a href="{{ $urlWith(['category' => null, 'page' => null]) }}"
                        class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-bold whitespace-nowrap transition active:scale-95
                               {{ $categorySlug === '' ? 'bg-slate-900 text-white shadow-md' : 'bg-white border border-slate-200 text-slate-700 hover:border-[#44A08D] hover:bg-teal-50' }}">
@@ -93,8 +92,8 @@
 
             {{-- Marchands en vedette --}}
             @if($featuredMerchants->isNotEmpty() && $activeFiltersCount === 0)
-                <div class="pb-4 -mx-4 sm:mx-0 px-4 sm:px-0 overflow-x-auto" style="scrollbar-width:none;">
-                    <div class="flex items-center gap-2 min-w-max sm:min-w-0 sm:flex-wrap gabon-pills">
+                <div class="pb-4">
+                    <div class="flex items-center gap-2 flex-wrap">
                         <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 mr-1 whitespace-nowrap">Marchands</span>
                         @foreach($featuredMerchants as $m)
                             <a href="{{ route('gabon.merchant', $m->slug) }}"
