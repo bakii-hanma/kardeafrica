@@ -15,6 +15,7 @@ use App\Http\Controllers\Admin\DaywatchController as AdminDaywatchController;
 use App\Http\Controllers\Admin\SettingsController as AdminSettingsController;
 use App\Http\Controllers\Admin\AuthController as AdminAuthController;
 use App\Http\Controllers\Admin\ResellerController as AdminResellerController;
+use App\Http\Controllers\Admin\MerchantCardController as AdminMerchantCardController;
 use App\Http\Controllers\Admin\VendorOrderController as AdminVendorOrderController;
 use App\Http\Controllers\Vendor\AuthController       as VendorAuthController;
 use App\Http\Controllers\Vendor\DashboardController  as VendorDashboardController;
@@ -278,6 +279,12 @@ Route::prefix('admin')->middleware(['auth', 'is_admin'])->group(function () {
     Route::post('/resellers/{reseller}/orders/{order}/retry-delivery', [AdminVendorOrderController::class, 'retryDelivery'])->name('admin.resellers.orders.retry-delivery');
     Route::post('/resellers/{reseller}/orders/{order}/refund',         [AdminVendorOrderController::class, 'refund'])->name('admin.resellers.orders.refund');
     Route::post('/resellers/{reseller}/orders/{order}/inject-cards',   [AdminVendorOrderController::class, 'injectCards'])->name('admin.resellers.orders.inject-cards');
+
+    // Modération des cartes-cadeau marchand (Carte Gabon — Phase 6)
+    Route::get('/merchant-cards',                            [AdminMerchantCardController::class, 'index'])->name('admin.merchant-cards.index');
+    Route::get('/merchant-cards/{merchantCard}',             [AdminMerchantCardController::class, 'show'])->name('admin.merchant-cards.show');
+    Route::patch('/merchant-cards/{merchantCard}/approve',   [AdminMerchantCardController::class, 'approve'])->name('admin.merchant-cards.approve');
+    Route::patch('/merchant-cards/{merchantCard}/reject',    [AdminMerchantCardController::class, 'reject'])->name('admin.merchant-cards.reject');
 
     // Daywatch (offre streaming locale — BDD)
     Route::get('/daywatch',                          [AdminDaywatchController::class, 'index'])->name('admin.daywatch.index');
