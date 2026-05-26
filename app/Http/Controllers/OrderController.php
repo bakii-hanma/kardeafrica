@@ -93,22 +93,59 @@ class OrderController extends Controller
             abort(403);
         }
 
-        if ($order->userCards()->exists()) {
-            return back()->with('error', 'Cette commande a deja ete livree.');
-        }
-
         if ($order->payment_status !== Order::PAYMENT_STATUS_COMPLETED) {
             return back()->with('error', 'Cette commande n\'a pas encore ete payee.');
+        }
+
+        $order->load('orderItems');
+
+        // ============================================================
+        // 0. Items marchand (Carte Gabon) : création LOCALE en synchrone.
+        //    Pas d'appel API, pas de queue worker requis — le job database
+        //    n'a aucun worker sur shared hosting.
+        // ============================================================
+        $merchantItems = $order->orderItems->filter(
+            fn ($i) => \App\Support\MerchantCardCode::isMerchantOrderItem($i)
+        );
+        $afrikardItems = $order->orderItems->reject(
+            fn ($i) => \App\Support\MerchantCardCode::isMerchantOrderItem($i)
+        );
+
+        foreach ($merchantItems as $item) {
+            try {
+                \App\Support\MerchantCardCode::createPurchaseForOrderItem($order, $item);
+            } catch (\Throwable $e) {
+                Log::error('Retry checkout: échec MerchantCardPurchase', [
+                    'order_id'      => $order->id,
+                    'order_item_id' => $item->id,
+                    'product_id'    => $item->product_id,
+                    'error'         => $e->getMessage(),
+                ]);
+            }
+        }
+
+        // Si aucun item afrikard, on complète la commande et on renvoie.
+        if ($afrikardItems->isEmpty()) {
+            $order->update([
+                'status'       => Order::STATUS_COMPLETED,
+                'completed_at' => now(),
+            ]);
+            return redirect()->route('orders.show', $order)
+                ->with('success', 'Cartes marchand livrées !');
+        }
+
+        // Au-delà, on poursuit le flow historique pour les items afrikard.
+        if ($order->userCards()->exists()) {
+            return back()->with('error', 'Cette commande a deja ete livree.');
         }
 
         // Lookup face values reels depuis afrikard. Cache → API ciblée → deepScan
         // multi-pages (pour anciennes commandes / produits récemment dépréciés).
         $service = app(ProductApiService::class);
-        $order->load('orderItems');
 
         $missing  = [];
         $payload  = [];
-        foreach ($order->orderItems as $item) {
+        foreach ($afrikardItems as $item) {
             $productId = (int) $item->product_id;
             $qty       = (int) $item->quantity;
 

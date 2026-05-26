@@ -317,7 +317,9 @@ class PaymentController extends Controller
                 $productService = app(\App\Services\ProductApiService::class);
                 $orderItems = [];
                 foreach ($cartItems as $item) {
-                    $native = $productService->resolveNativeValue($item->product_id);
+                    // Skip lookupNativeValue pour items marchand (Carte Gabon)
+                    $isMerchant = str_starts_with((string) $item->product_id, 'merchant_');
+                    $native = $isMerchant ? null : $productService->resolveNativeValue($item->product_id);
                     $orderItem = OrderItem::create([
                         'order_id'        => $order->id,
                         'product_id'      => $item->product_id,
@@ -336,10 +338,42 @@ class PaymentController extends Controller
                 // 4. Clear Cart
                 ShoppingCart::where('user_id', $userId)->delete();
 
-                // 5. Dispatch async checkout job (with retry)
-                ProcessCheckoutJob::dispatch($order);
+                // 5a. Items marchand (Carte Gabon) : génération LOCALE en synchrone
+                //     pour ne PAS dépendre du queue worker (QUEUE_CONNECTION=database
+                //     sans worker sur shared hosting). Le code 8 chiffres + QR signé
+                //     sont créés immédiatement après le paiement.
+                $orderFresh = $order->fresh()->load('orderItems');
+                $merchantItems = $orderFresh->orderItems->filter(
+                    fn ($i) => \App\Support\MerchantCardCode::isMerchantOrderItem($i)
+                );
+                foreach ($merchantItems as $item) {
+                    try {
+                        \App\Support\MerchantCardCode::createPurchaseForOrderItem($orderFresh, $item);
+                    } catch (\Throwable $e) {
+                        Log::error('PaymentController finalize: échec MerchantCardPurchase', [
+                            'order_id'      => $order->id,
+                            'order_item_id' => $item->id,
+                            'product_id'    => $item->product_id,
+                            'error'         => $e->getMessage(),
+                        ]);
+                    }
+                }
 
-                Log::info('Checkout job dispatched', ['order_id' => $order->id]);
+                // 5b. Items afrikard : dispatch du job async (= comportement historique)
+                $afrikardItems = $orderFresh->orderItems->reject(
+                    fn ($i) => \App\Support\MerchantCardCode::isMerchantOrderItem($i)
+                );
+                if ($afrikardItems->isNotEmpty()) {
+                    ProcessCheckoutJob::dispatch($order);
+                    Log::info('Checkout job dispatched (afrikard items present)', ['order_id' => $order->id]);
+                } else {
+                    // Commande 100% marchand → on complète immédiatement
+                    $order->update([
+                        'status'       => Order::STATUS_COMPLETED,
+                        'completed_at' => now(),
+                    ]);
+                    Log::info('Order 100% marchand complétée inline', ['order_id' => $order->id]);
+                }
 
                 return [
                     'order' => $order->fresh()->load('orderItems'),
