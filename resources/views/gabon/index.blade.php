@@ -2,427 +2,521 @@
 
 @section('title', 'Carte Gabon — Cartes-cadeau des marchands gabonais')
 
+@php
+    // Helper : reconstruit l'URL avec des params modifiés (mirror /boutique)
+    $urlWith = function (array $changes) {
+        $params = array_merge(request()->query(), $changes);
+        // Nettoie : vire les clés à null/empty array
+        foreach ($params as $k => $v) {
+            if ($v === null || (is_array($v) && empty($v)) || $v === '') {
+                unset($params[$k]);
+            }
+        }
+        return route('gabon.index') . (empty($params) ? '' : '?' . http_build_query($params));
+    };
+@endphp
+
 @section('content')
-<style>
-    /* ============== Hero ============== */
-    .gabon-hero {
-        position: relative;
-        background: linear-gradient(135deg, #0F172A 0%, #1E293B 45%, #0F4F44 100%);
-        color: white;
-        padding: 56px 20px 72px;
-        overflow: hidden;
-    }
-    .gabon-hero::before {
-        content: ''; position: absolute;
-        top: -30%; right: -10%;
-        width: 540px; height: 540px;
-        background: radial-gradient(circle, rgba(94,234,212,.20), transparent 60%);
-        pointer-events: none;
-    }
-    .gabon-hero::after {
-        content: ''; position: absolute;
-        bottom: -40%; left: -5%;
-        width: 420px; height: 420px;
-        background: radial-gradient(circle, rgba(68,160,141,.18), transparent 60%);
-        pointer-events: none;
-    }
-    .gabon-hero-inner {
-        max-width: 1180px; margin: 0 auto;
-        position: relative;
-    }
-    .gabon-hero-tag {
-        display: inline-flex; align-items: center; gap: 6px;
-        padding: 5px 12px;
-        background: rgba(94,234,212,.18);
-        border: 1px solid rgba(94,234,212,.30);
-        border-radius: 9999px;
-        font-size: 10px; font-weight: 800;
-        color: #5EEAD4;
-        letter-spacing: .14em;
-        text-transform: uppercase;
-        margin-bottom: 14px;
-    }
-    .gabon-hero-tag::before {
-        content: ''; display: inline-block;
-        width: 6px; height: 6px;
-        background: #5EEAD4; border-radius: 50%;
-        animation: pulse 2s ease-in-out infinite;
-    }
-    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
-    .gabon-hero h1 {
-        font-family: 'Space Grotesk','Inter',sans-serif;
-        font-size: 34px; font-weight: 800;
-        letter-spacing: -0.03em;
-        line-height: 1.1;
-        margin: 0 0 14px;
-        max-width: 720px;
-    }
-    @media (min-width:768px) { .gabon-hero h1 { font-size: 48px; } }
-    .gabon-hero p {
-        font-size: 16px; line-height: 1.6;
-        color: rgba(255,255,255,.78);
-        max-width: 620px; margin: 0 0 28px;
-    }
-    .gabon-hero-stats {
-        display: flex; flex-wrap: wrap; gap: 20px;
-        font-size: 12px; color: rgba(255,255,255,.7);
-    }
-    .gabon-hero-stats strong {
-        display: block; font-family: 'Space Grotesk','Inter',sans-serif;
-        font-size: 22px; color: white; font-weight: 800;
-        font-variant-numeric: tabular-nums;
-    }
+<div class="bg-slate-50 min-h-screen pb-12"
+     x-data="{ view: localStorage.getItem('gabon-view') || 'grid' }"
+     x-init="$watch('view', v => localStorage.setItem('gabon-view', v))">
 
-    /* ============== Search bar ============== */
-    .gabon-search {
-        margin-top: 28px;
-        background: white;
-        border-radius: 16px;
-        padding: 8px;
-        display: flex; gap: 6px;
-        box-shadow: 0 24px 48px -16px rgba(0,0,0,.4);
-        max-width: 720px;
-    }
-    .gabon-search input, .gabon-search select {
-        flex: 1; padding: 12px 14px;
-        font-size: 14px; color: #0F172A;
-        border: 0; border-radius: 10px;
-        background: #F8FAFC;
-        font-family: inherit;
-    }
-    .gabon-search select { flex: 0 0 130px; }
-    .gabon-search input:focus, .gabon-search select:focus {
-        outline: 0; background: white;
-        box-shadow: 0 0 0 2px #44A08D;
-    }
-    .gabon-search button {
-        padding: 12px 22px;
-        background: linear-gradient(135deg, #44A08D, #4ECDC4);
-        color: white; font-weight: 800; font-size: 13px;
-        border: 0; border-radius: 10px; cursor: pointer;
-        display: inline-flex; align-items: center; gap: 6px;
-        box-shadow: 0 6px 14px -4px rgba(78,205,196,.5),
-                    inset 0 1px 0 rgba(255,255,255,.25);
-    }
-    .gabon-search button svg { width: 14px; height: 14px; }
-    @media (max-width:600px) {
-        .gabon-search { flex-direction: column; }
-        .gabon-search select { flex: 1; }
-    }
+    {{-- ================================================================
+         TOP STRIP — breadcrumb + title + toolbar (search/sort/view)
+         ================================================================ --}}
+    <section class="bg-white border-b border-slate-200">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
-    /* ============== Categories scroller ============== */
-    .gabon-cat-wrap {
-        max-width: 1180px; margin: -36px auto 0;
-        padding: 0 20px; position: relative; z-index: 2;
-    }
-    .gabon-cat-card {
-        background: white;
-        border-radius: 18px;
-        padding: 18px;
-        box-shadow: 0 14px 32px -10px rgba(15,23,42,.18),
-                    0 0 0 1px rgba(15,23,42,.04);
-    }
-    .gabon-cat-title {
-        font-family: 'Space Grotesk','Inter',sans-serif;
-        font-size: 11px; font-weight: 800; color: #64748B;
-        text-transform: uppercase; letter-spacing: .10em;
-        margin: 0 0 12px;
-    }
-    .gabon-cats {
-        display: flex; gap: 8px;
-        overflow-x: auto;
-        scrollbar-width: none;          /* Firefox */
-        -ms-overflow-style: none;       /* IE / Edge legacy */
-    }
-    .gabon-cats::-webkit-scrollbar { display: none; } /* Chrome / Safari / new Edge */
-    .gabon-cat {
-        flex-shrink: 0;
-        display: inline-flex; align-items: center; gap: 6px;
-        padding: 9px 16px;
-        background: #F1F5F9;
-        color: #334155;
-        text-decoration: none;
-        border-radius: 9999px;
-        font-size: 12px; font-weight: 700;
-        white-space: nowrap;
-        transition: background .15s, color .15s;
-        border: 1px solid transparent;
-    }
-    .gabon-cat:hover {
-        background: #ECFDF5; color: #0F4F44;
-        border-color: #BBF7D0;
-    }
-    .gabon-cat--active {
-        background: linear-gradient(135deg, #44A08D, #4ECDC4) !important;
-        color: white !important;
-        border-color: transparent !important;
-    }
+            {{-- Breadcrumb --}}
+            <nav class="flex items-center gap-1.5 text-xs text-slate-500 pt-5 pb-2">
+                <a href="{{ route('home') }}" class="hover:text-[#44A08D] transition flex items-center gap-1">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+                    Accueil
+                </a>
+                <svg class="w-3 h-3 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+                <a href="{{ route('gabon.index') }}" class="hover:text-[#44A08D] transition">Carte Gabon</a>
+                @if($currentCategory)
+                    <svg class="w-3 h-3 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+                    <span class="text-slate-900 font-medium">{{ $currentCategory }}</span>
+                @endif
+                @if($search)
+                    <svg class="w-3 h-3 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+                    <span class="text-slate-900 font-medium">Recherche</span>
+                @endif
+            </nav>
 
-    /* ============== Section header ============== */
-    .gabon-section {
-        max-width: 1180px; margin: 48px auto 0;
-        padding: 0 20px;
-    }
-    .gabon-section-head {
-        display: flex; align-items: flex-end; justify-content: space-between;
-        gap: 16px; flex-wrap: wrap;
-        margin-bottom: 18px;
-    }
-    .gabon-section-head h2 {
-        margin: 0;
-        font-family: 'Space Grotesk','Inter',sans-serif;
-        font-size: 22px; font-weight: 800; color: #0F172A;
-        letter-spacing: -0.02em;
-    }
-    .gabon-section-head p {
-        margin: 4px 0 0; color: #64748B; font-size: 13px;
-    }
-    .gabon-section-head a {
-        color: #44A08D; font-size: 13px; font-weight: 700;
-        text-decoration: none;
-        display: inline-flex; align-items: center; gap: 4px;
-    }
-
-    /* ============== Featured merchants ============== */
-    .gabon-merchants {
-        display: grid;
-        gap: 14px;
-        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-    }
-    .gabon-merchant-card {
-        display: block;
-        background: white;
-        border-radius: 14px;
-        padding: 16px;
-        text-decoration: none;
-        color: inherit;
-        box-shadow: 0 4px 14px -6px rgba(15,23,42,.08),
-                    0 0 0 1px rgba(15,23,42,.04);
-        transition: transform .15s, box-shadow .15s;
-        text-align: center;
-    }
-    .gabon-merchant-card:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 12px 24px -6px rgba(15,23,42,.15);
-    }
-    .gabon-merchant-avatar {
-        display: inline-flex; align-items: center; justify-content: center;
-        width: 60px; height: 60px;
-        border-radius: 18px;
-        background: linear-gradient(135deg, #44A08D, #4ECDC4);
-        color: white;
-        font-family: 'Space Grotesk','Inter',sans-serif;
-        font-weight: 800; font-size: 22px;
-        margin: 0 auto 10px;
-        box-shadow: 0 6px 14px -4px rgba(78,205,196,.40);
-    }
-    .gabon-merchant-name {
-        font-family: 'Space Grotesk','Inter',sans-serif;
-        font-size: 13px; font-weight: 800; color: #0F172A;
-        line-height: 1.25;
-        margin: 0 0 4px;
-    }
-    .gabon-merchant-city {
-        font-size: 11px; color: #64748B;
-        display: inline-flex; align-items: center; gap: 3px;
-    }
-    .gabon-merchant-city svg { width: 10px; height: 10px; color: #94A3B8; }
-    .gabon-merchant-count {
-        display: inline-block;
-        margin-top: 8px;
-        padding: 3px 9px;
-        background: #ECFDF5;
-        color: #0F4F44;
-        border-radius: 9999px;
-        font-size: 10px; font-weight: 800;
-        text-transform: uppercase; letter-spacing: .06em;
-    }
-
-    /* ============== Cards grid ============== */
-    .gabon-grid {
-        display: grid;
-        gap: 18px;
-        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    }
-    .gabon-card {
-        display: block;
-        text-decoration: none;
-        color: inherit;
-    }
-    .gabon-card-info {
-        padding: 12px 4px 0;
-    }
-    .gabon-card-merchant {
-        display: inline-flex; align-items: center; gap: 5px;
-        font-size: 11px; font-weight: 700; color: #44A08D;
-        letter-spacing: .04em;
-    }
-    .gabon-card-merchant svg { width: 11px; height: 11px; }
-    .gabon-card-title {
-        font-family: 'Space Grotesk','Inter',sans-serif;
-        font-size: 15px; font-weight: 800; color: #0F172A;
-        margin: 4px 0 2px;
-        line-height: 1.3;
-    }
-    .gabon-card-city {
-        font-size: 11px; color: #94A3B8;
-    }
-
-    /* ============== Empty state ============== */
-    .gabon-empty {
-        background: white;
-        border-radius: 16px;
-        padding: 60px 24px;
-        text-align: center;
-        border: 2px dashed #E2E8F0;
-    }
-    .gabon-empty-icon {
-        display: inline-flex; align-items: center; justify-content: center;
-        width: 72px; height: 72px;
-        border-radius: 50%;
-        background: linear-gradient(135deg,#ECFDF5,#D1FAE5);
-        color: #44A08D;
-        margin-bottom: 16px;
-    }
-    .gabon-empty-icon svg { width: 36px; height: 36px; }
-    .gabon-empty h3 {
-        margin: 0 0 6px;
-        font-family: 'Space Grotesk','Inter',sans-serif;
-        font-size: 18px; font-weight: 800; color: #0F172A;
-    }
-    .gabon-empty p { margin: 0; color: #64748B; font-size: 14px; }
-
-    /* ============== Pagination ============== */
-    .gabon-pagination { margin: 28px 0 60px; }
-</style>
-
-{{-- ============ HERO ============ --}}
-<section class="gabon-hero">
-    <div class="gabon-hero-inner">
-        <span class="gabon-hero-tag">Carte Gabon · Cartes-cadeau locales</span>
-        <h1>Offre une carte-cadeau d'un commerçant gabonais.</h1>
-        <p>Restaurants, mode, beauté, spa, services… Choisis un marchand près de toi et envoie une carte-cadeau par SMS, WhatsApp ou email en quelques secondes.</p>
-
-        <form method="GET" action="{{ route('gabon.index') }}" class="gabon-search">
-            <input type="text" name="q" value="{{ $currentSearch }}" placeholder="Restaurant, boutique, salon…">
-            <select name="city">
-                <option value="">Toutes les villes</option>
-                @foreach($cities as $c)
-                    <option value="{{ $c }}" {{ $currentCity === $c ? 'selected' : '' }}>{{ $c }}</option>
-                @endforeach
-            </select>
-            <button type="submit">
-                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                Rechercher
-            </button>
-        </form>
-
-        <div class="gabon-hero-stats" style="margin-top:32px;">
-            <div>
-                <strong>{{ $cards->total() }}+</strong>
-                Cartes disponibles
+            {{-- Title + résumé --}}
+            <div class="pb-3 md:pb-4">
+                <h1 class="font-display text-xl md:text-3xl font-bold text-slate-900 tracking-tight leading-tight">
+                    @if($search)
+                        Résultats pour <span class="text-[#44A08D]">"{{ $search }}"</span>
+                    @elseif($currentCategory)
+                        {{ $currentCategory }}
+                    @else
+                        Cartes-cadeau marchand · Gabon
+                    @endif
+                </h1>
+                <p class="text-xs md:text-sm text-slate-500 mt-1">
+                    <span class="font-semibold text-slate-700">{{ $cards->total() }}</span>
+                    carte{{ $cards->total() > 1 ? 's' : '' }} disponible{{ $cards->total() > 1 ? 's' : '' }}
+                    @if($activeFiltersCount > 0)
+                        · {{ $activeFiltersCount }} filtre{{ $activeFiltersCount > 1 ? 's' : '' }} actif{{ $activeFiltersCount > 1 ? 's' : '' }}
+                    @endif
+                </p>
             </div>
-            <div>
-                <strong>{{ $featuredMerchants->count() }}+</strong>
-                Marchands validés
+
+            {{-- Quick filter pills : Catégories --}}
+            <div class="pb-3 -mx-4 sm:mx-0 px-4 sm:px-0 overflow-x-auto" style="scrollbar-width:none;-ms-overflow-style:none;">
+                <style>.gabon-pills::-webkit-scrollbar { display: none; }</style>
+                <div class="flex items-center gap-2 min-w-max sm:min-w-0 sm:flex-wrap gabon-pills">
+                    <a href="{{ $urlWith(['category' => null, 'page' => null]) }}"
+                       class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-bold whitespace-nowrap transition active:scale-95
+                              {{ $categorySlug === '' ? 'bg-slate-900 text-white shadow-md' : 'bg-white border border-slate-200 text-slate-700 hover:border-[#44A08D] hover:bg-teal-50' }}">
+                        Toutes
+                        @if($categorySlug === '')
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                        @endif
+                    </a>
+                    @foreach($categories as $slug => $label)
+                        @php $catActive = $categorySlug === $slug; @endphp
+                        <a href="{{ $urlWith(['category' => $catActive ? null : $slug, 'page' => null]) }}"
+                           class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-bold whitespace-nowrap transition active:scale-95
+                                  {{ $catActive ? 'bg-slate-900 text-white shadow-md' : 'bg-white border border-slate-200 text-slate-700 hover:border-[#44A08D] hover:bg-teal-50' }}">
+                            {{ $label }}
+                            @if($catActive)
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                            @endif
+                        </a>
+                    @endforeach
+                </div>
             </div>
-            <div>
-                <strong>{{ $cities->count() }}+</strong>
-                Villes couvertes
+
+            {{-- Marchands en vedette --}}
+            @if($featuredMerchants->isNotEmpty() && $activeFiltersCount === 0)
+                <div class="pb-4 -mx-4 sm:mx-0 px-4 sm:px-0 overflow-x-auto" style="scrollbar-width:none;">
+                    <div class="flex items-center gap-2 min-w-max sm:min-w-0 sm:flex-wrap gabon-pills">
+                        <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 mr-1 whitespace-nowrap">Marchands</span>
+                        @foreach($featuredMerchants as $m)
+                            <a href="{{ route('gabon.merchant', $m->slug) }}"
+                               class="inline-flex items-center gap-1.5 pl-1.5 pr-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition active:scale-95 bg-white border border-slate-200 text-slate-700 hover:border-slate-400">
+                                <span class="w-5 h-5 rounded-full flex items-center justify-center text-white text-[10px] font-black bg-gradient-to-br from-[#44A08D] to-[#4ECDC4]">
+                                    {{ strtoupper(substr($m->business_name ?? $m->name, 0, 1)) }}
+                                </span>
+                                {{ \Illuminate\Support\Str::limit($m->business_name ?? $m->name, 22) }}
+                            </a>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
+
+            {{-- Toolbar : search + actions row --}}
+            <div class="pb-4 space-y-2 md:space-y-0 md:flex md:items-center md:gap-3 md:justify-end">
+                {{-- Search --}}
+                <form action="{{ route('gabon.index') }}" method="GET" class="flex items-center bg-slate-50 border border-slate-200 rounded-xl pl-3 pr-1 py-1 focus-within:bg-white focus-within:border-[#44A08D] focus-within:shadow-card transition w-full md:w-auto md:min-w-[320px]" data-no-loader>
+                    <input type="hidden" name="sort" value="{{ $sort }}">
+                    @if($categorySlug)<input type="hidden" name="category" value="{{ $categorySlug }}">@endif
+                    <svg class="w-4 h-4 text-slate-400 mr-2 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                    <input type="text" name="search" value="{{ $search }}"
+                           placeholder="Marchand, carte, ville…"
+                           class="flex-1 min-w-0 bg-transparent border-0 text-slate-900 placeholder-slate-400 focus:ring-0 text-sm focus:outline-none py-2">
+                    @if($search)
+                        <a href="{{ $urlWith(['search' => null, 'page' => null]) }}" class="w-7 h-7 rounded-md flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 mr-1 shrink-0" aria-label="Effacer">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                        </a>
+                    @endif
+                    <button type="submit"
+                            class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gradient-to-br from-[#44A08D] to-[#4ECDC4] text-white text-sm font-bold shadow-md shadow-[#44A08D]/30 active:scale-95 transition shrink-0">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                        <span class="hidden sm:inline">OK</span>
+                    </button>
+                </form>
+
+                {{-- Actions row : Filtres mobile + Tri + View --}}
+                <div class="flex items-center gap-2">
+                    {{-- Bouton Filtres mobile --}}
+                    <button type="button" @click="$dispatch('open-filters')"
+                            class="lg:hidden flex items-center justify-center gap-1.5 flex-1 px-3 py-2.5 rounded-xl bg-slate-900 text-white text-sm font-bold active:scale-95 transition">
+                        <svg class="w-4 h-4 text-[#5EEAD4]" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.207A1 1 0 013 6.5V4z"/></svg>
+                        Filtres
+                        @if($activeFiltersCount > 0)
+                            <span class="px-1.5 py-0.5 rounded-md bg-[#44A08D] text-white text-[10px] font-bold tabular-nums">{{ $activeFiltersCount }}</span>
+                        @endif
+                    </button>
+
+                    {{-- Sort --}}
+                    <div class="relative shrink-0" x-data="{ open: false }" @click.away="open = false">
+                        <button @click="open = !open" type="button" class="flex items-center gap-1.5 px-3 py-2.5 md:py-2 rounded-xl md:rounded-lg bg-slate-50 border border-slate-200 hover:bg-white hover:border-[#44A08D] text-sm font-semibold text-slate-700 transition active:scale-95">
+                            <svg class="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"/></svg>
+                            <span class="hidden sm:inline">{{ $sortLabel }}</span>
+                            <svg class="w-3 h-3 text-slate-400 transition-transform" :class="open && 'rotate-180'" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                        </button>
+                        <div x-show="open" x-transition class="absolute right-0 mt-1.5 w-44 bg-white rounded-xl border border-slate-200 shadow-pop overflow-hidden z-30" style="display:none;">
+                            @foreach ($sortOptions as $value => $label)
+                                <a href="{{ $urlWith(['sort' => $value, 'page' => null]) }}"
+                                   class="flex items-center justify-between px-3 py-2 text-sm transition
+                                          {{ $sort === $value ? 'bg-slate-50 text-[#44A08D] font-semibold' : 'text-slate-700 hover:bg-slate-50' }}">
+                                    <span>{{ $label }}</span>
+                                    @if($sort === $value)
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                                    @endif
+                                </a>
+                            @endforeach
+                        </div>
+                    </div>
+
+                    {{-- View toggle (desktop) --}}
+                    <div class="hidden md:flex items-center bg-slate-50 border border-slate-200 rounded-lg p-0.5 shrink-0">
+                        <button @click="view='grid'" type="button"
+                                :class="view === 'grid' ? 'bg-white shadow-sm text-[#44A08D]' : 'text-slate-500 hover:text-slate-700'"
+                                class="w-8 h-8 rounded-md flex items-center justify-center transition" aria-label="Vue grille">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
+                        </button>
+                        <button @click="view='list'" type="button"
+                                :class="view === 'list' ? 'bg-white shadow-sm text-[#44A08D]' : 'text-slate-500 hover:text-slate-700'"
+                                class="w-8 h-8 rounded-md flex items-center justify-center transition" aria-label="Vue liste">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
+                        </button>
+                    </div>
+                </div>
             </div>
+
+            {{-- Active filter chips --}}
+            @if($activeFiltersCount > 0)
+                <div class="flex flex-wrap items-center gap-2 pb-4">
+                    @if($search)
+                        <a href="{{ $urlWith(['search' => null, 'page' => null]) }}"
+                           class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-900 text-white text-xs font-medium hover:bg-slate-700 transition">
+                            <span>Recherche : {{ \Illuminate\Support\Str::limit($search, 20) }}</span>
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                        </a>
+                    @endif
+                    @if($currentCategory)
+                        <a href="{{ $urlWith(['category' => null, 'page' => null]) }}"
+                           class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-900 text-white text-xs font-medium hover:bg-slate-700 transition">
+                            <span>{{ $currentCategory }}</span>
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                        </a>
+                    @endif
+                    @foreach($selectedCities as $c)
+                        <a href="{{ $urlWith(['city' => array_values(array_diff($selectedCities, [$c])), 'page' => null]) }}"
+                           class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-medium hover:bg-slate-200 transition">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                            <span>{{ $c }}</span>
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                        </a>
+                    @endforeach
+                    @foreach($priceRanges as $range)
+                        <a href="{{ $urlWith(['price_range' => array_values(array_diff($priceRanges, [$range])), 'page' => null]) }}"
+                           class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-medium hover:bg-slate-200 transition">
+                            <span>{{ $priceRangeLabels[$range] ?? $range }} F</span>
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                        </a>
+                    @endforeach
+                    <a href="{{ route('gabon.index') }}" class="text-xs font-semibold text-slate-500 hover:text-[#44A08D] underline ml-1 transition">
+                        Tout effacer
+                    </a>
+                </div>
+            @endif
         </div>
-    </div>
-</section>
+    </section>
 
-{{-- ============ CATEGORIES SCROLLER ============ --}}
-<div class="gabon-cat-wrap">
-    <div class="gabon-cat-card">
-        <p class="gabon-cat-title">Explore par catégorie</p>
-        <div class="gabon-cats">
-            <a href="{{ route('gabon.index') }}" class="gabon-cat gabon-cat--active">Toutes</a>
-            @foreach($categories as $slug => $label)
-                <a href="{{ route('gabon.category', $slug) }}" class="gabon-cat">{{ $label }}</a>
-            @endforeach
+    {{-- ================================================================
+         CONTENT — Sidebar + Grid
+         ================================================================ --}}
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
+        <div class="grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-6">
+
+            {{-- ============ SIDEBAR (drawer mobile / sticky desktop) ============ --}}
+            <aside x-data="{ mobileOpen: false }"
+                   @open-filters.window="mobileOpen = true"
+                   @keydown.escape.window="mobileOpen = false"
+                   :class="mobileOpen ? 'fixed inset-0 z-50' : ''"
+                   class="lg:sticky lg:top-[120px] lg:self-start lg:!relative lg:!inset-auto lg:!z-auto">
+
+                <div x-show="mobileOpen" x-transition.opacity x-cloak
+                     @click="mobileOpen = false"
+                     class="lg:hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm"></div>
+
+                <form id="filterForm" action="{{ route('gabon.index') }}" method="GET"
+                      :class="mobileOpen
+                        ? 'fixed left-0 top-0 bottom-0 w-[88%] max-w-sm overflow-y-auto rounded-r-2xl rounded-l-none border-r border-slate-200'
+                        : 'hidden lg:block'"
+                      class="lg:!static lg:!w-auto lg:!max-w-none lg:!overflow-visible lg:rounded-2xl lg:!border bg-white border border-slate-200 shadow-card overflow-hidden">
+
+                    @if($search)<input type="hidden" name="search" value="{{ $search }}">@endif
+                    @if($sort !== 'newest')<input type="hidden" name="sort" value="{{ $sort }}">@endif
+
+                    {{-- Header --}}
+                    <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-3 bg-gradient-to-br from-slate-50 to-white sticky top-0 z-10">
+                        <div class="flex items-center gap-2.5 min-w-0">
+                            <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-[#4ECDC4] to-[#44A08D] flex items-center justify-center text-white shadow-md shadow-[#44A08D]/20 shrink-0">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.207A1 1 0 013 6.5V4z"/></svg>
+                            </div>
+                            <div class="min-w-0">
+                                <h3 class="font-display text-base font-bold text-slate-900 leading-none">Filtres</h3>
+                                @if($activeFiltersCount > 0)
+                                    <p class="text-[11px] text-slate-500 mt-1 leading-none">{{ $activeFiltersCount }} actif{{ $activeFiltersCount > 1 ? 's' : '' }}</p>
+                                @else
+                                    <p class="text-[11px] text-slate-500 mt-1 leading-none">Affinez votre recherche</p>
+                                @endif
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2 shrink-0">
+                            @if($activeFiltersCount > 0)
+                                <a href="{{ route('gabon.index') }}" class="text-xs font-semibold text-[#44A08D] hover:underline">Effacer</a>
+                            @endif
+                            <button type="button" @click="mobileOpen = false" class="lg:hidden w-8 h-8 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center active:scale-95 transition">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    {{-- ===== Section : Catégories ===== --}}
+                    <div x-data="{ open: true }" class="border-b border-slate-100">
+                        <button @click="open = !open" type="button" class="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-slate-50/50 transition">
+                            <span class="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                                Catégories
+                                @if($categorySlug)
+                                    <span class="px-1.5 py-0.5 rounded-md bg-teal-50 text-[#44A08D] text-[10px] font-bold">1</span>
+                                @endif
+                            </span>
+                            <svg class="w-4 h-4 text-slate-400 transition-transform" :class="open && 'rotate-180'" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                        </button>
+                        <div x-show="open" x-collapse class="px-3 pb-4 space-y-0.5">
+                            <a href="{{ $urlWith(['category' => null, 'page' => null]) }}"
+                               class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition
+                                      {{ $categorySlug === '' ? 'bg-slate-900 text-white font-semibold' : 'text-slate-700 hover:bg-slate-50' }}">
+                                <span>Toutes</span>
+                                @if($categorySlug === '')
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                                @endif
+                            </a>
+                            @foreach($categories as $slug => $label)
+                                <a href="{{ $urlWith(['category' => $slug, 'page' => null]) }}"
+                                   class="flex items-center justify-between px-3 py-2 rounded-lg text-sm transition
+                                          {{ $categorySlug === $slug ? 'bg-slate-900 text-white font-semibold' : 'text-slate-700 hover:bg-slate-50' }}">
+                                    <span>{{ $label }}</span>
+                                    @if($categorySlug === $slug)
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                                    @endif
+                                </a>
+                            @endforeach
+                        </div>
+                    </div>
+
+                    {{-- ===== Section : Gamme de prix ===== --}}
+                    <div x-data="{ open: true }" class="border-b border-slate-100">
+                        <button @click="open = !open" type="button" class="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-slate-50/50 transition">
+                            <span class="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                                Gamme de prix
+                                @if(count($priceRanges))
+                                    <span class="px-1.5 py-0.5 rounded-md bg-teal-50 text-[#44A08D] text-[10px] font-bold">{{ count($priceRanges) }}</span>
+                                @endif
+                            </span>
+                            <svg class="w-4 h-4 text-slate-400 transition-transform" :class="open && 'rotate-180'" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                        </button>
+                        <div x-show="open" x-collapse class="px-5 pb-4">
+                            <div class="grid grid-cols-2 gap-2">
+                                @foreach($priceRangeLabels as $value => $label)
+                                    @php $isActive = in_array($value, $priceRanges, true); @endphp
+                                    <label class="cursor-pointer">
+                                        <input type="checkbox" name="price_range[]" value="{{ $value }}" onchange="this.form.submit()"
+                                               {{ $isActive ? 'checked' : '' }} class="sr-only peer">
+                                        <div class="px-3 py-2.5 rounded-lg text-center text-xs font-semibold border-2 transition
+                                                    {{ $isActive ? 'bg-slate-900 border-slate-900 text-white' : 'bg-white border-slate-200 text-slate-700 hover:border-[#44A08D]/40' }}">
+                                            {{ $label }}
+                                            <span class="block text-[10px] font-normal opacity-75 mt-0.5">FCFA</span>
+                                        </div>
+                                    </label>
+                                @endforeach
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- ===== Section : Villes ===== --}}
+                    @if($availableCities->isNotEmpty())
+                        <div x-data="{ open: true }" class="border-b border-slate-100">
+                            <button @click="open = !open" type="button" class="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-slate-50/50 transition">
+                                <span class="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                                    Villes
+                                    @if(count($selectedCities))
+                                        <span class="px-1.5 py-0.5 rounded-md bg-teal-50 text-[#44A08D] text-[10px] font-bold">{{ count($selectedCities) }}</span>
+                                    @endif
+                                </span>
+                                <svg class="w-4 h-4 text-slate-400 transition-transform" :class="open && 'rotate-180'" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                            </button>
+                            <div x-show="open" x-collapse class="px-5 pb-4 space-y-1.5 max-h-72 overflow-y-auto">
+                                @foreach($availableCities as $city)
+                                    @php $cityActive = in_array($city, $selectedCities, true); @endphp
+                                    <label class="flex items-center gap-2.5 px-2 py-1.5 rounded-lg cursor-pointer hover:bg-slate-50 transition">
+                                        <input type="checkbox" name="city[]" value="{{ $city }}" onchange="this.form.submit()"
+                                               {{ $cityActive ? 'checked' : '' }}
+                                               class="w-4 h-4 rounded border-slate-300 text-[#44A08D] focus:ring-[#44A08D]/30">
+                                        <span class="flex-1 text-sm {{ $cityActive ? 'text-slate-900 font-semibold' : 'text-slate-700' }}">{{ $city }}</span>
+                                    </label>
+                                @endforeach
+                            </div>
+                        </div>
+                    @endif
+
+                    {{-- Footer mobile : "Voir les résultats" --}}
+                    <div class="lg:hidden sticky bottom-0 left-0 right-0 px-5 py-3 bg-white border-t border-slate-100 flex items-center gap-2">
+                        @if($activeFiltersCount > 0)
+                            <a href="{{ route('gabon.index') }}" class="px-3 py-2.5 rounded-lg bg-slate-100 text-slate-700 text-sm font-semibold">Effacer</a>
+                        @endif
+                        <button type="button" @click="mobileOpen = false" class="flex-1 px-3 py-2.5 rounded-lg bg-gradient-to-br from-[#44A08D] to-[#4ECDC4] text-white text-sm font-bold shadow-md">
+                            Voir {{ $cards->total() }} carte{{ $cards->total() > 1 ? 's' : '' }}
+                        </button>
+                    </div>
+                </form>
+            </aside>
+
+            {{-- ============ GRID / LIST ============ --}}
+            <main>
+                @if($cards->isEmpty())
+                    <div class="bg-white rounded-2xl border-2 border-dashed border-slate-200 p-12 text-center">
+                        <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-teal-50 to-emerald-50 text-[#44A08D] mb-4">
+                            <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
+                        </div>
+                        <h3 class="font-display text-lg font-bold text-slate-900 mb-1">Aucune carte trouvée</h3>
+                        <p class="text-sm text-slate-500 mb-4">
+                            @if($search || $categorySlug || count($selectedCities) || count($priceRanges))
+                                Aucun résultat pour ces filtres. Essaie d'élargir ta recherche.
+                            @else
+                                Aucune carte marchand n'est encore publiée. Reviens bientôt !
+                            @endif
+                        </p>
+                        @if($activeFiltersCount > 0)
+                            <a href="{{ route('gabon.index') }}" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-900 text-white text-sm font-semibold hover:bg-slate-700 transition">
+                                Réinitialiser
+                            </a>
+                        @endif
+                    </div>
+                @else
+                    {{-- ===== Grid view ===== --}}
+                    <div x-show="view === 'grid'" class="grid grid-cols-2 lg:grid-cols-3 gap-4">
+                        @foreach($cards as $card)
+                            <a href="{{ route('gabon.card', $card) }}" class="block group">
+                                @include('partials._merchant-card-visual', ['card' => $card])
+                                <div class="px-1 pt-2.5 pb-1">
+                                    <div class="text-[10px] font-bold uppercase tracking-wider text-[#44A08D] truncate">
+                                        {{ $card->reseller->business_name ?? $card->reseller->name }}
+                                    </div>
+                                    <h3 class="font-display text-sm md:text-base font-bold text-slate-900 leading-tight mt-0.5 line-clamp-2 group-hover:text-[#44A08D] transition">
+                                        {{ $card->name }}
+                                    </h3>
+                                    @php $min = collect($card->denominations ?? [])->min(); @endphp
+                                    <div class="flex items-center justify-between mt-1.5 text-xs text-slate-500">
+                                        <span class="font-semibold text-slate-700 tabular-nums">À partir de {{ number_format($min ?? 0, 0, ',', ' ') }} F</span>
+                                        @if($card->reseller->city)
+                                            <span class="inline-flex items-center gap-1">
+                                                <svg class="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                                                {{ $card->reseller->city }}
+                                            </span>
+                                        @endif
+                                    </div>
+                                </div>
+                            </a>
+                        @endforeach
+                    </div>
+
+                    {{-- ===== List view ===== --}}
+                    <div x-show="view === 'list'" class="space-y-3" x-cloak>
+                        @foreach($cards as $card)
+                            @php $min = collect($card->denominations ?? [])->min(); @endphp
+                            <a href="{{ route('gabon.card', $card) }}" class="flex bg-white rounded-2xl border border-slate-200 hover:border-[#44A08D] hover:shadow-card overflow-hidden transition group">
+                                {{-- Left visual (fixed width) --}}
+                                <div class="w-32 sm:w-44 flex-shrink-0 relative">
+                                    @if($card->visual_url)
+                                        <img src="{{ asset($card->visual_url) }}" alt="" class="w-full h-full object-cover">
+                                    @else
+                                        <div class="w-full h-full bg-gradient-to-br from-slate-800 to-[#0F4F44]"></div>
+                                    @endif
+                                    <div class="absolute inset-0 bg-gradient-to-r from-transparent via-transparent to-white/0 pointer-events-none"></div>
+                                </div>
+                                {{-- Right info --}}
+                                <div class="flex-1 p-4 flex items-center gap-3">
+                                    <div class="flex-1 min-w-0">
+                                        <div class="text-[10px] font-bold uppercase tracking-wider text-[#44A08D]">
+                                            {{ $card->reseller->business_name ?? $card->reseller->name }}
+                                        </div>
+                                        <h3 class="font-display text-base font-bold text-slate-900 mt-0.5 line-clamp-1 group-hover:text-[#44A08D] transition">
+                                            {{ $card->name }}
+                                        </h3>
+                                        <p class="text-xs text-slate-500 mt-1 line-clamp-1">
+                                            @if(isset($categories[$card->category])){{ $categories[$card->category] }} · @endif
+                                            {{ $card->reseller->city ?? '' }} · {{ $card->validity_months }} mois
+                                        </p>
+                                        <div class="flex flex-wrap gap-1 mt-2">
+                                            @foreach(array_slice($card->denominations ?? [], 0, 3) as $d)
+                                                <span class="px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-[10px] font-bold tabular-nums">{{ number_format($d, 0, ',', ' ') }} F</span>
+                                            @endforeach
+                                            @if($card->allow_custom_amount)
+                                                <span class="px-2 py-0.5 rounded bg-teal-50 text-[#44A08D] text-[10px] font-bold">+ libre</span>
+                                            @endif
+                                        </div>
+                                    </div>
+                                    <div class="shrink-0 text-right">
+                                        <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Dès</div>
+                                        <div class="font-display text-lg font-bold text-slate-900 tabular-nums">{{ number_format($min ?? 0, 0, ',', ' ') }}<span class="text-xs text-slate-500 font-semibold ml-0.5">F</span></div>
+                                        <span class="inline-flex items-center gap-1 mt-1 text-xs font-bold text-[#44A08D]">
+                                            Voir
+                                            <svg class="w-3.5 h-3.5 transition group-hover:translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+                                        </span>
+                                    </div>
+                                </div>
+                            </a>
+                        @endforeach
+                    </div>
+
+                    {{-- ===== Pagination ===== --}}
+                    @if($cards->lastPage() > 1)
+                        <div class="mt-8 flex items-center justify-center gap-1.5 flex-wrap">
+                            @if($cards->onFirstPage())
+                                <span class="w-9 h-9 rounded-lg bg-slate-100 text-slate-300 flex items-center justify-center cursor-not-allowed">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+                                </span>
+                            @else
+                                <a href="{{ $cards->previousPageUrl() }}" class="w-9 h-9 rounded-lg bg-white border border-slate-200 text-slate-700 hover:border-[#44A08D] hover:text-[#44A08D] flex items-center justify-center transition">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+                                </a>
+                            @endif
+
+                            @php
+                                $current = $cards->currentPage();
+                                $last    = $cards->lastPage();
+                                $pages   = collect(range(1, $last))->filter(fn ($p) => $p === 1 || $p === $last || abs($p - $current) <= 1);
+                                $prev    = 0;
+                            @endphp
+                            @foreach($pages as $p)
+                                @if($prev > 0 && $p - $prev > 1)
+                                    <span class="w-9 h-9 flex items-center justify-center text-slate-400">…</span>
+                                @endif
+                                @if($p === $current)
+                                    <span class="min-w-9 h-9 px-3 rounded-lg bg-gradient-to-br from-[#44A08D] to-[#4ECDC4] text-white text-sm font-bold flex items-center justify-center shadow-md shadow-[#44A08D]/30">{{ $p }}</span>
+                                @else
+                                    <a href="{{ $cards->url($p) }}" class="min-w-9 h-9 px-3 rounded-lg bg-white border border-slate-200 text-slate-700 hover:border-[#44A08D] hover:text-[#44A08D] text-sm font-semibold flex items-center justify-center transition">{{ $p }}</a>
+                                @endif
+                                @php $prev = $p; @endphp
+                            @endforeach
+
+                            @if($cards->hasMorePages())
+                                <a href="{{ $cards->nextPageUrl() }}" class="w-9 h-9 rounded-lg bg-white border border-slate-200 text-slate-700 hover:border-[#44A08D] hover:text-[#44A08D] flex items-center justify-center transition">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+                                </a>
+                            @else
+                                <span class="w-9 h-9 rounded-lg bg-slate-100 text-slate-300 flex items-center justify-center cursor-not-allowed">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+                                </span>
+                            @endif
+                        </div>
+                        <p class="text-center text-xs text-slate-500 mt-2">
+                            Page {{ $current }} sur {{ $last }} · {{ $cards->total() }} carte{{ $cards->total() > 1 ? 's' : '' }}
+                        </p>
+                    @endif
+                @endif
+            </main>
         </div>
     </div>
 </div>
-
-{{-- ============ FEATURED MERCHANTS ============ --}}
-@if($featuredMerchants->isNotEmpty())
-    <section class="gabon-section">
-        <div class="gabon-section-head">
-            <div>
-                <h2>Marchands en vedette</h2>
-                <p>Les commerces partenaires qui proposent leurs cartes-cadeau.</p>
-            </div>
-        </div>
-        <div class="gabon-merchants">
-            @foreach($featuredMerchants as $m)
-                <a href="{{ route('gabon.merchant', $m->slug) }}" class="gabon-merchant-card">
-                    <div class="gabon-merchant-avatar">
-                        {{ strtoupper(substr($m->business_name ?? $m->name, 0, 1)) }}
-                    </div>
-                    <h3 class="gabon-merchant-name">{{ $m->business_name ?? $m->name }}</h3>
-                    @if($m->city)
-                        <span class="gabon-merchant-city">
-                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                            {{ $m->city }}
-                        </span>
-                    @endif
-                    <div>
-                        <span class="gabon-merchant-count">{{ $m->merchant_cards_count }} carte{{ $m->merchant_cards_count > 1 ? 's' : '' }}</span>
-                    </div>
-                </a>
-            @endforeach
-        </div>
-    </section>
-@endif
-
-{{-- ============ CARDS GRID ============ --}}
-<section class="gabon-section" id="cards">
-    <div class="gabon-section-head">
-        <div>
-            <h2>
-                @if($currentSearch || $currentCity)
-                    Résultats
-                @else
-                    Toutes les cartes
-                @endif
-            </h2>
-            <p>{{ $cards->total() }} carte{{ $cards->total() > 1 ? 's' : '' }} disponible{{ $cards->total() > 1 ? 's' : '' }}.</p>
-        </div>
-    </div>
-
-    @if($cards->isEmpty())
-        <div class="gabon-empty">
-            <div class="gabon-empty-icon">
-                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
-            </div>
-            <h3>Aucune carte ne correspond</h3>
-            <p>Essaie une autre catégorie ou une autre ville.</p>
-        </div>
-    @else
-        <div class="gabon-grid">
-            @foreach($cards as $card)
-                <a href="{{ route('gabon.card', $card) }}" class="gabon-card">
-                    @include('partials._merchant-card-visual', ['card' => $card])
-                    <div class="gabon-card-info">
-                        <span class="gabon-card-merchant">
-                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-                            {{ $card->reseller->business_name ?? $card->reseller->name }}
-                        </span>
-                        <h3 class="gabon-card-title">{{ $card->name }}</h3>
-                        @if($card->reseller->city)
-                            <span class="gabon-card-city">{{ $card->reseller->city }}</span>
-                        @endif
-                    </div>
-                </a>
-            @endforeach
-        </div>
-
-        <div class="gabon-pagination">
-            {{ $cards->links() }}
-        </div>
-    @endif
-</section>
 @endsection
