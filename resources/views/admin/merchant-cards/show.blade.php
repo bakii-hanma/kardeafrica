@@ -12,58 +12,46 @@
 @section('content')
 <div style="padding:24px;font-family:'Inter','Figtree',sans-serif;max-width:1180px;margin:0 auto;" x-data="merchantCardActionModal()">
 
-    {{-- ============ CUSTOM MODAL ============ --}}
-    <div x-show="open" x-cloak @keydown.escape.window="close()"
-         style="position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;padding:20px;">
-        <div x-show="open" x-transition.opacity @click="close()"
-             style="position:absolute;inset:0;background:rgba(15,23,42,0.55);backdrop-filter:blur(4px);"></div>
-
-        <div x-show="open"
-             x-transition:enter="ease-out duration-200"
-             x-transition:enter-start="opacity-0 scale-95"
-             x-transition:enter-end="opacity-100 scale-100"
-             role="dialog" aria-modal="true"
-             style="position:relative;background:white;border-radius:18px;max-width:460px;width:100%;box-shadow:0 25px 50px -12px rgba(15,23,42,0.45);overflow:hidden;">
-
-            <div :style="kind === 'approve' ? 'background:linear-gradient(135deg,#ECFDF5,#D1FAE5);' : 'background:linear-gradient(135deg,#FEE2E2,#FECACA);'"
-                 style="padding:22px 24px 18px;display:flex;align-items:flex-start;gap:14px;">
-                <div :style="kind === 'approve' ? 'background:linear-gradient(135deg,#10B981,#059669);' : 'background:linear-gradient(135deg,#DC2626,#B91C1C);'"
-                     style="width:46px;height:46px;border-radius:14px;display:flex;align-items:center;justify-content:center;color:white;flex-shrink:0;box-shadow:0 6px 14px -4px rgba(0,0,0,0.20),inset 0 1px 0 rgba(255,255,255,0.25);">
-                    <template x-if="kind === 'approve'">
-                        <svg style="width:22px;height:22px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-                    </template>
-                    <template x-if="kind === 'reject'">
-                        <svg style="width:22px;height:22px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-                    </template>
-                    <template x-if="kind === 'unpublish'">
-                        <svg style="width:22px;height:22px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/></svg>
-                    </template>
+    {{-- ============ CUSTOM MODAL (teleported to body to escape parent stacking context) ============ --}}
+    <template x-teleport="body">
+        <div x-show="open" x-cloak class="mc-modal-root" @keydown.escape.window="close()">
+            <div class="mc-modal-backdrop" @click="close()"></div>
+            <div class="mc-modal-dialog" role="dialog" aria-modal="true" @click.stop>
+                <div class="mc-modal-head" :class="kind === 'approve' ? 'mc-modal-head--ok' : 'mc-modal-head--ko'">
+                    <div class="mc-modal-ic" :class="kind === 'approve' ? 'mc-modal-ic--ok' : 'mc-modal-ic--ko'">
+                        <template x-if="kind === 'approve'">
+                            <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                        </template>
+                        <template x-if="kind === 'reject'">
+                            <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                        </template>
+                        <template x-if="kind === 'unpublish'">
+                            <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/></svg>
+                        </template>
+                    </div>
+                    <div class="mc-modal-text">
+                        <h3 x-text="title"></h3>
+                        <p x-text="message"></p>
+                    </div>
                 </div>
-                <div style="flex:1;min-width:0;">
-                    <h3 style="margin:0 0 4px;font-family:'Space Grotesk','Inter',sans-serif;font-size:17px;font-weight:800;color:#0F172A;line-height:1.25;" x-text="title"></h3>
-                    <p style="margin:0;font-size:13px;color:#475569;line-height:1.5;" x-text="message"></p>
+
+                <div class="mc-modal-reason" x-show="kind === 'reject' && reasonPreview">
+                    <div class="mc-modal-reason-label">Motif qui sera envoyé au marchand</div>
+                    <div class="mc-modal-reason-body" x-text="reasonPreview"></div>
                 </div>
-            </div>
 
-            {{-- Reject reason preview --}}
-            <div x-show="kind === 'reject' && reasonPreview" style="padding:14px 24px;background:#FEF2F2;border-top:1px solid #FECACA;border-bottom:1px solid #FECACA;">
-                <div style="font-size:10px;font-weight:800;color:#B91C1C;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:5px;">Motif qui sera envoyé au marchand</div>
-                <div style="font-size:13px;color:#7F1D1D;line-height:1.5;white-space:pre-line;" x-text="reasonPreview"></div>
-            </div>
-
-            <div style="padding:16px 24px 20px;display:flex;gap:10px;justify-content:flex-end;">
-                <button type="button" @click="close()"
-                        style="padding:11px 20px;background:#F1F5F9;color:#334155;border:0;border-radius:11px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">
-                    Annuler
-                </button>
-                <button type="button" @click="confirmAction()"
-                        :style="kind === 'approve' ? 'background:linear-gradient(135deg,#10B981,#059669);box-shadow:0 8px 18px -6px rgba(16,185,129,0.55),inset 0 1px 0 rgba(255,255,255,0.25);' : 'background:linear-gradient(135deg,#DC2626,#B91C1C);box-shadow:0 8px 18px -6px rgba(220,38,38,0.55),inset 0 1px 0 rgba(255,255,255,0.25);'"
-                        style="padding:11px 20px;color:white;border:0;border-radius:11px;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:6px;">
-                    <span x-text="confirmLabel"></span>
-                </button>
+                <div class="mc-modal-actions">
+                    <button type="button" @click="close()" class="mc-modal-btn mc-modal-btn--cancel">Annuler</button>
+                    <button type="button" @click="confirmAction()" class="mc-modal-btn" :class="kind === 'approve' ? 'mc-modal-btn--ok' : 'mc-modal-btn--ko'">
+                        <template x-if="kind === 'approve'">
+                            <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                        </template>
+                        <span x-text="confirmLabel"></span>
+                    </button>
+                </div>
             </div>
         </div>
-    </div>
+    </template>
 
     {{-- ============ Crumb + status ============ --}}
     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:18px;">
@@ -279,7 +267,99 @@
     </div>
 </div>
 
-<style>[x-cloak] { display: none !important; }</style>
+<style>
+    [x-cloak] { display: none !important; }
+
+    /* ============ Custom modal (teleported to <body>) ============ */
+    .mc-modal-root {
+        position: fixed; inset: 0;
+        z-index: 9999;
+        display: flex; align-items: center; justify-content: center;
+        padding: 20px;
+        animation: mcFadeIn .15s ease-out;
+    }
+    @keyframes mcFadeIn { from { opacity: 0 } to { opacity: 1 } }
+    .mc-modal-backdrop {
+        position: absolute; inset: 0;
+        background: rgba(15, 23, 42, 0.55);
+        backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px);
+    }
+    .mc-modal-dialog {
+        position: relative;
+        background: white;
+        border-radius: 18px;
+        max-width: 480px;
+        width: 100%;
+        box-shadow: 0 25px 50px -12px rgba(15,23,42,0.45);
+        overflow: hidden;
+        font-family: 'Inter','Figtree',sans-serif;
+        animation: mcSlideIn .22s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes mcSlideIn {
+        from { transform: translateY(8px) scale(.96); opacity: 0; }
+        to   { transform: translateY(0)    scale(1);   opacity: 1; }
+    }
+    .mc-modal-head { padding: 22px 24px 18px; display: flex; align-items: flex-start; gap: 14px; }
+    .mc-modal-head--ok { background: linear-gradient(135deg,#ECFDF5,#D1FAE5); }
+    .mc-modal-head--ko { background: linear-gradient(135deg,#FEE2E2,#FECACA); }
+    .mc-modal-ic {
+        width: 46px; height: 46px;
+        border-radius: 14px;
+        display: flex; align-items: center; justify-content: center;
+        color: white;
+        flex-shrink: 0;
+        box-shadow: 0 6px 14px -4px rgba(0,0,0,0.20), inset 0 1px 0 rgba(255,255,255,0.25);
+    }
+    .mc-modal-ic--ok { background: linear-gradient(135deg,#10B981,#059669); }
+    .mc-modal-ic--ko { background: linear-gradient(135deg,#DC2626,#B91C1C); }
+    .mc-modal-text { flex: 1; min-width: 0; }
+    .mc-modal-text h3 {
+        margin: 0 0 4px;
+        font-family: 'Space Grotesk','Inter',sans-serif;
+        font-size: 17px; font-weight: 800; color: #0F172A; line-height: 1.25;
+    }
+    .mc-modal-text p { margin: 0; font-size: 13px; line-height: 1.5; color: #475569; }
+    .mc-modal-reason {
+        padding: 14px 24px;
+        background: #FEF2F2;
+        border-top: 1px solid #FECACA;
+        border-bottom: 1px solid #FECACA;
+    }
+    .mc-modal-reason-label {
+        font-size: 10px; font-weight: 800; color: #B91C1C;
+        text-transform: uppercase; letter-spacing: 0.06em;
+        margin-bottom: 5px;
+    }
+    .mc-modal-reason-body {
+        font-size: 13px; color: #7F1D1D;
+        line-height: 1.5;
+        white-space: pre-line;
+    }
+    .mc-modal-actions { padding: 16px 24px 20px; display: flex; gap: 10px; justify-content: flex-end; }
+    .mc-modal-btn {
+        padding: 11px 20px;
+        border: 0; border-radius: 11px;
+        font-size: 13px; font-weight: 700;
+        cursor: pointer;
+        font-family: inherit;
+        display: inline-flex; align-items: center; gap: 6px;
+        transition: transform .15s, box-shadow .15s;
+    }
+    .mc-modal-btn:hover { transform: translateY(-1px); }
+    .mc-modal-btn--cancel { background: #F1F5F9; color: #334155; }
+    .mc-modal-btn--cancel:hover { background: #E2E8F0; }
+    .mc-modal-btn--ok {
+        background: linear-gradient(135deg,#10B981,#059669);
+        color: white; font-weight: 800;
+        box-shadow: 0 8px 18px -6px rgba(16,185,129,0.55), inset 0 1px 0 rgba(255,255,255,0.25);
+    }
+    .mc-modal-btn--ko {
+        background: linear-gradient(135deg,#DC2626,#B91C1C);
+        color: white; font-weight: 800;
+        box-shadow: 0 8px 18px -6px rgba(220,38,38,0.55), inset 0 1px 0 rgba(255,255,255,0.25);
+    }
+</style>
 
 <script>
 function merchantCardActionModal() {

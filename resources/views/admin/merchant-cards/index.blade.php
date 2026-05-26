@@ -6,64 +6,48 @@
 @section('content')
 <div style="padding:24px;font-family:'Inter','Figtree',sans-serif;" x-data="merchantCardsModal()">
 
-    {{-- ============ CUSTOM MODAL ============ --}}
-    <div x-show="open" x-cloak @keydown.escape.window="close()"
-         style="position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;padding:20px;">
-        {{-- Backdrop --}}
-        <div x-show="open" x-transition.opacity @click="close()"
-             style="position:absolute;inset:0;background:rgba(15,23,42,0.55);backdrop-filter:blur(4px);"></div>
+    {{-- ============ CUSTOM MODAL (teleported to body to escape parent stacking context) ============ --}}
+    <template x-teleport="body">
+        <div x-show="open" x-cloak class="mc-modal-root" @keydown.escape.window="close()">
+            {{-- Backdrop --}}
+            <div class="mc-modal-backdrop" @click="close()"></div>
 
-        {{-- Dialog --}}
-        <div x-show="open"
-             x-transition:enter="ease-out duration-200"
-             x-transition:enter-start="opacity-0 scale-95"
-             x-transition:enter-end="opacity-100 scale-100"
-             role="dialog" aria-modal="true"
-             style="position:relative;background:white;border-radius:18px;max-width:440px;width:100%;box-shadow:0 25px 50px -12px rgba(15,23,42,0.45);overflow:hidden;">
-
-            {{-- Header with icon --}}
-            <div :style="kind === 'approve' ? 'background:linear-gradient(135deg,#ECFDF5,#D1FAE5);' : 'background:linear-gradient(135deg,#FEE2E2,#FECACA);'"
-                 style="padding:22px 24px 18px;display:flex;align-items:flex-start;gap:14px;">
-                <div :style="kind === 'approve' ? 'background:linear-gradient(135deg,#10B981,#059669);' : 'background:linear-gradient(135deg,#DC2626,#B91C1C);'"
-                     style="width:44px;height:44px;border-radius:14px;display:flex;align-items:center;justify-content:center;color:white;flex-shrink:0;box-shadow:0 6px 14px -4px rgba(0,0,0,0.20),inset 0 1px 0 rgba(255,255,255,0.25);">
-                    <template x-if="kind === 'approve'">
-                        <svg style="width:22px;height:22px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-                    </template>
-                    <template x-if="kind !== 'approve'">
-                        <svg style="width:22px;height:22px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-                    </template>
+            {{-- Dialog --}}
+            <div class="mc-modal-dialog" role="dialog" aria-modal="true" @click.stop>
+                <div class="mc-modal-head" :class="kind === 'approve' ? 'mc-modal-head--ok' : 'mc-modal-head--ko'">
+                    <div class="mc-modal-ic" :class="kind === 'approve' ? 'mc-modal-ic--ok' : 'mc-modal-ic--ko'">
+                        <template x-if="kind === 'approve'">
+                            <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                        </template>
+                        <template x-if="kind !== 'approve'">
+                            <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                        </template>
+                    </div>
+                    <div class="mc-modal-text">
+                        <h3 x-text="title"></h3>
+                        <p x-text="message"></p>
+                    </div>
                 </div>
-                <div style="flex:1;min-width:0;">
-                    <h3 style="margin:0 0 4px;font-family:'Space Grotesk','Inter',sans-serif;font-size:17px;font-weight:800;color:#0F172A;line-height:1.25;" x-text="title"></h3>
-                    <p style="margin:0;font-size:13px;color:#475569;line-height:1.5;" x-text="message"></p>
-                </div>
-            </div>
 
-            {{-- Card preview --}}
-            <div x-show="cardName" style="padding:14px 24px;background:#F8FAFC;border-top:1px solid #E2E8F0;border-bottom:1px solid #E2E8F0;display:flex;align-items:center;gap:12px;">
-                <div style="width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#1E293B,#0F4F44);display:flex;align-items:center;justify-content:center;color:white;flex-shrink:0;">
-                    <svg style="width:18px;height:18px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
+                <div class="mc-modal-card" x-show="cardName">
+                    <div class="mc-modal-card-ic">
+                        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
+                    </div>
+                    <div class="mc-modal-card-name" x-text="cardName"></div>
                 </div>
-                <div style="font-size:13px;font-weight:700;color:#0F172A;" x-text="cardName"></div>
-            </div>
 
-            {{-- Actions --}}
-            <div style="padding:16px 24px 20px;display:flex;gap:10px;justify-content:flex-end;">
-                <button type="button" @click="close()"
-                        style="padding:11px 20px;background:#F1F5F9;color:#334155;border:0;border-radius:11px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">
-                    Annuler
-                </button>
-                <button type="button" @click="confirmAction()"
-                        :style="kind === 'approve' ? 'background:linear-gradient(135deg,#10B981,#059669);box-shadow:0 8px 18px -6px rgba(16,185,129,0.55),inset 0 1px 0 rgba(255,255,255,0.25);' : 'background:linear-gradient(135deg,#DC2626,#B91C1C);box-shadow:0 8px 18px -6px rgba(220,38,38,0.55),inset 0 1px 0 rgba(255,255,255,0.25);'"
-                        style="padding:11px 20px;color:white;border:0;border-radius:11px;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:6px;">
-                    <template x-if="kind === 'approve'">
-                        <svg style="width:14px;height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-                    </template>
-                    <span x-text="confirmLabel"></span>
-                </button>
+                <div class="mc-modal-actions">
+                    <button type="button" @click="close()" class="mc-modal-btn mc-modal-btn--cancel">Annuler</button>
+                    <button type="button" @click="confirmAction()" class="mc-modal-btn" :class="kind === 'approve' ? 'mc-modal-btn--ok' : 'mc-modal-btn--ko'">
+                        <template x-if="kind === 'approve'">
+                            <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                        </template>
+                        <span x-text="confirmLabel"></span>
+                    </button>
+                </div>
             </div>
         </div>
-    </div>
+    </template>
 
     {{-- ============ STATS ============ --}}
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:18px;">
@@ -234,6 +218,127 @@
 <style>
     @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
     [x-cloak] { display: none !important; }
+
+    /* ============ Custom modal (teleported to <body>) ============ */
+    .mc-modal-root {
+        position: fixed; inset: 0;
+        z-index: 9999;
+        display: flex; align-items: center; justify-content: center;
+        padding: 20px;
+        animation: mcFadeIn .15s ease-out;
+    }
+    @keyframes mcFadeIn { from { opacity: 0 } to { opacity: 1 } }
+
+    .mc-modal-backdrop {
+        position: absolute; inset: 0;
+        background: rgba(15, 23, 42, 0.55);
+        backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px);
+    }
+
+    .mc-modal-dialog {
+        position: relative;
+        background: white;
+        border-radius: 18px;
+        max-width: 460px;
+        width: 100%;
+        box-shadow: 0 25px 50px -12px rgba(15,23,42,0.45);
+        overflow: hidden;
+        font-family: 'Inter','Figtree',sans-serif;
+        animation: mcSlideIn .22s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes mcSlideIn {
+        from { transform: translateY(8px) scale(.96); opacity: 0; }
+        to   { transform: translateY(0)    scale(1);   opacity: 1; }
+    }
+
+    .mc-modal-head {
+        padding: 22px 24px 18px;
+        display: flex; align-items: flex-start; gap: 14px;
+    }
+    .mc-modal-head--ok { background: linear-gradient(135deg,#ECFDF5,#D1FAE5); }
+    .mc-modal-head--ko { background: linear-gradient(135deg,#FEE2E2,#FECACA); }
+
+    .mc-modal-ic {
+        width: 46px; height: 46px;
+        border-radius: 14px;
+        display: flex; align-items: center; justify-content: center;
+        color: white;
+        flex-shrink: 0;
+        box-shadow: 0 6px 14px -4px rgba(0,0,0,0.20),
+                    inset 0 1px 0 rgba(255,255,255,0.25);
+    }
+    .mc-modal-ic--ok { background: linear-gradient(135deg,#10B981,#059669); }
+    .mc-modal-ic--ko { background: linear-gradient(135deg,#DC2626,#B91C1C); }
+
+    .mc-modal-text { flex: 1; min-width: 0; }
+    .mc-modal-text h3 {
+        margin: 0 0 4px;
+        font-family: 'Space Grotesk','Inter',sans-serif;
+        font-size: 17px; font-weight: 800;
+        color: #0F172A;
+        line-height: 1.25;
+    }
+    .mc-modal-text p {
+        margin: 0;
+        font-size: 13px; line-height: 1.5;
+        color: #475569;
+    }
+
+    .mc-modal-card {
+        padding: 14px 24px;
+        background: #F8FAFC;
+        border-top: 1px solid #E2E8F0;
+        border-bottom: 1px solid #E2E8F0;
+        display: flex; align-items: center; gap: 12px;
+    }
+    .mc-modal-card-ic {
+        width: 36px; height: 36px;
+        border-radius: 10px;
+        background: linear-gradient(135deg,#1E293B,#0F4F44);
+        display: flex; align-items: center; justify-content: center;
+        color: white;
+        flex-shrink: 0;
+    }
+    .mc-modal-card-name {
+        font-size: 13px; font-weight: 700;
+        color: #0F172A;
+    }
+
+    .mc-modal-actions {
+        padding: 16px 24px 20px;
+        display: flex; gap: 10px;
+        justify-content: flex-end;
+    }
+    .mc-modal-btn {
+        padding: 11px 20px;
+        border: 0; border-radius: 11px;
+        font-size: 13px; font-weight: 700;
+        cursor: pointer;
+        font-family: inherit;
+        display: inline-flex; align-items: center; gap: 6px;
+        transition: transform .15s, box-shadow .15s;
+    }
+    .mc-modal-btn:hover { transform: translateY(-1px); }
+    .mc-modal-btn--cancel {
+        background: #F1F5F9;
+        color: #334155;
+    }
+    .mc-modal-btn--cancel:hover { background: #E2E8F0; }
+    .mc-modal-btn--ok {
+        background: linear-gradient(135deg,#10B981,#059669);
+        color: white;
+        font-weight: 800;
+        box-shadow: 0 8px 18px -6px rgba(16,185,129,0.55),
+                    inset 0 1px 0 rgba(255,255,255,0.25);
+    }
+    .mc-modal-btn--ko {
+        background: linear-gradient(135deg,#DC2626,#B91C1C);
+        color: white;
+        font-weight: 800;
+        box-shadow: 0 8px 18px -6px rgba(220,38,38,0.55),
+                    inset 0 1px 0 rgba(255,255,255,0.25);
+    }
 </style>
 
 <script>
