@@ -393,27 +393,38 @@
                         @endif
                     </div>
                 @else
-                    {{-- ===== Grid view ===== --}}
+                    {{-- ===== Grid view (mirror /boutique <x-product-card>) ===== --}}
                     <div x-show="view === 'grid'" class="grid grid-cols-2 lg:grid-cols-3 gap-4">
                         @foreach($cards as $card)
-                            <a href="{{ route('gabon.card', $card) }}" class="block group">
+                            @php
+                                $denomsCount = count($card->denominations ?? []);
+                                $min = collect($card->denominations ?? [])->min() ?? 0;
+                            @endphp
+                            <a href="{{ route('gabon.card', $card) }}"
+                               class="group block overflow-hidden rounded-2xl bg-white border border-slate-100 shadow-card hover:shadow-card-hover transition-all duration-300 hover:-translate-y-1 hover:scale-[1.02] active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#44A08D]">
+
+                                {{-- Visual --}}
                                 @include('partials._merchant-card-visual', ['card' => $card])
-                                <div class="px-1 pt-2.5 pb-1">
-                                    <div class="text-[10px] font-bold uppercase tracking-wider text-[#44A08D] truncate">
-                                        {{ $card->reseller->business_name ?? $card->reseller->name }}
-                                    </div>
-                                    <h3 class="font-display text-sm md:text-base font-bold text-slate-900 leading-tight mt-0.5 line-clamp-2 group-hover:text-[#44A08D] transition">
+
+                                {{-- Info block (= identique au <x-product-card>) --}}
+                                <div class="relative bg-white p-3 sm:p-4">
+                                    <h4 class="text-xs sm:text-sm font-semibold text-slate-900 leading-snug line-clamp-2 group-hover:text-[#44A08D] transition-colors">
                                         {{ $card->name }}
-                                    </h3>
-                                    @php $min = collect($card->denominations ?? [])->min(); @endphp
-                                    <div class="flex items-center justify-between mt-1.5 text-xs text-slate-500">
-                                        <span class="font-semibold text-slate-700 tabular-nums">À partir de {{ number_format($min ?? 0, 0, ',', ' ') }} F</span>
-                                        @if($card->reseller->city)
-                                            <span class="inline-flex items-center gap-1">
-                                                <svg class="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                                                {{ $card->reseller->city }}
-                                            </span>
-                                        @endif
+                                    </h4>
+
+                                    @if($denomsCount > 1)
+                                        <p class="text-[10px] text-slate-400 mt-0.5 font-medium">
+                                            {{ $denomsCount }} montants disponibles{{ $card->allow_custom_amount ? ' + libre' : '' }}
+                                        </p>
+                                    @elseif($card->allow_custom_amount)
+                                        <p class="text-[10px] text-slate-400 mt-0.5 font-medium">Montant libre</p>
+                                    @endif
+
+                                    <div class="mt-2.5 sm:mt-3 pt-2.5 sm:pt-3 border-t border-slate-100 flex items-end justify-between gap-2">
+                                        <span class="text-[10px] text-slate-400 font-medium">Dès</span>
+                                        <span class="text-sm sm:text-base font-black tabular-nums text-slate-900 whitespace-nowrap">
+                                            {{ number_format($min, 0, ',', ' ') }} <span class="text-[10px] font-bold text-slate-500">FCFA</span>
+                                        </span>
                                     </div>
                                 </div>
                             </a>
