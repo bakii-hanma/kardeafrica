@@ -36,7 +36,7 @@ class MerchantCardPurchase extends Model
     protected $fillable = [
         'merchant_card_id', 'reseller_id',
         'order_id', 'order_item_id',
-        'unique_code', 'qr_payload',
+        'unique_code', 'pin_code', 'qr_payload',
         'buyer_name', 'buyer_phone', 'buyer_email',
         'recipient_name', 'recipient_phone', 'recipient_message',
         'amount', 'remaining_balance', 'currency',

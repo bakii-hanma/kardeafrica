@@ -6,6 +6,7 @@ use App\Models\MerchantCard;
 use App\Models\MerchantCardPurchase;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\UserCard;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -95,6 +96,70 @@ class MerchantCardCode
     }
 
     /**
+     * Pour les achats marchand créés AVANT l'ajout du PIN / du miroir UserCard :
+     *  - génère un pin_code s'il manque
+     *  - crée la UserCard miroir si elle n'existe pas
+     *
+     * Idempotent (peut être appelé plusieurs fois sans dupliquer).
+     */
+    public static function backfillPinAndUserCard(
+        MerchantCardPurchase $purchase,
+        OrderItem $item,
+        Order $order
+    ): void {
+        // 1. PIN si manquant
+        if (empty($purchase->pin_code)) {
+            $purchase->update([
+                'pin_code' => str_pad((string) random_int(0, 9999), 4, '0', STR_PAD_LEFT),
+            ]);
+        }
+
+        // 2. UserCard miroir si absent (lookup par order_item_id pour éviter le doublon)
+        $hasMirror = UserCard::where('order_item_id', $item->id)
+            ->where('user_id', $order->user_id)
+            ->exists();
+
+        if (!$hasMirror) {
+            $purchase->loadMissing(['merchantCard.reseller']);
+            $card = $purchase->merchantCard;
+            $merchantName = $card?->reseller?->business_name
+                ?? $card?->reseller?->name
+                ?? 'Marchand';
+
+            UserCard::create([
+                'user_id'         => $order->user_id,
+                'order_id'        => $order->id,
+                'order_item_id'   => $item->id,
+                'product_id'      => $item->product_id,
+                'checkout_card_id'=> 'mp_' . $purchase->id,
+                'name'            => $card?->name ?? 'Carte marchand',
+                'brand'           => $merchantName,
+                'serial_number'   => 'MGAB-' . str_pad((string) $purchase->id, 8, '0', STR_PAD_LEFT),
+                'card_code'       => $purchase->unique_code,
+                'pin'             => $purchase->fresh()->pin_code,
+                'expiration_date' => $purchase->expires_at?->toDateString(),
+                'status'          => UserCard::STATUS_ACTIVE,
+                'face_value'      => $purchase->amount,
+                'currency'        => 'XAF',
+                'image_url'       => $card && $card->visual_url ? asset($card->visual_url) : null,
+                'metadata'        => [
+                    'source'              => 'merchant',
+                    'merchant_purchase_id'=> $purchase->id,
+                    'merchant_card_id'    => $card?->id,
+                    'reseller_id'         => $purchase->reseller_id,
+                    'merchant_name'       => $merchantName,
+                    'merchant_city'       => $card?->reseller?->city ?? null,
+                ],
+            ]);
+
+            Log::info('MerchantCardCode: UserCard miroir backfillée', [
+                'purchase_id' => $purchase->id,
+                'order_id'    => $order->id,
+            ]);
+        }
+    }
+
+    /**
      * Crée localement une MerchantCardPurchase pour un OrderItem marchand.
      * Équivalent du payload `cards[]` renvoyé par afrikard pour une carte de marque,
      * mais 100% local (pas d'appel API).
@@ -111,10 +176,13 @@ class MerchantCardCode
      */
     public static function createPurchaseForOrderItem(Order $order, OrderItem $item): MerchantCardPurchase
     {
-        // Idempotence
+        // Idempotence : si la purchase existe déjà, on s'assure qu'elle a un
+        // PIN ET une UserCard miroir, puis on retourne. Permet de réparer les
+        // achats créés avant l'ajout du PIN/mirror.
         $existing = MerchantCardPurchase::where('order_item_id', $item->id)->first();
         if ($existing) {
-            Log::info('MerchantCardCode: purchase déjà existante, skip create', [
+            self::backfillPinAndUserCard($existing, $item, $order);
+            Log::info('MerchantCardCode: purchase déjà existante, backfill check', [
                 'order_id'       => $order->id,
                 'order_item_id'  => $item->id,
                 'purchase_id'    => $existing->id,
@@ -142,12 +210,17 @@ class MerchantCardCode
             // 1. Crée la purchase avec un qr_payload PROVISOIRE — qr_payload est
             //    NOT NULL/UNIQUE en BDD, et buildQrPayload() a besoin de l'ID
             //    réel (qu'on n'a pas encore). On finalise juste après.
+            $uniqueCode = self::generateUniqueCode();
+            $pinCode    = str_pad((string) random_int(0, 9999), 4, '0', STR_PAD_LEFT); // 0000-9999
+            $expiresAt  = now()->addMonths((int) ($card->validity_months ?? 12));
+
             $purchase = MerchantCardPurchase::create([
                 'merchant_card_id'  => $card->id,
                 'reseller_id'       => $card->reseller_id,
                 'order_id'          => $order->id,
                 'order_item_id'     => $item->id,
-                'unique_code'       => self::generateUniqueCode(),
+                'unique_code'       => $uniqueCode,
+                'pin_code'          => $pinCode,
                 'qr_payload'        => 'pending-' . uniqid('', true),
                 'buyer_name'        => $billing['name']  ?? $user->name  ?? 'Client KardAfrica',
                 'buyer_phone'       => $billing['phone'] ?? $user->phone ?? '',
@@ -162,7 +235,7 @@ class MerchantCardCode
                 'delivery_channel'  => ['email', 'orders_page'],
                 'delivered_at'      => now(),
                 'paid_at'           => now(),
-                'expires_at'        => now()->addMonths((int) ($card->validity_months ?? 12)),
+                'expires_at'        => $expiresAt,
             ]);
 
             // 2. Finalise le qr_payload signé avec l'ID réel
@@ -170,16 +243,47 @@ class MerchantCardCode
                 'qr_payload' => self::buildQrPayload($purchase->id, $card->reseller_id),
             ]);
 
-            // 3. Stats marchand
+            // 3. Mirroir UserCard : la carte apparaît dans /cards à côté des
+            //    cartes afrikard, mêmes champs (code + PIN + date d'expiration).
+            //    L'utilisateur a UNE liste unifiée de ses cartes-cadeau.
+            $merchantName = $card->reseller->business_name ?? $card->reseller->name ?? 'Marchand';
+            UserCard::create([
+                'user_id'         => $order->user_id,
+                'order_id'        => $order->id,
+                'order_item_id'   => $item->id,
+                'product_id'      => $item->product_id,
+                'checkout_card_id'=> 'mp_' . $purchase->id, // ref interne
+                'name'            => $card->name,
+                'brand'           => $merchantName,
+                'serial_number'   => 'MGAB-' . str_pad((string) $purchase->id, 8, '0', STR_PAD_LEFT),
+                'card_code'       => $uniqueCode,
+                'pin'             => $pinCode,
+                'expiration_date' => $expiresAt->toDateString(),
+                'status'          => UserCard::STATUS_ACTIVE,
+                'face_value'      => $amount,
+                'currency'        => 'XAF',
+                'image_url'       => $card->visual_url ? asset($card->visual_url) : null,
+                'metadata'        => [
+                    'source'              => 'merchant',         // distingue de 'afrikard'
+                    'merchant_purchase_id'=> $purchase->id,      // lien vers la purchase
+                    'merchant_card_id'    => $card->id,
+                    'reseller_id'         => $card->reseller_id,
+                    'merchant_name'       => $merchantName,
+                    'merchant_city'       => $card->reseller->city ?? null,
+                ],
+            ]);
+
+            // 4. Stats marchand
             $card->increment('total_sold');
             $card->increment('total_revenue', $amount);
 
-            Log::info('MerchantCardCode: purchase créée', [
+            Log::info('MerchantCardCode: purchase + UserCard mirror créés', [
                 'order_id'    => $order->id,
                 'purchase_id' => $purchase->id,
                 'card_id'     => $card->id,
                 'amount'      => $amount,
                 'unique_code' => $purchase->unique_code,
+                'has_pin'     => !empty($pinCode),
             ]);
 
             return $purchase;
