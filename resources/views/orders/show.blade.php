@@ -89,7 +89,9 @@
     <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 md:pt-10">
 
         {{-- Retry banner si commande payee mais sans cartes (afrikard a echoue) --}}
-        @if($order->payment_status === 'completed' && $cards->count() === 0)
+        {{-- Les cartes marchand (MerchantCardPurchase) comptent aussi comme "livrées". --}}
+        @php $mpCount = ($merchantPurchases ?? collect())->count(); @endphp
+        @if($order->payment_status === 'completed' && $cards->count() === 0 && $mpCount === 0)
             <div class="mb-6 bg-amber-50 border border-amber-200 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div class="flex items-start gap-3 flex-1 min-w-0">
                     <div class="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center text-amber-700 shrink-0">

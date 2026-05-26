@@ -2,10 +2,8 @@
 
 namespace App\Jobs;
 
-use App\Models\MerchantCard;
 use App\Models\MerchantCardPurchase;
 use App\Models\Order;
-use App\Models\OrderItem;
 use App\Models\UserCard;
 use App\Support\MerchantCardCode;
 use Illuminate\Bus\Queueable;
@@ -13,7 +11,6 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -72,7 +69,7 @@ class ProcessCheckoutJob implements ShouldQueue
         // ============================================================
         foreach ($merchantItems as $item) {
             try {
-                $this->createMerchantPurchase($item);
+                MerchantCardCode::createPurchaseForOrderItem($this->order, $item);
             } catch (\Throwable $e) {
                 Log::error('ProcessCheckoutJob: échec création MerchantCardPurchase', [
                     'order_id'      => $this->order->id,
@@ -171,79 +168,6 @@ class ProcessCheckoutJob implements ShouldQueue
         }
     }
 
-    /**
-     * Crée une MerchantCardPurchase localement pour un item Carte Gabon.
-     * product_id format : "merchant_<card_id>_<amount>" (amount optionnel).
-     *
-     * Idempotent : si une purchase existe déjà pour cet order_item_id, on skip.
-     */
-    private function createMerchantPurchase(OrderItem $item): void
-    {
-        // Idempotence (job retry / replay du callback de paiement)
-        if (MerchantCardPurchase::where('order_item_id', $item->id)->exists()) {
-            Log::info('ProcessCheckoutJob: MerchantCardPurchase déjà créée, skip', ['order_item_id' => $item->id]);
-            return;
-        }
-
-        if (!preg_match('/^merchant_(\d+)(?:_(\d+))?$/', (string) $item->product_id, $m)) {
-            throw new \Exception("product_id marchand invalide : {$item->product_id}");
-        }
-
-        $cardId = (int) $m[1];
-        $amount = isset($m[2]) ? (float) $m[2] : (float) $item->unit_price;
-
-        $card = MerchantCard::find($cardId);
-        if (!$card) {
-            throw new \Exception("MerchantCard #{$cardId} introuvable");
-        }
-
-        $user = $this->order->user;
-        $billing = (array) $this->order->billing_details;
-
-        DB::transaction(function () use ($card, $amount, $item, $user, $billing) {
-            // Crée la purchase (qr_payload provisoire — on le finalise juste après
-            // avec l'ID réel, requis par buildQrPayload).
-            $purchase = MerchantCardPurchase::create([
-                'merchant_card_id'  => $card->id,
-                'reseller_id'       => $card->reseller_id,
-                'order_id'          => $this->order->id,
-                'order_item_id'     => $item->id,
-                'unique_code'       => MerchantCardCode::generateUniqueCode(),
-                'qr_payload'        => 'pending-' . uniqid('', true), // placeholder unique
-                'buyer_name'        => $billing['name']  ?? $user->name  ?? 'Client KardAfrica',
-                'buyer_phone'       => $billing['phone'] ?? $user->phone ?? '',
-                'buyer_email'       => $billing['email'] ?? $user->email ?? null,
-                'amount'            => $amount,
-                'remaining_balance' => $amount,
-                'currency'          => 'XAF',
-                'payment_method'    => $this->order->payment_method ?? 'ebilling',
-                'payment_status'    => MerchantCardPurchase::PAYMENT_PAID,
-                'payment_ref'       => $this->order->external_reference,
-                'status'            => MerchantCardPurchase::STATUS_ACTIVE,
-                'delivery_channel'  => ['email', 'orders_page'],
-                'delivered_at'      => now(),
-                'paid_at'           => now(),
-                'expires_at'        => now()->addMonths((int) ($card->validity_months ?? 12)),
-            ]);
-
-            // Maintenant qu'on a l'ID, on génère le vrai QR signé
-            $purchase->update([
-                'qr_payload' => MerchantCardCode::buildQrPayload($purchase->id, $card->reseller_id),
-            ]);
-
-            // Stats marchand
-            $card->increment('total_sold');
-            $card->increment('total_revenue', $amount);
-
-            Log::info('ProcessCheckoutJob: MerchantCardPurchase créée', [
-                'order_id'    => $this->order->id,
-                'purchase_id' => $purchase->id,
-                'card_id'     => $card->id,
-                'amount'      => $amount,
-                'unique_code' => $purchase->unique_code,
-            ]);
-        });
-    }
 
     /**
      * Sauvegarder les cartes du checkout dans user_cards

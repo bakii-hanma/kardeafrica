@@ -212,12 +212,20 @@ class CheckoutController extends Controller
                     'total_amount'       => $subtotal,
                     'currency'           => 'XAF',
                     'payment_method'     => 'simulated',
-                    'billing_details'    => ['note' => 'Paiement simule (DEV)'],
+                    'billing_details'    => [
+                        'note'  => 'Paiement simule (DEV)',
+                        'phone' => $user->phone ?? null,
+                        'email' => $user->email ?? null,
+                        'name'  => $user->name  ?? null,
+                    ],
                 ]);
 
                 $svc = app(ProductApiService::class);
                 foreach ($cartItems as $item) {
-                    $native = $svc->lookupNativeValue($item->product_id);
+                    // Skip lookupNativeValue pour les items marchand (Carte Gabon)
+                    // — ils ne sont pas dans le catalogue afrikard.
+                    $isMerchant = str_starts_with((string) $item->product_id, 'merchant_');
+                    $native = $isMerchant ? null : $svc->lookupNativeValue($item->product_id);
                     OrderItem::create([
                         'order_id'        => $order->id,
                         'product_id'      => $item->product_id,
@@ -248,15 +256,54 @@ class CheckoutController extends Controller
                 return $order->fresh()->load('orderItems');
             });
 
-            // 2. Lookup des face values reelles dans le catalogue afrikard
-            // (le panier stocke le prix XAF affiche, mais l'API attend la face value en devise native)
+            // 2a. Items marchand (Carte Gabon) : génération LOCALE de la
+            //     MerchantCardPurchase via MerchantCardCode (= équivalent du
+            //     payload `cards[]` d'afrikard mais 100% en BDD).
+            $merchantItems = $order->orderItems->filter(
+                fn ($i) => \App\Support\MerchantCardCode::isMerchantOrderItem($i)
+            );
+            $afrikardItems = $order->orderItems->reject(
+                fn ($i) => \App\Support\MerchantCardCode::isMerchantOrderItem($i)
+            );
+
+            foreach ($merchantItems as $item) {
+                try {
+                    \App\Support\MerchantCardCode::createPurchaseForOrderItem($order, $item);
+                } catch (\Throwable $e) {
+                    Log::error('Checkout simulate: échec création MerchantCardPurchase', [
+                        'order_id'      => $order->id,
+                        'order_item_id' => $item->id,
+                        'product_id'    => $item->product_id,
+                        'error'         => $e->getMessage(),
+                    ]);
+                }
+            }
+
+            // 2b. Si AUCUN item afrikard restant, on complète l'order immédiatement
+            //     sans appeler l'API. La page commande affichera directement les cartes.
+            if ($afrikardItems->isEmpty()) {
+                $order->update([
+                    'status'       => Order::STATUS_COMPLETED,
+                    'completed_at' => now(),
+                ]);
+
+                $url = route('orders.show', $order);
+                return response()->json([
+                    'success'  => true,
+                    'order_id' => $order->id,
+                    'url'      => $url,
+                    'message'  => 'Carte marchand livrée immédiatement (paiement simulé).',
+                ]);
+            }
+
+            // 2c. Lookup des face values reelles dans le catalogue afrikard pour
+            //     les items afrikard restants
             $service = app(ProductApiService::class);
             $allProducts = collect($service->getAllProducts(0, 99999))->keyBy('id');
 
-            $payload = $order->orderItems->map(function ($item) use ($allProducts) {
+            $payload = $afrikardItems->map(function ($item) use ($allProducts) {
                 $productId = (int) $item->product_id;
                 $product = $allProducts->get($productId);
-                // Priorite : minFaceValue de l'API (vraie valeur) > unit_price du panier (fallback)
                 $value = $product
                     ? (int) round($product['minFaceValue'] ?? $product['price']['min'] ?? $item->unit_price)
                     : (int) round($item->unit_price);
