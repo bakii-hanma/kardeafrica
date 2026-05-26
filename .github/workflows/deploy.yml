@@ -53,9 +53,11 @@ jobs:
       # ⚡ Le vrai déploiement : on appelle le script bash deploy.sh installé sur
       # le serveur, qui orchestre git pull + composer + migrations + cache clear.
       - name: Run deploy script on SiteGround
+        env:
+          DEPLOY_PATH: /home/customer/www/kardafrica.com/public_html
         run: |
           ssh -i ~/.ssh/deploy_key -p ${{ secrets.SSH_PORT }} ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
-            "cd ${{ secrets.DEPLOY_PATH }} && bash scripts/deploy.sh ${{ github.sha }}"
+            "cd \"$DEPLOY_PATH\" && bash scripts/deploy.sh ${{ github.sha }}"
 
       - name: Notify success
         if: success()
