@@ -3,518 +3,402 @@
 @section('title', $card->name . ' — ' . ($merchant->business_name ?? $merchant->name))
 
 @section('content')
-<style>
-    .cd-wrap { max-width: 1180px; margin: 0 auto; padding: 24px 20px 80px; }
+@php
+    $merchantInitial = strtoupper(substr($merchant->business_name ?? $merchant->name, 0, 1));
+    $minDenom = collect($card->denominations ?? [])->min() ?? 0;
+    $maxDenom = collect($card->denominations ?? [])->max() ?? 0;
+@endphp
 
-    /* ====== Breadcrumb ====== */
-    .cd-crumb {
-        display: flex; gap: 6px; flex-wrap: wrap;
-        font-size: 12px; color: #94A3B8;
-        margin-bottom: 20px;
-    }
-    .cd-crumb a { color: #44A08D; text-decoration: none; font-weight: 600; }
-    .cd-crumb a:hover { text-decoration: underline; }
-    .cd-crumb svg { width: 11px; height: 11px; }
+<div class="min-h-screen bg-[#FAFAF7] pb-32" x-data="merchantCardDetails()">
 
-    /* ====== Layout 2 cols ====== */
-    .cd-grid {
-        display: grid; gap: 32px;
-        grid-template-columns: 1fr;
-    }
-    @media (min-width: 960px) {
-        .cd-grid { grid-template-columns: 1fr 1fr; gap: 48px; }
-    }
+    {{-- ================================================================
+         BREADCRUMB STRIP
+         ================================================================ --}}
+    <div class="bg-white border-b border-slate-200">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between">
+            <nav class="flex items-center gap-1.5 text-xs text-slate-500">
+                <a href="{{ route('home') }}" class="hover:text-[#44A08D] transition flex items-center gap-1">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+                    Accueil
+                </a>
+                <svg class="w-3 h-3 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+                <a href="{{ route('gabon.index') }}" class="hover:text-[#44A08D] transition">Carte Gabon</a>
+                <svg class="w-3 h-3 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+                <a href="{{ route('gabon.merchant', $merchant->slug) }}" class="hover:text-[#44A08D] transition truncate max-w-[160px]">{{ $merchant->business_name ?? $merchant->name }}</a>
+                <svg class="w-3 h-3 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+                <span class="text-slate-900 font-medium truncate max-w-[200px]">{{ $card->name }}</span>
+            </nav>
 
-    /* ====== Visual side ====== */
-    .cd-visual-wrap { position: sticky; top: 80px; align-self: start; }
-    .cd-visual-cont { max-width: 520px; }
-
-    /* ====== Info side ====== */
-    .cd-cat {
-        display: inline-block;
-        font-size: 11px; font-weight: 800; color: #44A08D;
-        text-transform: uppercase; letter-spacing: .10em;
-        margin-bottom: 8px;
-    }
-    .cd-title {
-        font-family: 'Space Grotesk','Inter',sans-serif;
-        font-size: 30px; font-weight: 800; color: #0F172A;
-        margin: 0 0 12px;
-        letter-spacing: -0.02em; line-height: 1.15;
-    }
-    @media (min-width:768px) { .cd-title { font-size: 38px; } }
-
-    .cd-merchant-link {
-        display: inline-flex; align-items: center; gap: 10px;
-        padding: 10px 14px;
-        background: white;
-        border: 1px solid #E2E8F0;
-        border-radius: 14px;
-        text-decoration: none;
-        color: inherit;
-        margin-bottom: 24px;
-        transition: border-color .15s, transform .15s;
-    }
-    .cd-merchant-link:hover {
-        border-color: #44A08D;
-        transform: translateY(-1px);
-    }
-    .cd-merchant-av {
-        width: 36px; height: 36px;
-        border-radius: 10px;
-        background: linear-gradient(135deg, #44A08D, #4ECDC4);
-        color: white;
-        display: inline-flex; align-items: center; justify-content: center;
-        font-family: 'Space Grotesk','Inter',sans-serif;
-        font-weight: 800; font-size: 14px;
-        flex-shrink: 0;
-    }
-    .cd-merchant-name {
-        font-family: 'Space Grotesk','Inter',sans-serif;
-        font-size: 14px; font-weight: 800; color: #0F172A;
-        line-height: 1.2;
-    }
-    .cd-merchant-meta {
-        font-size: 11px; color: #64748B;
-        display: inline-flex; align-items: center; gap: 5px;
-        margin-top: 2px;
-    }
-    .cd-merchant-meta svg { width: 10px; height: 10px; color: #94A3B8; }
-    .cd-merchant-arrow {
-        margin-left: auto;
-        color: #94A3B8;
-    }
-    .cd-merchant-arrow svg { width: 14px; height: 14px; }
-
-    /* ====== Amount selector ====== */
-    .cd-section { margin-bottom: 24px; }
-    .cd-section-label {
-        font-family: 'Space Grotesk','Inter',sans-serif;
-        font-size: 11px; font-weight: 800; color: #64748B;
-        text-transform: uppercase; letter-spacing: .10em;
-        margin: 0 0 10px;
-    }
-    .cd-amounts {
-        display: grid; grid-template-columns: repeat(3, 1fr);
-        gap: 8px;
-    }
-    @media (min-width:640px) { .cd-amounts { grid-template-columns: repeat(4, 1fr); } }
-    .cd-amount {
-        padding: 14px 8px;
-        background: white;
-        border: 2px solid #E2E8F0;
-        border-radius: 12px;
-        font-family: 'Space Grotesk','Inter',sans-serif;
-        font-size: 15px; font-weight: 800;
-        color: #0F172A;
-        cursor: pointer;
-        transition: all .15s;
-        font-variant-numeric: tabular-nums;
-        text-align: center;
-    }
-    .cd-amount:hover { border-color: #44A08D; }
-    .cd-amount--selected {
-        border-color: #44A08D;
-        background: linear-gradient(135deg, #ECFDF5, #D1FAE5);
-        color: #0F4F44;
-        box-shadow: 0 6px 14px -4px rgba(78,205,196,.30);
-    }
-    .cd-amount-label {
-        display: block;
-        font-size: 9px; font-weight: 700; color: #94A3B8;
-        text-transform: uppercase; letter-spacing: .08em;
-        margin-bottom: 2px;
-    }
-    .cd-custom-amount {
-        display: flex; align-items: center; gap: 8px;
-        padding: 12px 14px;
-        background: #F8FAFC;
-        border: 2px dashed #CBD5E1;
-        border-radius: 12px;
-        margin-top: 8px;
-    }
-    .cd-custom-amount label {
-        font-size: 12px; font-weight: 700; color: #475569;
-        white-space: nowrap;
-    }
-    .cd-custom-amount input {
-        flex: 1; padding: 8px 10px;
-        font-size: 16px; font-weight: 800;
-        font-variant-numeric: tabular-nums;
-        font-family: 'Space Grotesk','Inter',sans-serif;
-        border: 1.5px solid #E2E8F0;
-        border-radius: 8px;
-        background: white;
-    }
-    .cd-custom-amount input:focus {
-        outline: 0; border-color: #44A08D;
-        box-shadow: 0 0 0 3px rgba(68,160,141,.15);
-    }
-    .cd-custom-amount span { color: #64748B; font-size: 12px; font-weight: 700; }
-
-    /* ====== CTA ====== */
-    .cd-cta-wrap {
-        background: linear-gradient(135deg, #0F172A 0%, #0F4F44 100%);
-        color: white;
-        border-radius: 18px;
-        padding: 22px 24px;
-        margin-bottom: 24px;
-        position: relative; overflow: hidden;
-    }
-    .cd-cta-wrap::before {
-        content: ''; position: absolute;
-        top: -40%; right: -10%;
-        width: 280px; height: 280px;
-        background: radial-gradient(circle, rgba(94,234,212,.25), transparent 60%);
-        pointer-events: none;
-    }
-    .cd-cta-amount-row {
-        position: relative; z-index: 1;
-        display: flex; justify-content: space-between; align-items: baseline;
-        margin-bottom: 16px;
-    }
-    .cd-cta-amount-label {
-        font-size: 11px; font-weight: 700;
-        color: rgba(255,255,255,.6);
-        text-transform: uppercase; letter-spacing: .10em;
-    }
-    .cd-cta-amount-value {
-        font-family: 'Space Grotesk','Inter',sans-serif;
-        font-size: 32px; font-weight: 800;
-        font-variant-numeric: tabular-nums;
-        letter-spacing: -0.02em;
-    }
-    .cd-cta-amount-value small {
-        font-size: 14px; font-weight: 700;
-        color: rgba(255,255,255,.6);
-        margin-left: 4px;
-    }
-    .cd-cta-btn {
-        position: relative; z-index: 1;
-        width: 100%;
-        display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-        padding: 16px 24px;
-        background: linear-gradient(135deg, #44A08D, #4ECDC4);
-        color: white;
-        border: 0; border-radius: 14px;
-        font-family: 'Space Grotesk','Inter',sans-serif;
-        font-size: 15px; font-weight: 800;
-        cursor: pointer;
-        box-shadow: 0 14px 28px -8px rgba(78,205,196,.50),
-                    inset 0 1px 0 rgba(255,255,255,.30);
-        transition: transform .15s, box-shadow .15s;
-        text-decoration: none;
-    }
-    .cd-cta-btn:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 18px 32px -8px rgba(78,205,196,.60);
-    }
-    .cd-cta-btn:disabled {
-        background: #475569;
-        cursor: not-allowed;
-        opacity: .6;
-        transform: none;
-        box-shadow: none;
-    }
-    .cd-cta-btn svg { width: 18px; height: 18px; }
-    .cd-cta-note {
-        position: relative; z-index: 1;
-        margin-top: 12px;
-        font-size: 11px; color: rgba(255,255,255,.6);
-        text-align: center;
-    }
-
-    /* ====== Description + Terms ====== */
-    .cd-block {
-        background: white;
-        border-radius: 14px;
-        padding: 20px;
-        margin-bottom: 14px;
-        border: 1px solid #E2E8F0;
-    }
-    .cd-block h3 {
-        font-family: 'Space Grotesk','Inter',sans-serif;
-        font-size: 14px; font-weight: 800; color: #0F172A;
-        margin: 0 0 10px;
-        display: flex; align-items: center; gap: 8px;
-    }
-    .cd-block h3 svg {
-        width: 16px; height: 16px;
-        color: #44A08D;
-    }
-    .cd-block p, .cd-block li {
-        font-size: 13px; line-height: 1.65;
-        color: #475569;
-        margin: 0;
-        white-space: pre-line;
-    }
-    .cd-block ul { padding-left: 18px; margin: 0; }
-
-    /* ====== Features list ====== */
-    .cd-feats {
-        display: grid; gap: 8px;
-        grid-template-columns: 1fr 1fr;
-        margin-bottom: 14px;
-    }
-    .cd-feat {
-        display: flex; gap: 10px; align-items: flex-start;
-        background: white;
-        padding: 12px 14px;
-        border-radius: 12px;
-        border: 1px solid #E2E8F0;
-    }
-    .cd-feat-ic {
-        width: 32px; height: 32px;
-        border-radius: 10px;
-        background: linear-gradient(135deg, #ECFDF5, #D1FAE5);
-        color: #0F4F44;
-        display: inline-flex; align-items: center; justify-content: center;
-        flex-shrink: 0;
-    }
-    .cd-feat-ic svg { width: 16px; height: 16px; }
-    .cd-feat-txt strong {
-        display: block; font-size: 12px; font-weight: 800; color: #0F172A;
-        margin-bottom: 2px;
-    }
-    .cd-feat-txt span { font-size: 11px; color: #64748B; line-height: 1.4; }
-
-    /* ====== Other cards from this merchant ====== */
-    .cd-other {
-        margin-top: 48px;
-        padding-top: 32px;
-        border-top: 1px solid #E2E8F0;
-    }
-    .cd-other h2 {
-        font-family: 'Space Grotesk','Inter',sans-serif;
-        font-size: 22px; font-weight: 800; color: #0F172A;
-        margin: 0 0 16px;
-        letter-spacing: -0.02em;
-    }
-    .cd-other-grid {
-        display: grid; gap: 16px;
-        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    }
-    .cd-other-link { text-decoration: none; color: inherit; display: block; }
-    .cd-other-title {
-        font-family: 'Space Grotesk','Inter',sans-serif;
-        font-size: 13px; font-weight: 800; color: #0F172A;
-        margin: 8px 0 0;
-    }
-</style>
-
-<div class="cd-wrap" x-data="cardDetail({
-    denoms: {{ json_encode($card->denominations ?? []) }},
-    allowCustom: {{ $card->allow_custom_amount ? 'true' : 'false' }},
-    minAmount: {{ (int) ($card->min_amount ?? 0) }},
-    maxAmount: {{ (int) ($card->max_amount ?? 0) }},
-})">
-
-    {{-- ====== Breadcrumb ====== --}}
-    <nav class="cd-crumb">
-        <a href="{{ route('gabon.index') }}">Carte Gabon</a>
-        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
-        <a href="{{ route('gabon.merchant', $merchant->slug) }}">{{ $merchant->business_name ?? $merchant->name }}</a>
-        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
-        <span>{{ $card->name }}</span>
-    </nav>
-
-    <div class="cd-grid">
-        {{-- ============ LEFT : VISUAL ============ --}}
-        <div class="cd-visual-wrap">
-            <div class="cd-visual-cont">
-                @include('partials._merchant-card-visual', ['card' => $card])
-            </div>
-        </div>
-
-        {{-- ============ RIGHT : INFO + BUY ============ --}}
-        <div>
-            @if(isset($categories[$card->category]))
-                <span class="cd-cat">{{ $categories[$card->category] }}</span>
-            @endif
-            <h1 class="cd-title">{{ $card->name }}</h1>
-
-            <a href="{{ route('gabon.merchant', $merchant->slug) }}" class="cd-merchant-link">
-                <div class="cd-merchant-av">
-                    @if($merchant->logo_url)
-                        <img src="{{ asset($merchant->logo_url) }}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:10px;">
-                    @else
-                        {{ strtoupper(substr($merchant->business_name ?? $merchant->name, 0, 1)) }}
-                    @endif
-                </div>
-                <div>
-                    <div class="cd-merchant-name">{{ $merchant->business_name ?? $merchant->name }}</div>
-                    @if($merchant->city)
-                        <span class="cd-merchant-meta">
-                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                            {{ $merchant->city }}
-                        </span>
-                    @endif
-                </div>
-                <span class="cd-merchant-arrow">
-                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
-                </span>
+            <a href="{{ route('gabon.index') }}" class="hidden sm:inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-[#44A08D] transition">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+                Retour
             </a>
-
-            {{-- ============ AMOUNT SELECTOR ============ --}}
-            <div class="cd-section">
-                <p class="cd-section-label">Choisis le montant</p>
-                <div class="cd-amounts">
-                    @foreach($card->denominations ?? [] as $d)
-                        <button type="button"
-                                class="cd-amount"
-                                :class="selectedDenom === {{ $d }} ? 'cd-amount--selected' : ''"
-                                @click="selectDenom({{ $d }})">
-                            <span class="cd-amount-label">FCFA</span>
-                            {{ number_format($d, 0, ',', ' ') }}
-                        </button>
-                    @endforeach
-                </div>
-
-                @if($card->allow_custom_amount)
-                    <div class="cd-custom-amount">
-                        <label for="custom_amount">Autre montant :</label>
-                        <input type="number" id="custom_amount"
-                               x-model.number="customAmount"
-                               @input="onCustomInput()"
-                               :min="minAmount" :max="maxAmount"
-                               step="500"
-                               placeholder="{{ number_format($card->min_amount ?? 1000, 0, ',', ' ') }}">
-                        <span>FCFA</span>
-                    </div>
-                    <p style="font-size:11px;color:#94A3B8;margin-top:6px;">
-                        Entre {{ number_format($card->min_amount ?? 0, 0, ',', ' ') }} et {{ number_format($card->max_amount ?? 0, 0, ',', ' ') }} FCFA
-                    </p>
-                @endif
-            </div>
-
-            {{-- ============ CTA ============ --}}
-            <div class="cd-cta-wrap">
-                <div class="cd-cta-amount-row">
-                    <span class="cd-cta-amount-label">Total</span>
-                    <span class="cd-cta-amount-value">
-                        <span x-text="formatAmount(amount)"></span><small>FCFA</small>
-                    </span>
-                </div>
-                <button type="button" class="cd-cta-btn" :disabled="!amount" @click="buy()">
-                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
-                    Acheter maintenant
-                </button>
-                <p class="cd-cta-note">Paiement sécurisé · Livraison instantanée par SMS · WhatsApp · email</p>
-            </div>
-
-            {{-- ============ FEATURES ============ --}}
-            <div class="cd-feats">
-                <div class="cd-feat">
-                    <span class="cd-feat-ic">
-                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                    </span>
-                    <div class="cd-feat-txt">
-                        <strong>Validité {{ $card->validity_months }} mois</strong>
-                        <span>À utiliser avant expiration</span>
-                    </div>
-                </div>
-                <div class="cd-feat">
-                    <span class="cd-feat-ic">
-                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-                    </span>
-                    <div class="cd-feat-txt">
-                        <strong>Envoi instantané</strong>
-                        <span>SMS, WhatsApp ou email</span>
-                    </div>
-                </div>
-                <div class="cd-feat">
-                    <span class="cd-feat-ic">
-                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-                    </span>
-                    <div class="cd-feat-txt">
-                        <strong>Paiement sécurisé</strong>
-                        <span>Carte, Mobile Money</span>
-                    </div>
-                </div>
-                <div class="cd-feat">
-                    <span class="cd-feat-ic">
-                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>
-                    </span>
-                    <div class="cd-feat-txt">
-                        <strong>Plusieurs utilisations</strong>
-                        <span>Jusqu'à épuisement du solde</span>
-                    </div>
-                </div>
-            </div>
-
-            {{-- ============ DESCRIPTION ============ --}}
-            @if($card->description)
-                <div class="cd-block">
-                    <h3>
-                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                        Description
-                    </h3>
-                    <p>{{ $card->description }}</p>
-                </div>
-            @endif
-
-            {{-- ============ TERMS ============ --}}
-            @if($card->terms_conditions)
-                <div class="cd-block">
-                    <h3>
-                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                        Conditions d'utilisation
-                    </h3>
-                    <p>{{ $card->terms_conditions }}</p>
-                </div>
-            @endif
         </div>
     </div>
 
-    {{-- ============ OTHER CARDS FROM MERCHANT ============ --}}
-    @if($otherCards->isNotEmpty())
-        <section class="cd-other">
-            <h2>Autres cartes de {{ $merchant->business_name ?? $merchant->name }}</h2>
-            <div class="cd-other-grid">
-                @foreach($otherCards as $other)
-                    <a href="{{ route('gabon.card', $other) }}" class="cd-other-link">
-                        @include('partials._merchant-card-visual', ['card' => $other, 'compact' => true])
-                        <h3 class="cd-other-title">{{ $other->name }}</h3>
-                    </a>
-                @endforeach
-            </div>
-        </section>
-    @endif
+    {{-- ================================================================
+         HERO — 3D Card visual (left) + Selection (right)
+         ================================================================ --}}
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-12 relative">
+        {{-- Ambient gradient teal --}}
+        <div class="absolute inset-0 -z-10 overflow-hidden pointer-events-none">
+            <div class="absolute -top-12 left-1/4 w-[600px] h-[400px] rounded-full blur-3xl opacity-25 bg-[#44A08D]"></div>
+        </div>
 
+        <div class="lg:grid lg:grid-cols-[minmax(0,_1fr)_minmax(0,_1.1fr)] lg:gap-12 items-start">
+
+            {{-- ====== LEFT: 3D Floating Card ====== --}}
+            <div class="mb-10 lg:mb-0 perspective-1000">
+                <div class="relative w-full max-w-md mx-auto aspect-[1.55] transition-transform duration-700 transform-style-3d cursor-pointer"
+                     :class="{'rotate-y-180': isFlipped}"
+                     @click="isFlipped = !isFlipped">
+
+                    {{-- ===== FRONT : merchant card visual ===== --}}
+                    <div class="absolute inset-0 backface-hidden rounded-[28px] shadow-pop overflow-hidden bg-white animate-float">
+                        @include('partials._merchant-card-visual', ['card' => $card, 'fill' => true])
+                    </div>
+
+                    {{-- ===== BACK : KardAfrica branding ===== --}}
+                    <div class="absolute inset-0 backface-hidden rotate-y-180 rounded-[28px] shadow-pop overflow-hidden bg-gradient-to-br from-[#1F2937] via-[#0F172A] to-[#1F2937] flex flex-col items-center justify-center p-8 text-center relative">
+                        <div class="absolute -top-20 -left-20 w-64 h-64 rounded-full bg-[#44A08D]/30 blur-3xl"></div>
+                        <div class="absolute -bottom-16 -right-16 w-48 h-48 rounded-full bg-[#4ECDC4]/20 blur-3xl"></div>
+                        <svg class="absolute inset-0 w-full h-full opacity-[0.04]" aria-hidden="true">
+                            <defs>
+                                <pattern id="back-dots-merchant" width="24" height="24" patternUnits="userSpaceOnUse">
+                                    <circle cx="2" cy="2" r="1" fill="white"/>
+                                </pattern>
+                            </defs>
+                            <rect width="100%" height="100%" fill="url(#back-dots-merchant)"/>
+                        </svg>
+                        <div class="relative z-10">
+                            <div class="absolute -top-2 left-1/2 -translate-x-1/2 w-32 h-4 bg-black/40 rounded"></div>
+                            <div class="mt-12">
+                                <img src="{{ asset('assets/logo/FAVCON-KARDAFRICA-.png') }}" class="w-12 h-12 mx-auto mb-3 opacity-90" alt="">
+                                <h3 class="font-display text-white font-bold text-2xl mb-1">KardAfrica</h3>
+                                <p class="text-slate-300 text-xs max-w-[240px] mx-auto leading-relaxed">
+                                    Carte-cadeau marchand utilisable chez <strong class="text-[#4ECDC4]">{{ $merchant->business_name ?? $merchant->name }}</strong>{{ $merchant->city ? ' à '.$merchant->city : '' }}.
+                                </p>
+                                <div class="mt-4 flex items-center justify-center gap-2 font-mono text-[#4ECDC4] text-sm">
+                                    <span>****</span><span>****</span><span>****</span><span>{{ str_pad($card->id, 4, '0', STR_PAD_LEFT) }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Hint --}}
+                <p class="text-center text-slate-400 text-xs mt-5 flex items-center justify-center gap-1.5">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                    Touchez la carte pour la retourner
+                </p>
+            </div>
+
+            {{-- ====== RIGHT: Details + Selection ====== --}}
+            <div>
+                {{-- Merchant badge + title + description --}}
+                <div class="mb-6">
+                    <a href="{{ route('gabon.merchant', $merchant->slug) }}" class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white border border-slate-200 shadow-card mb-4 hover:border-[#44A08D] transition">
+                        <span class="w-5 h-5 rounded-full flex items-center justify-center text-white text-[10px] font-black bg-gradient-to-br from-[#44A08D] to-[#4ECDC4]">{{ $merchantInitial }}</span>
+                        <span class="text-xs font-semibold text-slate-700">{{ $merchant->business_name ?? $merchant->name }}</span>
+                        @if($merchant->city)
+                            <span class="text-[10px] text-slate-400">· {{ $merchant->city }}</span>
+                        @endif
+                    </a>
+
+                    @if(isset($categories[$card->category]))
+                        <div class="text-[11px] font-bold uppercase tracking-wider text-[#44A08D] mb-1.5">{{ $categories[$card->category] }}</div>
+                    @endif
+
+                    <h1 class="font-display text-3xl md:text-4xl font-bold text-slate-900 tracking-tight leading-tight">
+                        {{ $card->name }}
+                    </h1>
+
+                    @if($card->description)
+                        <p class="text-sm text-slate-600 mt-3 leading-relaxed line-clamp-3">{{ $card->description }}</p>
+                    @endif
+                </div>
+
+                {{-- Selection : pills modernes (= card-type style) --}}
+                <div class="mb-6">
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="text-sm font-bold text-slate-900" x-text="selectedTitle"></h3>
+                        <span class="text-xs text-slate-500">
+                            {{ count($card->denominations ?? []) }} montant{{ count($card->denominations ?? []) > 1 ? 's' : '' }}{{ $card->allow_custom_amount ? ' + libre' : '' }}
+                        </span>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                        @foreach($card->denominations ?? [] as $d)
+                            <button @click="selectDenom({{ $d }})" type="button"
+                                    class="relative px-5 py-3 rounded-xl border-2 transition-all duration-200 font-bold text-sm min-w-[100px] active:scale-95"
+                                    :class="selectedDenom === {{ $d }}
+                                        ? 'border-[#44A08D] bg-teal-50 text-[#44A08D] shadow-md shadow-[#44A08D]/15'
+                                        : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'">
+                                <span class="tabular-nums">{{ number_format($d, 0, ',', ' ') }}</span>
+                                <span class="text-[10px] font-bold opacity-75 ml-0.5">FCFA</span>
+                                <span x-show="selectedDenom === {{ $d }}" class="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-[#44A08D] flex items-center justify-center shadow-lg">
+                                    <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                                </span>
+                            </button>
+                        @endforeach
+
+                        @if($card->allow_custom_amount)
+                            <button @click="toggleCustom()" type="button"
+                                    class="relative px-5 py-3 rounded-xl border-2 border-dashed transition-all duration-200 font-bold text-sm min-w-[100px] active:scale-95"
+                                    :class="customMode
+                                        ? 'border-[#44A08D] bg-teal-50 text-[#44A08D]'
+                                        : 'border-slate-300 bg-white text-slate-600 hover:border-slate-400'">
+                                <svg class="w-4 h-4 inline-block mr-1 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+                                Libre
+                            </button>
+                        @endif
+                    </div>
+
+                    {{-- Custom amount input (toggled) --}}
+                    @if($card->allow_custom_amount)
+                        <div x-show="customMode" x-cloak x-transition class="mt-3 flex items-center gap-2 p-3 bg-white border-2 border-dashed border-[#44A08D]/40 rounded-xl">
+                            <label class="text-xs font-bold text-slate-700 shrink-0">Montant&nbsp;:</label>
+                            <input type="number" x-model.number="customAmount"
+                                   min="{{ (int) ($card->min_amount ?? 500) }}"
+                                   max="{{ (int) ($card->max_amount ?? 1000000) }}"
+                                   step="500"
+                                   placeholder="{{ number_format($card->min_amount ?? 1000, 0, ',', ' ') }}"
+                                   class="flex-1 min-w-0 px-3 py-2 rounded-lg border border-slate-200 focus:border-[#44A08D] focus:ring-2 focus:ring-[#44A08D]/20 outline-none font-bold text-base tabular-nums text-slate-900">
+                            <span class="text-xs font-bold text-slate-500 shrink-0">FCFA</span>
+                        </div>
+                        <p x-show="customMode" x-cloak class="text-[11px] text-slate-400 mt-1.5">
+                            Entre <span class="font-semibold tabular-nums">{{ number_format($card->min_amount ?? 0, 0, ',', ' ') }}</span>
+                            et <span class="font-semibold tabular-nums">{{ number_format($card->max_amount ?? 0, 0, ',', ' ') }}</span> FCFA
+                        </p>
+                    @endif
+                </div>
+
+                {{-- Trust strip --}}
+                <div class="grid grid-cols-3 gap-2 mb-6">
+                    @foreach ([
+                        ['icon' => 'bolt',    'top' => 'Livraison', 'bottom' => 'Instantanée'],
+                        ['icon' => 'shield',  'top' => 'Paiement',  'bottom' => '100% sécurisé'],
+                        ['icon' => 'check',   'top' => 'Validité',  'bottom' => $card->validity_months . ' mois'],
+                    ] as $trust)
+                        <div class="bg-white border border-slate-200 rounded-xl p-3 flex items-start gap-2.5">
+                            <div class="w-8 h-8 rounded-lg bg-teal-50 flex items-center justify-center text-[#44A08D] shrink-0">
+                                @switch($trust['icon'])
+                                    @case('bolt')
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                                        @break
+                                    @case('shield')
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                                        @break
+                                    @default
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                                @endswitch
+                            </div>
+                            <div class="min-w-0">
+                                <div class="text-[10px] text-slate-400 leading-none">{{ $trust['top'] }}</div>
+                                <div class="text-xs font-semibold text-slate-900 mt-0.5 truncate">{{ $trust['bottom'] }}</div>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+
+                {{-- Tabs : "Comment utiliser" / "Conditions" --}}
+                <div x-data="{ tab: 'how' }" class="bg-white rounded-2xl border border-slate-200 shadow-card overflow-hidden">
+                    <div class="flex border-b border-slate-100">
+                        <button @click="tab='how'" type="button"
+                                :class="tab === 'how' ? 'text-[#44A08D] border-[#44A08D]' : 'text-slate-500 border-transparent hover:text-slate-700'"
+                                class="flex-1 px-4 py-3 text-sm font-semibold border-b-2 transition">
+                            Comment utiliser
+                        </button>
+                        <button @click="tab='terms'" type="button"
+                                :class="tab === 'terms' ? 'text-[#44A08D] border-[#44A08D]' : 'text-slate-500 border-transparent hover:text-slate-700'"
+                                class="flex-1 px-4 py-3 text-sm font-semibold border-b-2 transition">
+                            Conditions
+                        </button>
+                    </div>
+
+                    <div x-show="tab === 'how'" class="p-5 space-y-3 text-sm text-slate-600">
+                        @foreach ([
+                            ['n' => 1, 'text' => 'Choisis ton montant et achète la carte en quelques clics.'],
+                            ['n' => 2, 'text' => 'Reçois ton code unique + QR par WhatsApp et email instantanément.'],
+                            ['n' => 3, 'text' => 'Présente le QR ou le code en boutique chez ' . ($merchant->business_name ?? $merchant->name) . '.'],
+                        ] as $step)
+                            <div class="flex items-start gap-3">
+                                <div class="w-7 h-7 rounded-full bg-teal-50 text-[#44A08D] font-bold text-xs flex items-center justify-center shrink-0">
+                                    {{ $step['n'] }}
+                                </div>
+                                <p class="leading-relaxed pt-1">{{ $step['text'] }}</p>
+                            </div>
+                        @endforeach
+                    </div>
+
+                    <div x-show="tab === 'terms'" class="p-5 text-sm text-slate-600 leading-relaxed" style="display:none;">
+                        <ul class="space-y-2 list-disc list-inside">
+                            <li>Valide pendant <strong>{{ $card->validity_months }} mois</strong> à compter de la date d'achat.</li>
+                            <li>Utilisable uniquement chez <strong>{{ $merchant->business_name ?? $merchant->name }}</strong>{{ $merchant->city ? ' à '.$merchant->city : '' }}.</li>
+                            <li>Non remboursable et non échangeable contre de l'espèce.</li>
+                            <li>Peut être utilisée en une ou plusieurs fois jusqu'à épuisement du solde.</li>
+                        </ul>
+                        @if(!empty($card->terms_conditions))
+                            <p class="mt-4 text-xs text-slate-500 italic whitespace-pre-line">{{ $card->terms_conditions }}</p>
+                        @endif
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {{-- ============================================================
+             OTHER CARDS FROM SAME MERCHANT
+             ============================================================ --}}
+        @if($otherCards->isNotEmpty())
+            <section class="mt-16 pt-12 border-t border-slate-200">
+                <div class="flex items-end justify-between mb-6 flex-wrap gap-3">
+                    <div>
+                        <h2 class="font-display text-xl md:text-2xl font-bold text-slate-900 tracking-tight">Autres cartes de {{ $merchant->business_name ?? $merchant->name }}</h2>
+                        <p class="text-xs text-slate-500 mt-1">Du même marchand, à découvrir aussi.</p>
+                    </div>
+                    <a href="{{ route('gabon.merchant', $merchant->slug) }}" class="inline-flex items-center gap-1 text-sm font-semibold text-[#44A08D] hover:underline">
+                        Tout voir
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+                    </a>
+                </div>
+
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                    @foreach($otherCards as $other)
+                        @php
+                            $otherMin = collect($other->denominations ?? [])->min() ?? 0;
+                            $otherCount = count($other->denominations ?? []);
+                        @endphp
+                        <a href="{{ route('gabon.card', $other) }}"
+                           class="group block overflow-hidden rounded-2xl bg-white border border-slate-100 shadow-card hover:shadow-card-hover transition-all duration-300 hover:-translate-y-1">
+                            @include('partials._merchant-card-visual', ['card' => $other])
+                            <div class="p-3">
+                                <h4 class="text-xs sm:text-sm font-semibold text-slate-900 leading-snug line-clamp-2 group-hover:text-[#44A08D] transition">{{ $other->name }}</h4>
+                                @if($otherCount > 1)
+                                    <p class="text-[10px] text-slate-400 mt-0.5">{{ $otherCount }} montants</p>
+                                @endif
+                                <div class="mt-2 pt-2 border-t border-slate-100 flex items-end justify-between">
+                                    <span class="text-[10px] text-slate-400">Dès</span>
+                                    <span class="text-sm font-black tabular-nums text-slate-900">{{ number_format($otherMin, 0, ',', ' ') }} <span class="text-[10px] font-bold text-slate-500">FCFA</span></span>
+                                </div>
+                            </div>
+                        </a>
+                    @endforeach
+                </div>
+            </section>
+        @endif
+    </div>
+
+    {{-- ================================================================
+         BOTTOM ACTION BAR (sticky)
+         ================================================================ --}}
+    <div class="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 shadow-[0_-8px_24px_-12px_rgba(15,23,42,0.15)] z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 md:py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-[env(safe-area-inset-bottom,0.75rem)]">
+            <div class="flex items-center justify-between sm:block">
+                <span class="text-xs uppercase tracking-wider text-slate-400 font-bold block leading-none">Total à payer</span>
+                <span class="font-display text-2xl md:text-3xl font-black text-slate-900 mt-1 block leading-none tabular-nums">
+                    <span x-text="formatFcfa(currentAmount)"></span> <span class="text-sm font-bold text-slate-500">FCFA</span>
+                </span>
+            </div>
+
+            <div class="flex gap-2 sm:gap-3 flex-1 sm:max-w-md">
+                <button @click="addToCart()"
+                        :disabled="!currentAmount"
+                        type="button"
+                        class="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl border-2 border-slate-200 hover:border-slate-300 bg-white text-slate-900 font-semibold text-sm transition active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>
+                    <span class="hidden sm:inline">Ajouter au panier</span>
+                    <span class="sm:hidden">Panier</span>
+                </button>
+                <button @click="buyNow()"
+                        :disabled="!currentAmount"
+                        type="button"
+                        class="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-[#44A08D] hover:bg-[#3d9180] text-white font-semibold text-sm shadow-lg shadow-[#44A08D]/30 transition active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed">
+                    <span>Acheter</span>
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+                </button>
+            </div>
+        </div>
+    </div>
 </div>
 
+<style>
+    .perspective-1000 { perspective: 1200px; }
+    .transform-style-3d { transform-style: preserve-3d; }
+    .backface-hidden { backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+    .rotate-y-180 { transform: rotateY(180deg); }
+
+    @keyframes float {
+        0%, 100% { transform: translateY(0); }
+        50%      { transform: translateY(-12px); }
+    }
+    .animate-float { animation: float 3.5s ease-in-out infinite; }
+    .rotate-y-180 .animate-float { animation: none; }
+
+    @media (prefers-reduced-motion: reduce) {
+        .animate-float { animation: none; }
+        .transform-style-3d { transition: none !important; }
+    }
+
+    [x-cloak] { display: none !important; }
+</style>
+
 <script>
-    function cardDetail(opts) {
+    function merchantCardDetails() {
         return {
-            denoms: opts.denoms,
-            allowCustom: opts.allowCustom,
-            minAmount: opts.minAmount,
-            maxAmount: opts.maxAmount,
-            selectedDenom: opts.denoms[0] || null,
+            denoms:       {{ json_encode($card->denominations ?? []) }},
+            allowCustom:  {{ $card->allow_custom_amount ? 'true' : 'false' }},
+            minAmount:    {{ (int) ($card->min_amount ?? 0) }},
+            maxAmount:    {{ (int) ($card->max_amount ?? 0) }},
+            selectedDenom: null,
+            customMode:   false,
             customAmount: null,
+            isFlipped:    false,
+
+            get currentAmount() {
+                if (this.customMode && this.customAmount) {
+                    const v = Number(this.customAmount);
+                    if (v >= this.minAmount && v <= this.maxAmount) return v;
+                    return 0;
+                }
+                return this.selectedDenom || 0;
+            },
+
+            get selectedTitle() {
+                if (this.customMode && this.customAmount) return 'Montant libre';
+                if (this.selectedDenom) return 'Montant sélectionné';
+                return 'Choisis un montant';
+            },
 
             init() {
-                this.amount = this.selectedDenom;
+                if (this.denoms.length > 0) this.selectedDenom = this.denoms[0];
             },
-            get amount() {
-                return this.customAmount || this.selectedDenom || 0;
-            },
-            set amount(v) { /* derived */ },
-            selectDenom(v) {
-                this.selectedDenom = v;
+
+            selectDenom(d) {
+                this.selectedDenom = d;
+                this.customMode = false;
                 this.customAmount = null;
             },
-            onCustomInput() {
-                if (this.customAmount) this.selectedDenom = null;
+
+            toggleCustom() {
+                this.customMode = !this.customMode;
+                if (this.customMode) {
+                    this.selectedDenom = null;
+                } else {
+                    this.customAmount = null;
+                    if (this.denoms.length > 0) this.selectedDenom = this.denoms[0];
+                }
             },
-            formatAmount(n) {
+
+            formatFcfa(n) {
                 return Number(n || 0).toLocaleString('fr-FR', { useGrouping: true });
             },
-            buy() {
-                // Phase 4 — futursowax purchase flow. Pour l'instant on alerte.
-                const amount = this.amount;
-                if (!amount) return;
-                alert("Achat de carte cadeau marchand : " + this.formatAmount(amount) + " FCFA.\n\nLe flux de paiement futursowax sera activé en Phase 4. Reviens bientôt !");
+
+            addToCart() {
+                if (!this.currentAmount) return;
+                alert('Carte-cadeau marchand : ' + this.formatFcfa(this.currentAmount) + ' FCFA.\n\nLe paiement futursowax sera activé en Phase 4. Reviens bientôt !');
+            },
+
+            buyNow() {
+                this.addToCart();
             },
         };
     }

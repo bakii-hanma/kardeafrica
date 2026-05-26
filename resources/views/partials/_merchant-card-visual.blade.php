@@ -15,9 +15,10 @@
     $_biz     = $_card->reseller->business_name ?? $_card->reseller->name;
     $_city    = $_card->reseller->city ?? null;
     $_compact = $compact ?? false;
+    $_fill    = $fill ?? false; // true = remplit le parent (utilisé par le flip card sur /gabon/carte/{id})
 @endphp
 
-<div class="mcv {{ $_compact ? 'mcv--compact' : '' }}">
+<div class="mcv {{ $_compact ? 'mcv--compact' : '' }} {{ $_fill ? 'mcv--fill' : '' }}">
     {{-- Background : image marchand ou dégradé fallback --}}
     @if($_visual)
         <div class="mcv-bg" style="background-image: url('{{ $_visual }}');"></div>
@@ -68,6 +69,11 @@
         overflow: hidden;
         color: white;
         background: linear-gradient(135deg, #0F172A 0%, #0F4F44 100%);
+    }
+    /* fill mode : remplit le parent qui gère lui-même son aspect-ratio (flip card) */
+    .mcv--fill {
+        aspect-ratio: auto;
+        width: 100%; height: 100%;
     }
     .mcv-bg {
         position: absolute; inset: 0;
