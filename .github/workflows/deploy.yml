@@ -35,30 +35,26 @@ jobs:
       - name: Checkout code (juste pour vérifier que le push est valide)
         uses: actions/checkout@v4
 
-      # Charge la clé privée SSH dans l'agent ssh-agent du runner
-      - name: Setup SSH key
-        uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-
-      # Ajoute le host SiteGround à known_hosts pour éviter le prompt
-      # "Are you sure you want to continue connecting?" qui bloquerait la commande
-      - name: Add SiteGround to known_hosts
+      # Setup SSH manuel — évite la dépendance à webfactory/ssh-agent
+      # (codeload.github.com a parfois des 404 transitoires sur les actions tiers).
+      - name: Setup SSH key + known_hosts
         run: |
           mkdir -p ~/.ssh
-          ssh-keyscan -p ${{ secrets.SSH_PORT }} -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+          chmod 700 ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p ${{ secrets.SSH_PORT }} -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
 
       # Test la connexion SSH avant le déploiement (échec rapide si KO)
       - name: Verify SSH connection
         run: |
-          ssh -p ${{ secrets.SSH_PORT }} ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} 'echo "✓ SSH OK"; pwd; php -v | head -1'
+          ssh -i ~/.ssh/deploy_key -p ${{ secrets.SSH_PORT }} ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} 'echo "✓ SSH OK"; pwd; php -v | head -1'
 
       # ⚡ Le vrai déploiement : on appelle le script bash deploy.sh installé sur
       # le serveur, qui orchestre git pull + composer + migrations + cache clear.
-      # Cf scripts/deploy.sh à la racine du projet (à copier sur le serveur la 1ère fois).
       - name: Run deploy script on SiteGround
         run: |
-          ssh -p ${{ secrets.SSH_PORT }} ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
+          ssh -i ~/.ssh/deploy_key -p ${{ secrets.SSH_PORT }} ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
             "cd ${{ secrets.DEPLOY_PATH }} && bash scripts/deploy.sh ${{ github.sha }}"
 
       - name: Notify success
