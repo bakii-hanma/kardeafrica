@@ -23,7 +23,6 @@ use App\Http\Controllers\Vendor\ProfileController    as VendorProfileController;
 use App\Http\Controllers\Vendor\SaleController       as VendorSaleController;
 use App\Http\Controllers\Vendor\CashOrderController  as VendorCashOrderController;
 use App\Http\Controllers\Vendor\RemittanceController as VendorRemittanceController;
-use App\Http\Controllers\Vendor\MerchantCardController as VendorMerchantCardController;
 use App\Http\Controllers\GabonController;
 use App\Http\Controllers\ClaimController;
 
@@ -201,13 +200,9 @@ Route::prefix('vendor')->group(function () {
 
         Route::get('/profile',          [VendorProfileController::class, 'show'])->name('vendor.profile');
 
-        // Carte Gabon — cartes-cadeau créées par le marchand lui-même
-        Route::get('/cartes-cadeau',                       [VendorMerchantCardController::class, 'index'])->name('vendor.merchant-cards.index');
-        Route::get('/cartes-cadeau/nouvelle',              [VendorMerchantCardController::class, 'create'])->name('vendor.merchant-cards.create');
-        Route::post('/cartes-cadeau',                      [VendorMerchantCardController::class, 'store'])->name('vendor.merchant-cards.store');
-        Route::get('/cartes-cadeau/{merchantCard}/edit',   [VendorMerchantCardController::class, 'edit'])->name('vendor.merchant-cards.edit');
-        Route::put('/cartes-cadeau/{merchantCard}',        [VendorMerchantCardController::class, 'update'])->name('vendor.merchant-cards.update');
-        Route::delete('/cartes-cadeau/{merchantCard}',     [VendorMerchantCardController::class, 'destroy'])->name('vendor.merchant-cards.destroy');
+        // Note : la création/édition des cartes Carte Gabon a été migrée vers
+        // /admin/merchant-cards. Les boutiques NE créent plus de cartes, elles
+        // les vendent seulement depuis le catalogue géré par l'admin.
 
         // E-Billing payment flow (return depuis le portail + vérification)
         Route::get('/payment/return',   [VendorSaleController::class, 'paymentReturn'])->name('vendor.payment.return');
@@ -280,11 +275,16 @@ Route::prefix('admin')->middleware(['auth', 'is_admin'])->group(function () {
     Route::post('/resellers/{reseller}/orders/{order}/refund',         [AdminVendorOrderController::class, 'refund'])->name('admin.resellers.orders.refund');
     Route::post('/resellers/{reseller}/orders/{order}/inject-cards',   [AdminVendorOrderController::class, 'injectCards'])->name('admin.resellers.orders.inject-cards');
 
-    // Modération des cartes-cadeau marchand (Carte Gabon — Phase 6)
+    // Cartes-cadeau Carte Gabon — créées par l'admin, vendues par les boutiques
     Route::get('/merchant-cards',                            [AdminMerchantCardController::class, 'index'])->name('admin.merchant-cards.index');
+    Route::get('/merchant-cards/nouvelle',                   [AdminMerchantCardController::class, 'create'])->name('admin.merchant-cards.create');
+    Route::post('/merchant-cards',                           [AdminMerchantCardController::class, 'store'])->name('admin.merchant-cards.store');
     Route::get('/merchant-cards/{merchantCard}',             [AdminMerchantCardController::class, 'show'])->name('admin.merchant-cards.show');
+    Route::get('/merchant-cards/{merchantCard}/edit',        [AdminMerchantCardController::class, 'edit'])->name('admin.merchant-cards.edit');
+    Route::put('/merchant-cards/{merchantCard}',             [AdminMerchantCardController::class, 'update'])->name('admin.merchant-cards.update');
     Route::patch('/merchant-cards/{merchantCard}/approve',   [AdminMerchantCardController::class, 'approve'])->name('admin.merchant-cards.approve');
     Route::patch('/merchant-cards/{merchantCard}/reject',    [AdminMerchantCardController::class, 'reject'])->name('admin.merchant-cards.reject');
+    Route::delete('/merchant-cards/{merchantCard}',          [AdminMerchantCardController::class, 'destroy'])->name('admin.merchant-cards.destroy');
 
     // Daywatch (offre streaming locale — BDD)
     Route::get('/daywatch',                          [AdminDaywatchController::class, 'index'])->name('admin.daywatch.index');

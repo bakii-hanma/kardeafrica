@@ -92,6 +92,22 @@
                     @endif
                 </p>
             </div>
+            <div style="position:relative;display:flex;gap:8px;flex-wrap:wrap;align-self:flex-start;">
+                <a href="{{ route('admin.merchant-cards.edit', $card) }}"
+                   style="display:inline-flex;align-items:center;gap:6px;padding:9px 14px;background:rgba(255,255,255,0.15);color:white;border-radius:10px;font-size:12px;font-weight:700;text-decoration:none;backdrop-filter:blur(8px);">
+                    <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                    Éditer
+                </a>
+                <form action="{{ route('admin.merchant-cards.destroy', $card) }}" method="POST"
+                      onsubmit="return confirm('Supprimer définitivement cette carte ? Si des achats existent, elle sera juste désactivée.');">
+                    @csrf @method('DELETE')
+                    <button type="submit"
+                            style="display:inline-flex;align-items:center;gap:6px;padding:9px 14px;background:rgba(220,38,38,0.30);color:white;border:0;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;backdrop-filter:blur(8px);">
+                        <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3"/></svg>
+                        Supprimer
+                    </button>
+                </form>
+            </div>
         </div>
     </div>
 

@@ -20,6 +20,21 @@ class MerchantCard extends Model
 {
     use HasFactory;
 
+    /** Catégories proposées dans le formulaire admin (synchro avec /gabon). */
+    public const CATEGORIES = [
+        'restaurant'   => 'Restaurant / Café',
+        'mode'         => 'Mode & Vêtements',
+        'beaute'       => 'Beauté & Coiffure',
+        'spa'          => 'Spa & Bien-être',
+        'sport'        => 'Sport & Fitness',
+        'supermarche'  => 'Supermarché / Alimentation',
+        'electronique' => 'Électronique & High-tech',
+        'maison'       => 'Maison & Déco',
+        'loisirs'      => 'Loisirs & Divertissement',
+        'sante'        => 'Santé & Pharmacie',
+        'autre'        => 'Autre',
+    ];
+
     protected $fillable = [
         'reseller_id',
         'name', 'description', 'category', 'visual_url',

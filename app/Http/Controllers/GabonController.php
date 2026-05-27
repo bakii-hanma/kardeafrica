@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Controllers\Vendor\MerchantCardController;
 use App\Models\MerchantCard;
 use App\Models\Reseller;
 use Illuminate\Http\Request;
@@ -76,7 +75,7 @@ class GabonController extends Controller
             });
         }
 
-        if ($categorySlug !== '' && array_key_exists($categorySlug, MerchantCardController::CATEGORIES)) {
+        if ($categorySlug !== '' && array_key_exists($categorySlug, MerchantCard::CATEGORIES)) {
             $query->where(function ($q) use ($categorySlug) {
                 $q->where('category', $categorySlug)
                   ->orWhereHas('reseller', fn ($r) => $r->where('business_type', $categorySlug));
@@ -166,10 +165,10 @@ class GabonController extends Controller
             'cards'              => $cards,
             'featuredMerchants'  => $featuredMerchants,
             'availableCities'    => $availableCities,
-            'categories'         => MerchantCardController::CATEGORIES,
+            'categories'         => MerchantCard::CATEGORIES,
             'search'             => $search,
             'categorySlug'       => $categorySlug,
-            'currentCategory'    => $categorySlug !== '' ? MerchantCardController::CATEGORIES[$categorySlug] ?? null : null,
+            'currentCategory'    => $categorySlug !== '' ? MerchantCard::CATEGORIES[$categorySlug] ?? null : null,
             'selectedCities'     => $cities,
             'priceRanges'        => $priceRanges,
             'priceRangeLabels'   => self::PRICE_RANGES,
@@ -183,7 +182,7 @@ class GabonController extends Controller
     /** /gabon/categorie/{slug} — toutes les cartes d'une catégorie */
     public function category(Request $request, string $slug)
     {
-        abort_unless(array_key_exists($slug, MerchantCardController::CATEGORIES), 404);
+        abort_unless(array_key_exists($slug, MerchantCard::CATEGORIES), 404);
 
         // Filtre via la relation reseller.business_type (= "catégorie du marchand")
         // mais aussi via merchant_card.category (= catégorie spécifique à la carte)
@@ -200,8 +199,8 @@ class GabonController extends Controller
         return view('gabon.category', [
             'cards'        => $cards,
             'categorySlug' => $slug,
-            'categoryName' => MerchantCardController::CATEGORIES[$slug],
-            'categories'   => MerchantCardController::CATEGORIES,
+            'categoryName' => MerchantCard::CATEGORIES[$slug],
+            'categories'   => MerchantCard::CATEGORIES,
         ]);
     }
 
@@ -221,7 +220,7 @@ class GabonController extends Controller
         return view('gabon.merchant', [
             'merchant'   => $merchant,
             'cards'      => $cards,
-            'categories' => MerchantCardController::CATEGORIES,
+            'categories' => MerchantCard::CATEGORIES,
         ]);
     }
 
@@ -250,7 +249,7 @@ class GabonController extends Controller
             'card'       => $merchantCard,
             'merchant'   => $merchantCard->reseller,
             'otherCards' => $otherCards,
-            'categories' => MerchantCardController::CATEGORIES,
+            'categories' => MerchantCard::CATEGORIES,
         ]);
     }
 }

@@ -101,6 +101,12 @@
 
     {{-- ============ TOOLBAR ============ --}}
     <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:18px;">
+        <a href="{{ route('admin.merchant-cards.create') }}"
+           style="display:inline-flex;align-items:center;gap:8px;padding:12px 18px;background:linear-gradient(135deg,#44A08D,#4ECDC4);color:white;border-radius:12px;font-size:14px;font-weight:700;text-decoration:none;box-shadow:0 10px 24px -10px rgba(68,160,141,0.5);order:2;">
+            <svg style="width:16px;height:16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+            Nouvelle carte
+        </a>
+
         <form method="GET" action="{{ route('admin.merchant-cards.index') }}"
               style="flex:1 1 auto;min-width:280px;background:white;border-radius:14px;padding:10px;border:1px solid #E2E8F0;box-shadow:0 1px 2px rgba(15,23,42,0.04);display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
             <div style="position:relative;flex:1 1 240px;min-width:200px;">
