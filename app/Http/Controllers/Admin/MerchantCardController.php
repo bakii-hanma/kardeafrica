@@ -70,7 +70,7 @@ class MerchantCardController extends Controller
         ]);
     }
 
-    /** Formulaire création */
+    /** Formulaire création — par défaut la carte est active immédiatement (plus de workflow d'approbation) */
     public function create()
     {
         return view('admin.merchant-cards.create', [
@@ -78,6 +78,7 @@ class MerchantCardController extends Controller
                 'currency'        => 'XAF',
                 'validity_months' => 12,
                 'denominations'   => [5000, 10000, 25000, 50000],
+                'is_active'       => true, // Active par défaut, l'admin décoche s'il veut un brouillon
             ]),
             'categories'  => MerchantCard::CATEGORIES,
             'merchants'   => $this->merchantsForSelect(),

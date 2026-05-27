@@ -62,16 +62,10 @@
     Vendeurs
 </a>
 
-@php
-    $merchantCardsPending = \App\Models\MerchantCard::where('is_active', false)->whereNull('rejection_reason')->count();
-@endphp
 <a href="{{ route('admin.merchant-cards.index') }}"
    class="sidebar-link flex items-center px-3 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap {{ request()->routeIs('admin.merchant-cards.*') ? 'active' : 'text-gray-300' }}">
     <svg class="w-5 h-5 mr-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
-    Cartes marchand
-    @if($merchantCardsPending > 0)
-        <span style="margin-left:auto;background:#F59E0B;color:white;font-size:10px;font-weight:800;padding:2px 7px;border-radius:9999px;font-variant-numeric:tabular-nums;">{{ $merchantCardsPending }}</span>
-    @endif
+    Cartes locales
 </a>
 
 <a href="{{ route('admin.newsletter.index') }}"

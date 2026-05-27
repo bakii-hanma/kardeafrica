@@ -4,9 +4,7 @@
 @section('page-title', 'Modération · ' . $card->name)
 
 @php
-    $isActive   = $card->is_active;
-    $isRejected = !$isActive && $card->rejection_reason;
-    $isPending  = !$isActive && !$card->rejection_reason;
+    $isActive = $card->is_active;
 @endphp
 
 @section('content')
@@ -54,7 +52,7 @@
     </template>
 
     {{-- ============ HERO STATUS BANNER ============ --}}
-    <div class="mcs-hero {{ $isActive ? 'mcs-hero--ok' : ($isRejected ? 'mcs-hero--ko' : 'mcs-hero--pending') }}">
+    <div class="mcs-hero {{ $isActive ? 'mcs-hero--ok' : 'mcs-hero--pending' }}">
         <div class="mcs-hero-glow"></div>
         <a href="{{ route('admin.merchant-cards.index') }}" class="mcs-back">
             <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
@@ -65,30 +63,20 @@
             <div class="mcs-hero-ic">
                 @if($isActive)
                     <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-                @elseif($isRejected)
-                    <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                 @else
-                    <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                 @endif
             </div>
             <div class="mcs-hero-text">
                 <span class="mcs-hero-pill">
-                    @if($isActive)
-                        Publiée sur Kardafrica
-                    @elseif($isRejected)
-                        Refusée
-                    @else
-                        En attente de modération
-                    @endif
+                    {{ $isActive ? 'Publiée sur Kardafrica' : 'Brouillon' }}
                 </span>
                 <h1>{{ $card->name }}</h1>
                 <p>
                     @if($isActive)
                         Carte visible publiquement{{ $card->activated_at ? ' depuis '.$card->activated_at->translatedFormat('d M Y') : '' }}. Tu peux la dépublier si nécessaire.
-                    @elseif($isRejected)
-                        Le marchand voit le motif dans son espace vendeur. Il peut corriger et resoumettre.
                     @else
-                        Valide ou refuse cette carte pour la rendre visible (ou non) sur le marketplace Kardafrica.
+                        Carte en brouillon. Active-la pour la rendre visible sur le marketplace.
                     @endif
                 </p>
             </div>
@@ -208,53 +196,13 @@
                 </div>
             @endif
 
-            {{-- Rejection reason (if rejected) --}}
-            @if($card->rejection_reason)
-                <div class="mcs-card mcs-card--danger">
-                    <div class="mcs-card-head">
-                        <svg class="mcs-card-head-ic mcs-card-head-ic--danger" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-                        <h3>Motif du refus en cours</h3>
-                    </div>
-                    <p class="mcs-prose mcs-prose--danger">{{ $card->rejection_reason }}</p>
-                </div>
-            @endif
         </div>
 
-        {{-- ============ RIGHT : ACTIONS + MARCHAND ============ --}}
+        {{-- ============ RIGHT : STATUT + MARCHAND ============ --}}
         <div class="mcs-right">
 
-            {{-- ============ DECISION BLOCK ============ --}}
-            @if($isPending || $isRejected)
-                <div class="mcs-decision">
-                    <div class="mcs-decision-glow"></div>
-                    <div class="mcs-decision-step">Décision</div>
-                    <h3 class="mcs-decision-title">Approuver ou refuser ?</h3>
-                    <p class="mcs-decision-hint">Une décision admin est requise avant publication.</p>
-
-                    <form action="{{ route('admin.merchant-cards.approve', $card) }}" method="POST" id="form-approve">
-                        @csrf @method('PATCH')
-                        <button type="button" @click="askApprove(@js($card->name))" class="mcs-btn-approve">
-                            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-                            Approuver et publier
-                        </button>
-                    </form>
-
-                    <div class="mcs-decision-divider"><span>OU</span></div>
-
-                    <form action="{{ route('admin.merchant-cards.reject', $card) }}" method="POST" id="form-reject">
-                        @csrf @method('PATCH')
-                        <label class="mcs-decision-label">Motif du refus</label>
-                        <textarea name="rejection_reason" id="reject-reason" rows="3" required minlength="5" maxlength="500"
-                                  placeholder="Ex : Visuel flou, conditions trop restrictives, montants incohérents…"
-                                  class="mcs-decision-textarea">{{ $card->rejection_reason }}</textarea>
-                        <button type="button" @click="askReject(@js($card->name))" class="mcs-btn-reject">
-                            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-                            Refuser avec ce motif
-                        </button>
-                    </form>
-                </div>
-            @else
-                {{-- Active card : show "Unpublish" + public URL --}}
+            {{-- ============ STATUT BLOCK (toggle simple, plus de modération) ============ --}}
+            @if($isActive)
                 <div class="mcs-active">
                     <div class="mcs-active-head">
                         <div class="mcs-active-ic">
@@ -269,11 +217,29 @@
                         <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
                         Voir sur /gabon
                     </a>
-                    <form action="{{ route('admin.merchant-cards.reject', $card) }}" method="POST" id="form-unpublish" class="mcs-active-unpublish">
+                    <a href="{{ route('admin.merchant-cards.edit', $card) }}" class="mcs-active-link" style="margin-left:8px;">
+                        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                        Modifier
+                    </a>
+                </div>
+            @else
+                <div class="mcs-decision">
+                    <div class="mcs-decision-glow"></div>
+                    <div class="mcs-decision-step">Brouillon</div>
+                    <h3 class="mcs-decision-title">Carte non publiée</h3>
+                    <p class="mcs-decision-hint">Active la carte pour la rendre visible sur /gabon.</p>
+
+                    <form action="{{ route('admin.merchant-cards.approve', $card) }}" method="POST">
                         @csrf @method('PATCH')
-                        <input type="hidden" name="rejection_reason" value="Dépubliée par l'admin (raison à compléter)">
-                        <button type="button" @click="askUnpublish(@js($card->name))">Dépublier (re-modération)</button>
+                        <button type="submit" class="mcs-btn-approve" onclick="return confirm('Publier cette carte sur Kardafrica ?');">
+                            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                            Publier maintenant
+                        </button>
                     </form>
+
+                    <a href="{{ route('admin.merchant-cards.edit', $card) }}" style="display:inline-flex;align-items:center;justify-content:center;gap:6px;width:100%;margin-top:10px;padding:11px;background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.8);border:1px solid rgba(255,255,255,0.15);border-radius:11px;font-size:13px;font-weight:700;text-decoration:none;">
+                        Modifier les détails
+                    </a>
                 </div>
             @endif
 

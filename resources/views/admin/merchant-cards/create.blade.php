@@ -1,6 +1,6 @@
 @extends('admin.layouts.admin')
 
-@section('title', 'Nouvelle carte marchand')
+@section('title', 'Nouvelle carte locale')
 @section('page-title', 'Nouvelle carte Carte Gabon')
 
 @section('content')

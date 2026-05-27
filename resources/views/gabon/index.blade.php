@@ -53,7 +53,7 @@
                     @elseif($currentCategory)
                         {{ $currentCategory }}
                     @else
-                        Cartes-cadeau marchand · Gabon
+                        Cartes-cadeau locales · Gabon
                     @endif
                 </h1>
                 <p class="text-xs md:text-sm text-slate-500 mt-1">
@@ -382,7 +382,7 @@
                             @if($search || $categorySlug || count($selectedCities) || count($priceRanges))
                                 Aucun résultat pour ces filtres. Essaie d'élargir ta recherche.
                             @else
-                                Aucune carte marchand n'est encore publiée. Reviens bientôt !
+                                Aucune carte locale n'est encore publiée. Reviens bientôt !
                             @endif
                         </p>
                         @if($activeFiltersCount > 0)

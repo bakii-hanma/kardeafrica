@@ -222,7 +222,7 @@
             <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
             Retour aux cartes
         </a>
-        <h1>{{ $isEdit ? 'Modifier la carte' : 'Nouvelle carte marchand' }}</h1>
+        <h1>{{ $isEdit ? 'Modifier la carte' : 'Nouvelle carte locale' }}</h1>
         <p>{{ $isEdit
             ? 'Mets à jour les caractéristiques de cette carte. Si tu décoches « Active » elle sera retirée de /gabon.'
             : 'Crée une carte-cadeau Carte Gabon pour un marchand approuvé. Les boutiques la vendront depuis leur espace.' }}</p>

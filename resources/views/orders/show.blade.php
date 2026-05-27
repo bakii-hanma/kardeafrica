@@ -216,7 +216,7 @@
                         <span class="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-500 to-orange-500 text-white flex items-center justify-center shadow-md shadow-orange-500/20">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                         </span>
-                        Cartes marchand Gabon
+                        Cartes locales Gabon
                         <span class="text-xs font-normal text-slate-500">· {{ $mp->count() }} reçue{{ $mp->count() > 1 ? 's' : '' }}</span>
                     </h2>
                 </div>
