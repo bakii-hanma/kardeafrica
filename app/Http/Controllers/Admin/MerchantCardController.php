@@ -250,11 +250,17 @@ class MerchantCardController extends Controller
         return $validated;
     }
 
-    /** Sauve le visuel sous public/merchant-cards/admin/ (catalogue global) */
+    /**
+     * Sauve le visuel directement à la racine du doc-root nginx (= base_path()).
+     * Sur SiteGround, public_html/ EST la racine servie par nginx ; public_path()
+     * pointe vers public_html/public/ qui n'est PAS exposé. On écrit donc dans
+     * public_html/merchant-cards/admin/ pour que l'image soit accessible via
+     * https://kardafrica.com/merchant-cards/admin/<file>.
+     */
     private function storeVisual(UploadedFile $file): string
     {
         $relDir = 'merchant-cards/admin';
-        $absDir = public_path($relDir);
+        $absDir = base_path($relDir);
         if (!is_dir($absDir)) {
             @mkdir($absDir, 0755, true);
         }
@@ -263,11 +269,11 @@ class MerchantCardController extends Controller
         return $relDir.'/'.$filename;
     }
 
-    /** Supprime un fichier visuel */
+    /** Supprime un fichier visuel (à la racine doc-root) */
     private function deleteVisual(?string $relPath): void
     {
         if (!$relPath) return;
-        $abs = public_path($relPath);
+        $abs = base_path($relPath);
         if (is_file($abs)) {
             @unlink($abs);
         }
