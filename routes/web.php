@@ -23,6 +23,7 @@ use App\Http\Controllers\Vendor\ProfileController    as VendorProfileController;
 use App\Http\Controllers\Vendor\SaleController       as VendorSaleController;
 use App\Http\Controllers\Vendor\CashOrderController  as VendorCashOrderController;
 use App\Http\Controllers\Vendor\RemittanceController as VendorRemittanceController;
+use App\Http\Controllers\Vendor\WalletRechargeController as VendorWalletRechargeController;
 use App\Http\Controllers\GabonController;
 use App\Http\Controllers\ClaimController;
 
@@ -199,6 +200,12 @@ Route::prefix('vendor')->group(function () {
         Route::post('/cash/{order}/reject',          [VendorCashOrderController::class, 'reject'])->name('vendor.cash.reject');
 
         Route::get('/profile',          [VendorProfileController::class, 'show'])->name('vendor.profile');
+
+        // Recharge wallet (cagnotte) via Airtel Money / Moov Money / carte
+        Route::get('/wallet/recharge',           [VendorWalletRechargeController::class, 'index'])->name('vendor.wallet.recharge');
+        Route::post('/wallet/recharge/init',     [VendorWalletRechargeController::class, 'init'])->name('vendor.wallet.recharge.init');
+        Route::get('/wallet/recharge/return',    [VendorWalletRechargeController::class, 'paymentReturn'])->name('vendor.wallet.recharge.return');
+        Route::post('/wallet/recharge/finalize', [VendorWalletRechargeController::class, 'paymentFinalize'])->name('vendor.wallet.recharge.finalize');
 
         // Note : la création/édition des cartes Carte Gabon a été migrée vers
         // /admin/merchant-cards. Les boutiques NE créent plus de cartes, elles
