@@ -94,6 +94,11 @@ class MerchantCardController extends Controller
         $card->total_sold    = 0;
         $card->total_revenue = 0;
 
+        // Génération auto : code 8 chiffres + PIN 4 chiffres + expiration (= validity_months)
+        $card->unique_code = $this->generateMasterCode();
+        $card->pin_code    = str_pad((string) random_int(0, 9999), 4, '0', STR_PAD_LEFT);
+        $card->expires_at  = now()->addMonths((int) ($data['validity_months'] ?? 12))->toDateString();
+
         if ($request->hasFile('visual')) {
             $card->visual_url = $this->storeVisual($request->file('visual'));
         }
@@ -102,7 +107,19 @@ class MerchantCardController extends Controller
 
         return redirect()
             ->route('admin.merchant-cards.show', $card)
-            ->with('success', 'Carte créée' . ($card->is_active ? ' et publiée immédiatement.' : ' (brouillon — à activer ensuite).'));
+            ->with('success', 'Carte créée avec code + PIN' . ($card->is_active ? ' et publiée immédiatement.' : ' (brouillon — à activer ensuite).'));
+    }
+
+    /** Génère un code 8 chiffres unique sur la table merchant_cards */
+    private function generateMasterCode(int $maxAttempts = 8): string
+    {
+        for ($i = 0; $i < $maxAttempts; $i++) {
+            $code = (string) random_int(10000000, 99999999);
+            if (!MerchantCard::where('unique_code', $code)->exists()) {
+                return $code;
+            }
+        }
+        throw new \RuntimeException("Impossible de générer un code unique après {$maxAttempts} tentatives.");
     }
 
     /** Détail + form approve/reject */

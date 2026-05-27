@@ -38,6 +38,7 @@ class MerchantCard extends Model
     protected $fillable = [
         'reseller_id',
         'name', 'description', 'category', 'visual_url',
+        'unique_code', 'pin_code', 'expires_at',
         'denominations', 'allow_custom_amount', 'min_amount', 'max_amount', 'currency',
         'validity_months', 'terms_conditions',
         'is_active', 'activated_at', 'rejection_reason',
@@ -52,6 +53,7 @@ class MerchantCard extends Model
         'max_amount'           => 'decimal:2',
         'total_revenue'        => 'decimal:2',
         'activated_at'         => 'datetime',
+        'expires_at'           => 'date',
     ];
 
     // ============================================================
