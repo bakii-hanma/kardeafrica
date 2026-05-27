@@ -4,8 +4,6 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\MerchantCard;
-use App\Models\Reseller;
-use App\Support\MerchantSlug;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Str;
@@ -70,41 +68,34 @@ class MerchantCardController extends Controller
         ]);
     }
 
-    /** Formulaire création — par défaut la carte est active immédiatement (plus de workflow d'approbation) */
+    /** Formulaire création — par défaut la carte est active immédiatement */
     public function create()
     {
         return view('admin.merchant-cards.create', [
-            'card'        => new MerchantCard([
+            'card'       => new MerchantCard([
                 'currency'        => 'XAF',
                 'validity_months' => 12,
                 'denominations'   => [5000, 10000, 25000, 50000],
-                'is_active'       => true, // Active par défaut, l'admin décoche s'il veut un brouillon
+                'is_active'       => true,
             ]),
-            'categories'  => MerchantCard::CATEGORIES,
-            'merchants'   => $this->merchantsForSelect(),
+            'categories' => MerchantCard::CATEGORIES,
         ]);
     }
 
-    /** Crée la carte */
+    /** Crée la carte (catalogue admin global, pas de marchand attaché) */
     public function store(Request $request)
     {
         $data = $this->validated($request);
 
-        // S'assurer que le marchand a un slug pour /gabon
-        $reseller = Reseller::findOrFail($data['reseller_id']);
-        if (empty($reseller->slug) && !empty($reseller->business_name ?? $reseller->name)) {
-            $reseller->slug = MerchantSlug::generate($reseller->business_name ?? $reseller->name, $reseller->id);
-            $reseller->save();
-        }
-
         $card = new MerchantCard($data);
+        $card->reseller_id   = null; // catalogue admin global
         $card->is_active     = (bool) ($data['is_active'] ?? false);
         $card->activated_at  = $card->is_active ? now() : null;
         $card->total_sold    = 0;
         $card->total_revenue = 0;
 
         if ($request->hasFile('visual')) {
-            $card->visual_url = $this->storeVisual($request->file('visual'), $reseller->id);
+            $card->visual_url = $this->storeVisual($request->file('visual'));
         }
 
         $card->save();
@@ -131,7 +122,6 @@ class MerchantCardController extends Controller
         return view('admin.merchant-cards.edit', [
             'card'       => $merchantCard,
             'categories' => MerchantCard::CATEGORIES,
-            'merchants'  => $this->merchantsForSelect(),
         ]);
     }
 
@@ -142,10 +132,9 @@ class MerchantCardController extends Controller
 
         if ($request->hasFile('visual')) {
             $this->deleteVisual($merchantCard->visual_url);
-            $data['visual_url'] = $this->storeVisual($request->file('visual'), $data['reseller_id']);
+            $data['visual_url'] = $this->storeVisual($request->file('visual'));
         }
 
-        // is_active = checkbox admin (pas de "repasse en attente" comme côté vendor)
         $data['is_active']    = (bool) ($data['is_active'] ?? false);
         $data['activated_at'] = $data['is_active']
             ? ($merchantCard->activated_at ?? now())
@@ -210,25 +199,10 @@ class MerchantCardController extends Controller
     // Helpers privés
     // ============================================================
 
-    /** Liste des marchands éligibles pour le dropdown (approuvés OU vendeurs actifs) */
-    private function merchantsForSelect()
-    {
-        return Reseller::where('is_active', true)
-            ->orderBy('business_name')
-            ->orderBy('name')
-            ->get(['id', 'name', 'business_name', 'vendor_code', 'city', 'kyc_status'])
-            ->map(fn ($r) => [
-                'id'         => $r->id,
-                'label'      => ($r->business_name ?: $r->name) . ' · ' . $r->vendor_code . ($r->city ? ' · '.$r->city : ''),
-                'kyc_ok'     => $r->kyc_status === 'approved',
-            ]);
-    }
-
     /** Validation partagée create + update */
     private function validated(Request $request): array
     {
         $validated = $request->validate([
-            'reseller_id'         => ['required', 'integer', 'exists:resellers,id'],
             'name'                => ['required', 'string', 'max:120'],
             'description'         => ['nullable', 'string', 'max:2000'],
             'category'            => ['required', 'string', Rule::in(array_keys(MerchantCard::CATEGORIES))],
@@ -259,10 +233,10 @@ class MerchantCardController extends Controller
         return $validated;
     }
 
-    /** Sauve le visuel directement sous public/merchant-cards/{reseller_id}/ */
-    private function storeVisual(UploadedFile $file, int $resellerId): string
+    /** Sauve le visuel sous public/merchant-cards/admin/ (catalogue global) */
+    private function storeVisual(UploadedFile $file): string
     {
-        $relDir = 'merchant-cards/'.$resellerId;
+        $relDir = 'merchant-cards/admin';
         $absDir = public_path($relDir);
         if (!is_dir($absDir)) {
             @mkdir($absDir, 0755, true);

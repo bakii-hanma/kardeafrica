@@ -225,7 +225,7 @@
         <h1>{{ $isEdit ? 'Modifier la carte' : 'Nouvelle carte locale' }}</h1>
         <p>{{ $isEdit
             ? 'Mets à jour les caractéristiques de cette carte. Si tu décoches « Active » elle sera retirée de /gabon.'
-            : 'Crée une carte-cadeau Carte Gabon pour un marchand approuvé. Les boutiques la vendront depuis leur espace.' }}</p>
+            : 'Crée une carte-cadeau Carte Gabon. Catalogue centralisé : pas de marchand spécifique, toutes les boutiques peuvent la vendre.' }}</p>
     </div>
 
     @if($errors->any())
@@ -245,35 +245,21 @@
         @csrf
         @if($isEdit) @method('PUT') @endif
 
-        {{-- Marchand --}}
+        {{-- Identité --}}
         <div class="amf-section">
             <div class="amf-section-head">
                 <div class="amf-step">1</div>
                 <div>
-                    <h2 class="amf-section-title">Marchand & identité</h2>
-                    <p class="amf-section-hint">Pour quel marchand cette carte est-elle créée ? La carte apparaîtra sur la fiche /gabon/marchand/{slug}.</p>
+                    <h2 class="amf-section-title">Identité de la carte</h2>
+                    <p class="amf-section-hint">Le nom et la catégorie qui s'afficheront aux clients sur Kardafrica.</p>
                 </div>
-            </div>
-
-            <div class="amf-field">
-                <label class="amf-label" for="reseller_id">Marchand <span class="amf-label-req">*</span></label>
-                <select id="reseller_id" name="reseller_id" class="amf-select" required>
-                    <option value="">— Choisir un marchand —</option>
-                    @foreach($merchants as $m)
-                        <option value="{{ $m['id'] }}" {{ (int) old('reseller_id', $card->reseller_id) === $m['id'] ? 'selected' : '' }}>
-                            {{ $m['label'] }}{{ $m['kyc_ok'] ? '' : ' ⚠ KYC non approuvé' }}
-                        </option>
-                    @endforeach
-                </select>
-                <p class="amf-hint">Si le marchand n'est pas KYC approuvé, sa carte ne sera pas visible sur /gabon même si tu l'actives.</p>
-                @error('reseller_id') <p class="amf-error">{{ $message }}</p> @enderror
             </div>
 
             <div class="amf-field">
                 <label class="amf-label" for="name">Nom de la carte <span class="amf-label-req">*</span></label>
                 <input type="text" id="name" name="name" class="amf-input"
                        value="{{ old('name', $card->name) }}"
-                       placeholder="Ex : Carte cadeau Hôtel Le Méridien" required maxlength="120">
+                       placeholder="Ex : Carte cadeau 10 000 FCFA" required maxlength="120">
                 @error('name') <p class="amf-error">{{ $message }}</p> @enderror
             </div>
 

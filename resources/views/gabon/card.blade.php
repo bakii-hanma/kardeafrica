@@ -1,10 +1,13 @@
 @extends('layouts.app')
 
-@section('title', $card->name . ' — ' . ($merchant->business_name ?? $merchant->name))
+@section('title', $card->name . ($merchant ? ' — '.($merchant->business_name ?? $merchant->name) : ' — KardAfrica'))
 
 @section('content')
 @php
-    $merchantInitial = strtoupper(substr($merchant->business_name ?? $merchant->name, 0, 1));
+    $merchantName    = $merchant?->business_name ?? $merchant?->name ?? 'KardAfrica';
+    $merchantCity    = $merchant?->city;
+    $merchantSlug    = $merchant?->slug;
+    $merchantInitial = strtoupper(substr($merchantName, 0, 1));
     $minDenom = collect($card->denominations ?? [])->min() ?? 0;
     $maxDenom = collect($card->denominations ?? [])->max() ?? 0;
 @endphp
@@ -24,8 +27,10 @@
                 <svg class="w-3 h-3 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
                 <a href="{{ route('gabon.index') }}" class="hover:text-[#44A08D] transition">Carte Gabon</a>
                 <svg class="w-3 h-3 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
-                <a href="{{ route('gabon.merchant', $merchant->slug) }}" class="hover:text-[#44A08D] transition truncate max-w-[160px]">{{ $merchant->business_name ?? $merchant->name }}</a>
-                <svg class="w-3 h-3 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+                @if($merchantSlug)
+                    <a href="{{ route('gabon.merchant', $merchantSlug) }}" class="hover:text-[#44A08D] transition truncate max-w-[160px]">{{ $merchantName }}</a>
+                    <svg class="w-3 h-3 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+                @endif
                 <span class="text-slate-900 font-medium truncate max-w-[200px]">{{ $card->name }}</span>
             </nav>
 
@@ -76,7 +81,11 @@
                                 <img src="{{ asset('assets/logo/FAVCON-KARDAFRICA-.png') }}" class="w-12 h-12 mx-auto mb-3 opacity-90" alt="">
                                 <h3 class="font-display text-white font-bold text-2xl mb-1">KardAfrica</h3>
                                 <p class="text-slate-300 text-xs max-w-[240px] mx-auto leading-relaxed">
-                                    Carte-cadeau marchand utilisable chez <strong class="text-[#4ECDC4]">{{ $merchant->business_name ?? $merchant->name }}</strong>{{ $merchant->city ? ' à '.$merchant->city : '' }}.
+                                    @if($merchant)
+                                        Carte-cadeau utilisable chez <strong class="text-[#4ECDC4]">{{ $merchantName }}</strong>{{ $merchantCity ? ' à '.$merchantCity : '' }}.
+                                    @else
+                                        Carte-cadeau locale Kardafrica utilisable chez tous les marchands partenaires au Gabon.
+                                    @endif
                                 </p>
                                 <div class="mt-4 flex items-center justify-center gap-2 font-mono text-[#4ECDC4] text-sm">
                                     <span>****</span><span>****</span><span>****</span><span>{{ str_pad($card->id, 4, '0', STR_PAD_LEFT) }}</span>
@@ -97,13 +106,17 @@
             <div>
                 {{-- Merchant badge + title + description --}}
                 <div class="mb-6">
-                    <a href="{{ route('gabon.merchant', $merchant->slug) }}" class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white border border-slate-200 shadow-card mb-4 hover:border-[#44A08D] transition">
+                    @php
+                        $badgeTag = $merchantSlug ? 'a' : 'div';
+                        $badgeAttrs = $merchantSlug ? 'href="'.route('gabon.merchant', $merchantSlug).'"' : '';
+                    @endphp
+                    <{!! $badgeTag !!} {!! $badgeAttrs !!} class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white border border-slate-200 shadow-card mb-4 {{ $merchantSlug ? 'hover:border-[#44A08D] transition' : '' }}">
                         <span class="w-5 h-5 rounded-full flex items-center justify-center text-white text-[10px] font-black bg-gradient-to-br from-[#44A08D] to-[#4ECDC4]">{{ $merchantInitial }}</span>
-                        <span class="text-xs font-semibold text-slate-700">{{ $merchant->business_name ?? $merchant->name }}</span>
-                        @if($merchant->city)
-                            <span class="text-[10px] text-slate-400">· {{ $merchant->city }}</span>
+                        <span class="text-xs font-semibold text-slate-700">{{ $merchantName }}</span>
+                        @if($merchantCity)
+                            <span class="text-[10px] text-slate-400">· {{ $merchantCity }}</span>
                         @endif
-                    </a>
+                    </{!! $badgeTag !!}>
 
                     @if(isset($categories[$card->category]))
                         <div class="text-[11px] font-bold uppercase tracking-wider text-[#44A08D] mb-1.5">{{ $categories[$card->category] }}</div>
@@ -219,7 +232,7 @@
                         @foreach ([
                             ['n' => 1, 'text' => 'Choisis ton montant et achète la carte en quelques clics.'],
                             ['n' => 2, 'text' => 'Reçois ton code unique + QR par WhatsApp et email instantanément.'],
-                            ['n' => 3, 'text' => 'Présente le QR ou le code en boutique chez ' . ($merchant->business_name ?? $merchant->name) . '.'],
+                            ['n' => 3, 'text' => 'Présente le QR ou le code en boutique' . ($merchant ? ' chez '.$merchantName : ' chez un marchand Kardafrica partenaire') . '.'],
                         ] as $step)
                             <div class="flex items-start gap-3">
                                 <div class="w-7 h-7 rounded-full bg-teal-50 text-[#44A08D] font-bold text-xs flex items-center justify-center shrink-0">
@@ -233,7 +246,7 @@
                     <div x-show="tab === 'terms'" class="p-5 text-sm text-slate-600 leading-relaxed" style="display:none;">
                         <ul class="space-y-2 list-disc list-inside">
                             <li>Valide pendant <strong>{{ $card->validity_months }} mois</strong> à compter de la date d'achat.</li>
-                            <li>Utilisable uniquement chez <strong>{{ $merchant->business_name ?? $merchant->name }}</strong>{{ $merchant->city ? ' à '.$merchant->city : '' }}.</li>
+                            <li>Utilisable @if($merchant)uniquement chez <strong>{{ $merchantName }}</strong>{{ $merchantCity ? ' à '.$merchantCity : '' }}@else chez les marchands partenaires Kardafrica au Gabon@endif.</li>
                             <li>Non remboursable et non échangeable contre de l'espèce.</li>
                             <li>Peut être utilisée en une ou plusieurs fois jusqu'à épuisement du solde.</li>
                         </ul>
@@ -252,13 +265,15 @@
             <section class="mt-16 pt-12 border-t border-slate-200">
                 <div class="flex items-end justify-between mb-6 flex-wrap gap-3">
                     <div>
-                        <h2 class="font-display text-xl md:text-2xl font-bold text-slate-900 tracking-tight">Autres cartes de {{ $merchant->business_name ?? $merchant->name }}</h2>
-                        <p class="text-xs text-slate-500 mt-1">Du même marchand, à découvrir aussi.</p>
+                        <h2 class="font-display text-xl md:text-2xl font-bold text-slate-900 tracking-tight">{{ $merchant ? 'Autres cartes de '.$merchantName : 'Autres cartes locales' }}</h2>
+                        <p class="text-xs text-slate-500 mt-1">{{ $merchant ? 'Du même marchand, à découvrir aussi.' : 'À découvrir aussi dans le catalogue.' }}</p>
                     </div>
-                    <a href="{{ route('gabon.merchant', $merchant->slug) }}" class="inline-flex items-center gap-1 text-sm font-semibold text-[#44A08D] hover:underline">
-                        Tout voir
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
-                    </a>
+                    @if($merchantSlug)
+                        <a href="{{ route('gabon.merchant', $merchantSlug) }}" class="inline-flex items-center gap-1 text-sm font-semibold text-[#44A08D] hover:underline">
+                            Tout voir
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+                        </a>
+                    @endif
                 </div>
 
                 <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -400,7 +415,7 @@
             },
 
             cartProductName() {
-                return @js(($merchant->business_name ?? $merchant->name) . ' — ' . $card->name)
+                return @js($merchantName . ' — ' . $card->name)
                        + ' — ' + this.formatFcfa(this.currentAmount) + ' F';
             },
 

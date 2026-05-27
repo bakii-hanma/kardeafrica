@@ -76,12 +76,10 @@ class GabonController extends Controller
         }
 
         if ($categorySlug !== '' && array_key_exists($categorySlug, MerchantCard::CATEGORIES)) {
-            $query->where(function ($q) use ($categorySlug) {
-                $q->where('category', $categorySlug)
-                  ->orWhereHas('reseller', fn ($r) => $r->where('business_type', $categorySlug));
-            });
+            $query->where('category', $categorySlug);
         }
 
+        // Cities filter : seulement pour les cartes héritées d'un marchand
         if (!empty($cities)) {
             $query->whereHas('reseller', fn ($r) => $r->whereIn('city', $cities));
         }
@@ -227,27 +225,29 @@ class GabonController extends Controller
     /** /gabon/carte/{merchantCard} — détail + bouton acheter */
     public function card(MerchantCard $merchantCard)
     {
-        // Seules les cartes actives d'un marchand approuvé sont publiquement consultables
-        abort_unless(
-            $merchantCard->is_active
-            && $merchantCard->reseller
-            && $merchantCard->reseller->kyc_status === 'approved'
-            && $merchantCard->reseller->is_active,
-            404
-        );
-
         $merchantCard->load('reseller');
 
-        // Suggestions : autres cartes du même marchand
-        $otherCards = $merchantCard->reseller->merchantCards()
-            ->where('is_active', true)
+        // Carte active + (catalogue admin OU marchand actif/approuvé)
+        $publishable = $merchantCard->is_active && (
+            $merchantCard->reseller_id === null
+            || ($merchantCard->reseller && $merchantCard->reseller->kyc_status === 'approved' && $merchantCard->reseller->is_active)
+        );
+        abort_unless($publishable, 404);
+
+        // Suggestions : autres cartes (du même marchand si applicable, sinon du catalogue admin)
+        $otherCardsQuery = MerchantCard::active()
             ->where('id', '!=', $merchantCard->id)
-            ->take(4)
-            ->get();
+            ->take(4);
+        if ($merchantCard->reseller_id) {
+            $otherCardsQuery->where('reseller_id', $merchantCard->reseller_id);
+        } else {
+            $otherCardsQuery->whereNull('reseller_id');
+        }
+        $otherCards = $otherCardsQuery->get();
 
         return view('gabon.card', [
             'card'       => $merchantCard,
-            'merchant'   => $merchantCard->reseller,
+            'merchant'   => $merchantCard->reseller, // peut être null pour le catalogue admin
             'otherCards' => $otherCards,
             'categories' => MerchantCard::CATEGORIES,
         ]);

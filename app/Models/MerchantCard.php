@@ -72,15 +72,25 @@ class MerchantCard extends Model
     // Scopes
     // ============================================================
 
-    /** Cartes affichables sur la vitrine publique */
+    /**
+     * Cartes affichables sur la vitrine publique.
+     * Le catalogue est désormais 100 % admin → on filtre juste sur is_active.
+     * Les cartes héritées d'un marchand (reseller_id non null) doivent toujours
+     * avoir un marchand actif + KYC approuvé pour rester en ligne.
+     */
     public function scopeActive($query)
     {
         return $query->where('is_active', true)
-                     ->whereHas('reseller', fn ($q) => $q->where('kyc_status', 'approved')->where('is_active', true));
+                     ->where(function ($q) {
+                         // Cartes catalogue admin (pas de marchand attaché)
+                         $q->whereNull('reseller_id')
+                           // OU cartes héritées d'un marchand : marchand toujours valide
+                           ->orWhereHas('reseller', fn ($r) => $r->where('kyc_status', 'approved')->where('is_active', true));
+                     });
     }
 
     public function scopeByCategory($query, string $category)
     {
-        return $query->whereHas('reseller', fn ($q) => $q->where('business_type', $category));
+        return $query->where('category', $category);
     }
 }

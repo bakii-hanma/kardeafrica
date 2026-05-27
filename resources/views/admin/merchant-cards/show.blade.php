@@ -130,7 +130,7 @@
                     <div class="mcs-visual">
                         <img src="{{ asset($card->visual_url) }}" alt="{{ $card->name }}">
                         <div class="mcs-visual-overlay">
-                            <span class="mcs-visual-bizname">{{ \Illuminate\Support\Str::upper($card->reseller->business_name ?? $card->reseller->name) }}</span>
+                            <span class="mcs-visual-bizname">{{ \Illuminate\Support\Str::upper($card->reseller?->business_name ?? $card->reseller?->name ?? 'KardAfrica') }}</span>
                             <h2>{{ $card->name }}</h2>
                             <div class="mcs-visual-denoms">
                                 @foreach(array_slice($card->denominations ?? [], 0, 5) as $d)
@@ -243,71 +243,80 @@
                 </div>
             @endif
 
-            {{-- ============ MARCHAND CARD ============ --}}
-            <div class="mcs-merchant">
-                <div class="mcs-merchant-banner"></div>
-                <div class="mcs-merchant-body">
-                    <div class="mcs-merchant-av">
-                        @if($card->reseller->logo_url)
-                            <img src="{{ asset($card->reseller->logo_url) }}" alt="">
-                        @else
-                            {{ strtoupper(substr($card->reseller->business_name ?? $card->reseller->name, 0, 1)) }}
-                        @endif
-                    </div>
-                    <div class="mcs-merchant-name">{{ $card->reseller->business_name ?? $card->reseller->name }}</div>
-                    <div class="mcs-merchant-code">{{ $card->reseller->vendor_code }}</div>
+            {{-- ============ MARCHAND CARD (uniquement si carte héritée) ============ --}}
+            @if($card->reseller)
+                <div class="mcs-merchant">
+                    <div class="mcs-merchant-banner"></div>
+                    <div class="mcs-merchant-body">
+                        <div class="mcs-merchant-av">
+                            @if($card->reseller->logo_url)
+                                <img src="{{ asset($card->reseller->logo_url) }}" alt="">
+                            @else
+                                {{ strtoupper(substr($card->reseller->business_name ?? $card->reseller->name, 0, 1)) }}
+                            @endif
+                        </div>
+                        <div class="mcs-merchant-name">{{ $card->reseller->business_name ?? $card->reseller->name }}</div>
+                        <div class="mcs-merchant-code">{{ $card->reseller->vendor_code }}</div>
 
-                    <div class="mcs-merchant-kyc">
-                        @if($card->reseller->kyc_status === 'approved')
-                            <span class="mcs-kyc mcs-kyc--ok">
-                                <svg width="11" height="11" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-                                KYC approuvé
-                            </span>
-                        @elseif($card->reseller->kyc_status === 'rejected')
-                            <span class="mcs-kyc mcs-kyc--ko">KYC refusé</span>
-                        @else
-                            <span class="mcs-kyc mcs-kyc--pending">KYC en attente</span>
-                        @endif
-                        @if(isset($categories[$card->reseller->business_type ?? '']))
-                            <span class="mcs-kyc mcs-kyc--cat">{{ $categories[$card->reseller->business_type] }}</span>
-                        @endif
-                    </div>
+                        <div class="mcs-merchant-kyc">
+                            @if($card->reseller->kyc_status === 'approved')
+                                <span class="mcs-kyc mcs-kyc--ok">
+                                    <svg width="11" height="11" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                                    KYC approuvé
+                                </span>
+                            @elseif($card->reseller->kyc_status === 'rejected')
+                                <span class="mcs-kyc mcs-kyc--ko">KYC refusé</span>
+                            @else
+                                <span class="mcs-kyc mcs-kyc--pending">KYC en attente</span>
+                            @endif
+                            @if(isset($categories[$card->reseller->business_type ?? '']))
+                                <span class="mcs-kyc mcs-kyc--cat">{{ $categories[$card->reseller->business_type] }}</span>
+                            @endif
+                        </div>
 
-                    <div class="mcs-merchant-rows">
-                        @if($card->reseller->city)
-                            <div class="mcs-merchant-row">
-                                <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                                <span>{{ $card->reseller->city }}@if($card->reseller->province), {{ $card->reseller->province }}@endif</span>
-                            </div>
-                        @endif
-                        @if($card->reseller->phone)
-                            <a class="mcs-merchant-row mcs-merchant-row--link" href="tel:{{ $card->reseller->phone }}">
-                                <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
-                                <span>{{ $card->reseller->phone }}</span>
-                            </a>
-                        @endif
-                        @if($card->reseller->whatsapp_number)
-                            <a class="mcs-merchant-row mcs-merchant-row--link" href="https://wa.me/{{ preg_replace('/\D/', '', $card->reseller->whatsapp_number) }}" target="_blank">
-                                <svg width="13" height="13" fill="currentColor" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163a11.867 11.867 0 01-1.587-5.946C.16 5.335 5.495 0 12.05 0a11.817 11.817 0 018.413 3.488 11.824 11.824 0 013.48 8.414c-.003 6.557-5.338 11.892-11.893 11.892a11.9 11.9 0 01-5.688-1.448L.057 24z"/></svg>
-                                <span>{{ $card->reseller->whatsapp_number }}</span>
-                            </a>
-                        @endif
-                    </div>
+                        <div class="mcs-merchant-rows">
+                            @if($card->reseller->city)
+                                <div class="mcs-merchant-row">
+                                    <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                                    <span>{{ $card->reseller->city }}@if($card->reseller->province), {{ $card->reseller->province }}@endif</span>
+                                </div>
+                            @endif
+                            @if($card->reseller->phone)
+                                <a class="mcs-merchant-row mcs-merchant-row--link" href="tel:{{ $card->reseller->phone }}">
+                                    <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+                                    <span>{{ $card->reseller->phone }}</span>
+                                </a>
+                            @endif
+                            @if($card->reseller->whatsapp_number)
+                                <a class="mcs-merchant-row mcs-merchant-row--link" href="https://wa.me/{{ preg_replace('/\D/', '', $card->reseller->whatsapp_number) }}" target="_blank">
+                                    <svg width="13" height="13" fill="currentColor" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163a11.867 11.867 0 01-1.587-5.946C.16 5.335 5.495 0 12.05 0a11.817 11.817 0 018.413 3.488 11.824 11.824 0 013.48 8.414c-.003 6.557-5.338 11.892-11.893 11.892a11.9 11.9 0 01-5.688-1.448L.057 24z"/></svg>
+                                    <span>{{ $card->reseller->whatsapp_number }}</span>
+                                </a>
+                            @endif
+                        </div>
 
-                    <div class="mcs-merchant-actions">
-                        <a href="{{ route('admin.resellers.show', $card->reseller) }}" class="mcs-merchant-btn mcs-merchant-btn--neutral">
-                            <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2"/></svg>
-                            Fiche vendeur
-                        </a>
-                        @if($card->reseller->slug && $card->reseller->kyc_status === 'approved')
-                            <a href="{{ route('gabon.merchant', $card->reseller->slug) }}" target="_blank" class="mcs-merchant-btn mcs-merchant-btn--public">
-                                <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
-                                Profil public
+                        <div class="mcs-merchant-actions">
+                            <a href="{{ route('admin.resellers.show', $card->reseller) }}" class="mcs-merchant-btn mcs-merchant-btn--neutral">
+                                <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2"/></svg>
+                                Fiche vendeur
                             </a>
-                        @endif
+                            @if($card->reseller->slug && $card->reseller->kyc_status === 'approved')
+                                <a href="{{ route('gabon.merchant', $card->reseller->slug) }}" target="_blank" class="mcs-merchant-btn mcs-merchant-btn--public">
+                                    <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                                    Profil public
+                                </a>
+                            @endif
+                        </div>
                     </div>
                 </div>
-            </div>
+            @else
+                <div style="background:white;border:1px solid #E2E8F0;border-radius:14px;padding:18px;text-align:center;font-size:13px;color:#64748B;">
+                    <div style="font-family:'Space Grotesk','Inter',sans-serif;font-weight:800;color:#0F172A;font-size:14px;margin-bottom:4px;">
+                        Carte catalogue
+                    </div>
+                    Cette carte n'est attachée à aucun marchand spécifique. Toutes les boutiques peuvent la vendre.
+                </div>
+            @endif
 
             {{-- ============ Timeline (sticky note bottom) ============ --}}
             <div class="mcs-timeline">

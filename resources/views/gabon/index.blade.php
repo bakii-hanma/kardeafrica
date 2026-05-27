@@ -448,14 +448,14 @@
                                 <div class="flex-1 p-4 flex items-center gap-3">
                                     <div class="flex-1 min-w-0">
                                         <div class="text-[10px] font-bold uppercase tracking-wider text-[#44A08D]">
-                                            {{ $card->reseller->business_name ?? $card->reseller->name }}
+                                            {{ $card->reseller?->business_name ?? $card->reseller?->name ?? 'KardAfrica' }}
                                         </div>
                                         <h3 class="font-display text-base font-bold text-slate-900 mt-0.5 line-clamp-1 group-hover:text-[#44A08D] transition">
                                             {{ $card->name }}
                                         </h3>
                                         <p class="text-xs text-slate-500 mt-1 line-clamp-1">
                                             @if(isset($categories[$card->category])){{ $categories[$card->category] }} · @endif
-                                            {{ $card->reseller->city ?? '' }} · {{ $card->validity_months }} mois
+                                            {{ $card->reseller?->city ?? 'Gabon' }} · {{ $card->validity_months }} mois
                                         </p>
                                         <div class="flex flex-wrap gap-1 mt-2">
                                             @foreach(array_slice($card->denominations ?? [], 0, 3) as $d)

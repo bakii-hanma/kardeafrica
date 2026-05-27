@@ -12,8 +12,9 @@
 @php
     $_card    = $card;
     $_visual  = $_card->visual_url ? asset($_card->visual_url) : null;
-    $_biz     = $_card->reseller->business_name ?? $_card->reseller->name;
-    $_city    = $_card->reseller->city ?? null;
+    // Cartes catalogue admin → pas de marchand attaché. Sinon (legacy), affiche le nom.
+    $_biz     = $_card->reseller?->business_name ?? $_card->reseller?->name ?? null;
+    $_city    = $_card->reseller?->city ?? null;
     $_compact = $compact ?? false;
     $_fill    = $fill ?? false; // true = remplit le parent (utilisé par le flip card sur /gabon/carte/{id})
 @endphp
@@ -39,24 +40,20 @@
         </span>
     </div>
 
-    {{-- Center : nom du marchand BIG (= équivalent du brand label sur boutique) --}}
+    {{-- Center : marchand BIG si présent, sinon nom de la carte (catalogue admin) --}}
     <div class="mcv-brand">
-        <div class="mcv-brand-name">{{ $_biz }}</div>
+        <div class="mcv-brand-name">{{ $_biz ?? $_card->name }}</div>
     </div>
 
     {{-- Chip doré décoratif (= identique au boutique) --}}
     <div class="mcv-chip" aria-hidden="true"></div>
 
-    {{-- Bottom : ville + label « Marchand local » --}}
+    {{-- Bottom : ville si marchand, sinon "Gabon · Carte locale" pour le catalogue admin --}}
     <div class="mcv-bottom">
         <span class="mcv-region">
-            @if($_city)
-                <svg width="11" height="11" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                {{ $_city }}
-            @else
-                Gabon
-            @endif
-            · Marchand local
+            <svg width="11" height="11" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+            {{ $_city ?? 'Gabon' }}
+            · {{ $_biz ? 'Marchand local' : 'Carte locale' }}
         </span>
     </div>
 </div>
