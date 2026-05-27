@@ -68,11 +68,11 @@
             </div>
         </div>
 
-        {{-- Volume jour --}}
+        {{-- Volume jour — palette unifiée (icône slate neutre) --}}
         <div class="vd-stat">
             <div class="vd-stat-head">
                 <span class="vd-stat-label">Volume du jour</span>
-                <div class="vd-stat-icon" style="background:#EFF6FF;color:#2563EB;">
+                <div class="vd-stat-icon" style="background:#F1F5F9;color:#475569;">
                     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
                 </div>
             </div>
@@ -83,11 +83,11 @@
             <div class="vd-stat-meta">{{ $stats['orders_today'] }} vente{{ $stats['orders_today'] > 1 ? 's' : '' }} aujourd'hui</div>
         </div>
 
-        {{-- Total ventes --}}
+        {{-- Total ventes — même palette neutre --}}
         <div class="vd-stat">
             <div class="vd-stat-head">
                 <span class="vd-stat-label">Total ventes</span>
-                <div class="vd-stat-icon" style="background:#FAF5FF;color:#7C3AED;">
+                <div class="vd-stat-icon" style="background:#F1F5F9;color:#475569;">
                     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/></svg>
                 </div>
             </div>
@@ -183,31 +183,24 @@
                 </a>
             </div>
 
+            {{-- Palette unifiée : une seule couleur (dark slate + accent teal) pour
+                 TOUTES les cartes au lieu d'un arc-en-ciel d'une couleur par marque. --}}
             <div class="vd-cards-grid">
                 @foreach($recentCards as $card)
                     @php
                         $brand = $card->brand ?? $card->name ?? 'Carte';
-                        $brandColor = $brandColorFor($brand);
                     @endphp
                     <a href="{{ route('vendor.orders.show', $card->reseller_order_id) }}" class="vd-gcard">
-                        <div class="vd-gcard-visual" style="background-color:{{ $brandColor }};">
-                            <svg class="vd-gcard-pattern" aria-hidden="true">
-                                <defs>
-                                    <pattern id="vdc-{{ $card->id }}" width="28" height="28" patternUnits="userSpaceOnUse">
-                                        <circle cx="14" cy="14" r="11" fill="none" stroke="white" stroke-width="1"/>
-                                    </pattern>
-                                </defs>
-                                <rect width="100%" height="100%" fill="url(#vdc-{{ $card->id }})"/>
-                            </svg>
-                            <div class="vd-gcard-glow"></div>
+                        <div class="vd-gcard-visual" style="background:linear-gradient(135deg,#0F172A 0%,#1E293B 60%,#0F4F44 100%);">
+                            <div class="vd-gcard-glow" style="background:radial-gradient(circle at 20% 20%, rgba(94,234,212,0.18), transparent 60%);"></div>
                             <div class="vd-gcard-visual-body">
                                 <div class="vd-gcard-top">
                                     <div>
-                                        <div class="vd-gcard-tag">Gift Card</div>
+                                        <div class="vd-gcard-tag" style="color:rgba(255,255,255,0.65);">Gift Card</div>
                                         <div class="vd-gcard-brand">{{ explode(' ', $brand)[0] }}</div>
                                     </div>
-                                    <span class="vd-gcard-status">
-                                        <span class="vd-gcard-status-dot"></span>Vendue
+                                    <span class="vd-gcard-status" style="background:rgba(94,234,212,0.18);color:#5EEAD4;border:1px solid rgba(94,234,212,0.30);">
+                                        <span class="vd-gcard-status-dot" style="background:#5EEAD4;"></span>Vendue
                                     </span>
                                 </div>
                                 <div class="vd-gcard-price">
