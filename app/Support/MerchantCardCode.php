@@ -107,24 +107,34 @@ class MerchantCardCode
         OrderItem $item,
         Order $order
     ): void {
-        // 1. PIN si manquant
-        if (empty($purchase->pin_code)) {
-            $purchase->update([
-                'pin_code' => str_pad((string) random_int(0, 9999), 4, '0', STR_PAD_LEFT),
-            ]);
+        $purchase->loadMissing(['merchantCard.reseller']);
+        $card = $purchase->merchantCard;
+
+        // Aligne la purchase sur le MASTER de la carte (code + PIN + expiration
+        // définis par l'admin). C'est ce qui est livré au client.
+        $masterCode = $card?->unique_code;
+        $masterPin  = $card?->pin_code;
+        $masterExp  = $card?->expires_at ? \Illuminate\Support\Carbon::parse($card->expires_at) : null;
+
+        $patch = [];
+        if ($masterCode && $purchase->unique_code !== $masterCode) $patch['unique_code'] = $masterCode;
+        if ($masterPin)  $patch['pin_code']    = $masterPin;
+        elseif (empty($purchase->pin_code)) $patch['pin_code'] = str_pad((string) random_int(0, 9999), 4, '0', STR_PAD_LEFT);
+        if ($masterExp)  $patch['expires_at']  = $masterExp;
+        if (!empty($patch)) {
+            $purchase->update($patch);
+            $purchase->refresh();
         }
 
-        // 2. UserCard miroir si absent (lookup par order_item_id pour éviter le doublon)
+        // UserCard miroir si absent (lookup par order_item_id pour éviter le doublon)
         $hasMirror = UserCard::where('order_item_id', $item->id)
             ->where('user_id', $order->user_id)
             ->exists();
 
         if (!$hasMirror) {
-            $purchase->loadMissing(['merchantCard.reseller']);
-            $card = $purchase->merchantCard;
             $merchantName = $card?->reseller?->business_name
                 ?? $card?->reseller?->name
-                ?? 'Marchand';
+                ?? 'KardAfrica';
 
             UserCard::create([
                 'user_id'         => $order->user_id,
@@ -132,11 +142,11 @@ class MerchantCardCode
                 'order_item_id'   => $item->id,
                 'product_id'      => $item->product_id,
                 'checkout_card_id'=> 'mp_' . $purchase->id,
-                'name'            => $card?->name ?? 'Carte marchand',
+                'name'            => $card?->name ?? 'Carte locale',
                 'brand'           => $merchantName,
                 'serial_number'   => 'MGAB-' . str_pad((string) $purchase->id, 8, '0', STR_PAD_LEFT),
                 'card_code'       => $purchase->unique_code,
-                'pin'             => $purchase->fresh()->pin_code,
+                'pin'             => $purchase->pin_code,
                 'expiration_date' => $purchase->expires_at?->toDateString(),
                 'status'          => UserCard::STATUS_ACTIVE,
                 'face_value'      => $purchase->amount,
@@ -210,9 +220,16 @@ class MerchantCardCode
             // 1. Crée la purchase avec un qr_payload PROVISOIRE — qr_payload est
             //    NOT NULL/UNIQUE en BDD, et buildQrPayload() a besoin de l'ID
             //    réel (qu'on n'a pas encore). On finalise juste après.
-            $uniqueCode = self::generateUniqueCode();
-            $pinCode    = str_pad((string) random_int(0, 9999), 4, '0', STR_PAD_LEFT); // 0000-9999
-            $expiresAt  = now()->addMonths((int) ($card->validity_months ?? 12));
+            //
+            // Le code + PIN + expiration livrés au client = ceux du MASTER de la
+            // carte (générés par l'admin à la création), comme l'API afrikard
+            // renvoie le code de la carte source. Fallback sur génération locale
+            // si le master est manquant (vieilles cartes).
+            $uniqueCode = $card->unique_code ?: self::generateUniqueCode();
+            $pinCode    = $card->pin_code   ?: str_pad((string) random_int(0, 9999), 4, '0', STR_PAD_LEFT);
+            $expiresAt  = $card->expires_at
+                ? \Illuminate\Support\Carbon::parse($card->expires_at)
+                : now()->addMonths((int) ($card->validity_months ?? 12));
 
             $purchase = MerchantCardPurchase::create([
                 'merchant_card_id'  => $card->id,
@@ -246,7 +263,7 @@ class MerchantCardCode
             // 3. Mirroir UserCard : la carte apparaît dans /cards à côté des
             //    cartes afrikard, mêmes champs (code + PIN + date d'expiration).
             //    L'utilisateur a UNE liste unifiée de ses cartes-cadeau.
-            $merchantName = $card->reseller->business_name ?? $card->reseller->name ?? 'Marchand';
+            $merchantName = $card->reseller?->business_name ?? $card->reseller?->name ?? 'KardAfrica';
             UserCard::create([
                 'user_id'         => $order->user_id,
                 'order_id'        => $order->id,
@@ -269,7 +286,7 @@ class MerchantCardCode
                     'merchant_card_id'    => $card->id,
                     'reseller_id'         => $card->reseller_id,
                     'merchant_name'       => $merchantName,
-                    'merchant_city'       => $card->reseller->city ?? null,
+                    'merchant_city'       => $card->reseller?->city ?? null,
                 ],
             ]);
 
