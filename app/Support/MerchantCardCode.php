@@ -110,19 +110,11 @@ class MerchantCardCode
         $purchase->loadMissing(['merchantCard.reseller']);
         $card = $purchase->merchantCard;
 
-        // Aligne la purchase sur le MASTER de la carte (code + PIN + expiration
-        // définis par l'admin). C'est ce qui est livré au client.
-        $masterCode = $card?->unique_code;
-        $masterPin  = $card?->pin_code;
-        $masterExp  = $card?->expires_at ? \Illuminate\Support\Carbon::parse($card->expires_at) : null;
-
-        $patch = [];
-        if ($masterCode && $purchase->unique_code !== $masterCode) $patch['unique_code'] = $masterCode;
-        if ($masterPin)  $patch['pin_code']    = $masterPin;
-        elseif (empty($purchase->pin_code)) $patch['pin_code'] = str_pad((string) random_int(0, 9999), 4, '0', STR_PAD_LEFT);
-        if ($masterExp)  $patch['expires_at']  = $masterExp;
-        if (!empty($patch)) {
-            $purchase->update($patch);
+        // Génère un PIN unique à cet achat s'il manque (vieilles purchases)
+        if (empty($purchase->pin_code)) {
+            $purchase->update([
+                'pin_code' => str_pad((string) random_int(0, 9999), 4, '0', STR_PAD_LEFT),
+            ]);
             $purchase->refresh();
         }
 
@@ -221,15 +213,12 @@ class MerchantCardCode
             //    NOT NULL/UNIQUE en BDD, et buildQrPayload() a besoin de l'ID
             //    réel (qu'on n'a pas encore). On finalise juste après.
             //
-            // Le code + PIN + expiration livrés au client = ceux du MASTER de la
-            // carte (générés par l'admin à la création), comme l'API afrikard
-            // renvoie le code de la carte source. Fallback sur génération locale
-            // si le master est manquant (vieilles cartes).
-            $uniqueCode = $card->unique_code ?: self::generateUniqueCode();
-            $pinCode    = $card->pin_code   ?: str_pad((string) random_int(0, 9999), 4, '0', STR_PAD_LEFT);
-            $expiresAt  = $card->expires_at
-                ? \Illuminate\Support\Carbon::parse($card->expires_at)
-                : now()->addMonths((int) ($card->validity_months ?? 12));
+            // Le code + PIN + expiration sont générés À LA LIVRAISON, UNIQUES par
+            // achat : plusieurs clients peuvent acheter la même carte template,
+            // chacun reçoit son propre code stocké dans merchant_card_purchases.
+            $uniqueCode = self::generateUniqueCode();
+            $pinCode    = str_pad((string) random_int(0, 9999), 4, '0', STR_PAD_LEFT);
+            $expiresAt  = now()->addMonths((int) ($card->validity_months ?? 12));
 
             $purchase = MerchantCardPurchase::create([
                 'merchant_card_id'  => $card->id,

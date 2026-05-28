@@ -158,75 +158,50 @@
                 @endif
             </div>
 
-            {{-- ============ CODE + PIN (master code généré à la création) ============ --}}
-            @if($card->unique_code || $card->pin_code)
-                <div x-data="{ codeShown: false, pinShown: false, copied: null,
-                              copy(text, field) {
-                                  navigator.clipboard.writeText(text).then(() => {
-                                      this.copied = field;
-                                      setTimeout(() => this.copied = null, 1800);
-                                  });
-                              } }"
-                     class="mcs-card" style="background:linear-gradient(135deg,#0F172A 0%,#1E293B 60%,#0F4F44 100%);color:white;border:0;position:relative;overflow:hidden;">
-                    <div style="position:absolute;top:-40%;right:-10%;width:280px;height:280px;background:radial-gradient(circle,rgba(94,234,212,0.20),transparent 60%);pointer-events:none;"></div>
-
-                    <div class="mcs-card-head" style="position:relative;margin-bottom:14px;">
-                        <svg class="mcs-card-head-ic" style="color:#5EEAD4;" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
-                        <h3 style="color:white;">Code + PIN générés</h3>
-                    </div>
-
-                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;position:relative;">
-                        {{-- Code 8 chiffres --}}
-                        <div>
-                            <div style="font-size:10px;font-weight:800;color:rgba(255,255,255,0.55);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;">Code 8 chiffres</div>
-                            <div style="display:flex;align-items:center;gap:6px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:10px;padding:9px 12px;">
-                                <code x-show="!codeShown" style="flex:1;font-family:ui-monospace,monospace;font-size:15px;letter-spacing:.25em;color:rgba(255,255,255,0.40);">•••• ••••</code>
-                                <code x-show="codeShown" x-cloak style="flex:1;font-family:ui-monospace,monospace;font-size:15px;letter-spacing:.25em;color:#5EEAD4;font-weight:800;">{{ $card->unique_code }}</code>
-                                <button @click="codeShown = !codeShown" type="button" style="background:none;border:0;color:rgba(255,255,255,0.55);cursor:pointer;padding:4px;">
-                                    <template x-if="!codeShown">
-                                        <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
-                                    </template>
-                                    <template x-if="codeShown">
-                                        <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/></svg>
-                                    </template>
-                                </button>
-                                <button @click="copy('{{ $card->unique_code }}', 'code')" type="button" x-show="codeShown" x-cloak style="background:none;border:0;color:#5EEAD4;cursor:pointer;padding:4px;font-size:10px;font-weight:700;">
-                                    <span x-show="copied !== 'code'">Copier</span>
-                                    <span x-show="copied === 'code'" x-cloak>✓</span>
-                                </button>
-                            </div>
-                        </div>
-
-                        {{-- PIN 4 chiffres --}}
-                        <div>
-                            <div style="font-size:10px;font-weight:800;color:rgba(255,255,255,0.55);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;">PIN 4 chiffres</div>
-                            <div style="display:flex;align-items:center;gap:6px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:10px;padding:9px 12px;">
-                                <code x-show="!pinShown" style="flex:1;font-family:ui-monospace,monospace;font-size:15px;letter-spacing:.3em;color:rgba(255,255,255,0.40);">••••</code>
-                                <code x-show="pinShown" x-cloak style="flex:1;font-family:ui-monospace,monospace;font-size:15px;letter-spacing:.3em;color:#5EEAD4;font-weight:800;">{{ $card->pin_code }}</code>
-                                <button @click="pinShown = !pinShown" type="button" style="background:none;border:0;color:rgba(255,255,255,0.55);cursor:pointer;padding:4px;">
-                                    <template x-if="!pinShown">
-                                        <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
-                                    </template>
-                                    <template x-if="pinShown">
-                                        <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/></svg>
-                                    </template>
-                                </button>
-                                <button @click="copy('{{ $card->pin_code }}', 'pin')" type="button" x-show="pinShown" x-cloak style="background:none;border:0;color:#5EEAD4;cursor:pointer;padding:4px;font-size:10px;font-weight:700;">
-                                    <span x-show="copied !== 'pin'">Copier</span>
-                                    <span x-show="copied === 'pin'" x-cloak>✓</span>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    @if($card->expires_at)
-                        <div style="position:relative;margin-top:14px;display:flex;align-items:center;gap:6px;font-size:11px;color:rgba(255,255,255,0.6);">
-                            <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                            Valable jusqu'au <strong style="color:white;font-variant-numeric:tabular-nums;">{{ \Carbon\Carbon::parse($card->expires_at)->translatedFormat('d M Y') }}</strong>
-                        </div>
-                    @endif
+            {{-- ============ CARTES VENDUES (codes générés par achat) ============ --}}
+            <div class="mcs-card" style="position:relative;overflow:hidden;">
+                <div class="mcs-card-head">
+                    <svg class="mcs-card-head-ic" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
+                    <h3>Codes vendus <span style="color:#94A3B8;font-weight:600;">· {{ $card->purchases->count() }}</span></h3>
                 </div>
-            @endif
+                <p style="font-size:11px;color:#64748B;margin:0 0 14px;">
+                    Un code 8 chiffres + PIN 4 chiffres unique est généré pour <strong>chaque acheteur</strong> au moment de la livraison. La carte elle-même n'a pas de code fixe.
+                </p>
+
+                @if($card->purchases->isEmpty())
+                    <div style="text-align:center;padding:24px;background:#F8FAFC;border:1px dashed #E2E8F0;border-radius:12px;color:#94A3B8;font-size:13px;">
+                        Aucune vente pour l'instant. Les codes apparaîtront ici dès le premier achat.
+                    </div>
+                @else
+                    <div x-data="{ revealed: null }" style="display:flex;flex-direction:column;gap:8px;">
+                        @foreach($card->purchases->sortByDesc('created_at') as $p)
+                            <div style="border:1px solid #E2E8F0;border-radius:12px;padding:12px 14px;">
+                                <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+                                    <div style="min-width:0;">
+                                        <div style="font-size:13px;font-weight:700;color:#0F172A;">{{ $p->buyer_name ?: 'Client' }}</div>
+                                        <div style="font-size:11px;color:#94A3B8;">{{ $p->created_at->translatedFormat('d M Y · H:i') }} · {{ number_format($p->amount, 0, ',', ' ') }} F</div>
+                                    </div>
+                                    <span style="font-size:10px;font-weight:800;padding:3px 9px;border-radius:9999px;{{ in_array($p->status, ['active','partially_used']) ? 'background:#D1FAE5;color:#047857;' : ($p->status === 'fully_used' ? 'background:#F1F5F9;color:#475569;' : 'background:#FEE2E2;color:#B91C1C;') }}">
+                                        {{ strtoupper($p->status) }}
+                                    </span>
+                                </div>
+                                <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center;">
+                                    <code style="font-family:ui-monospace,monospace;font-size:13px;font-weight:800;letter-spacing:.15em;color:#0F172A;background:#F1F5F9;border-radius:8px;padding:6px 10px;"
+                                          x-text="revealed === {{ $p->id }} ? '{{ $p->unique_code }}' : '•••• ••••'"></code>
+                                    <code style="font-family:ui-monospace,monospace;font-size:13px;font-weight:800;letter-spacing:.2em;color:#0F172A;background:#F1F5F9;border-radius:8px;padding:6px 10px;"
+                                          x-text="revealed === {{ $p->id }} ? 'PIN {{ $p->pin_code }}' : 'PIN ••••'"></code>
+                                    <button type="button" @click="revealed = (revealed === {{ $p->id }} ? null : {{ $p->id }})"
+                                            style="font-size:11px;font-weight:700;color:#44A08D;background:none;border:0;cursor:pointer;">
+                                        <span x-show="revealed !== {{ $p->id }}">Afficher</span>
+                                        <span x-show="revealed === {{ $p->id }}" x-cloak>Masquer</span>
+                                    </button>
+                                    <span style="margin-left:auto;font-size:11px;color:#94A3B8;">exp. {{ $p->expires_at?->translatedFormat('d/m/Y') }}</span>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
+            </div>
 
             {{-- Denominations --}}
             <div class="mcs-card">
