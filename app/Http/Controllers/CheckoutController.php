@@ -185,11 +185,14 @@ class CheckoutController extends Controller
      */
     public function simulate(Request $request)
     {
-        if (!config('app.debug')) {
+        $user = $request->user();
+
+        // Simulation autorisée : en mode debug OU pour un admin connecté (test prod
+        // sans paiement réel). Bloquée pour les clients normaux en prod (sinon
+        // n'importe qui obtiendrait des cartes gratuites).
+        if (!config('app.debug') && !($user && method_exists($user, 'isAdmin') && $user->isAdmin())) {
             abort(404);
         }
-
-        $user = $request->user();
 
         $cartItems = ShoppingCart::where('user_id', $user->id)->get();
         if ($cartItems->isEmpty()) {
@@ -287,12 +290,11 @@ class CheckoutController extends Controller
                     'completed_at' => now(),
                 ]);
 
-                $url = route('orders.show', $order);
                 return response()->json([
-                    'success'  => true,
-                    'order_id' => $order->id,
-                    'url'      => $url,
-                    'message'  => 'Carte marchand livrée immédiatement (paiement simulé).',
+                    'success'      => true,
+                    'order_id'     => $order->id,
+                    'redirect_url' => route('orders.show', $order),
+                    'message'      => 'Carte locale livrée immédiatement (paiement simulé).',
                 ]);
             }
 
