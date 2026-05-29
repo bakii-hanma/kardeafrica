@@ -52,15 +52,15 @@ class MerchantCardCode
     /**
      * Chiffre la payload pour le QR. Output = string base64 URL-safe.
      *
-     * @param int $purchaseId  ID du MerchantCardPurchase
-     * @param int $merchantId  ID du Reseller (marchand) — défense en profondeur
+     * @param int      $purchaseId  ID du MerchantCardPurchase
+     * @param int|null $merchantId  ID du Reseller (null = carte catalogue admin)
      * @return string  payload chiffré à embarquer dans le QR
      */
-    public static function buildQrPayload(int $purchaseId, int $merchantId): string
+    public static function buildQrPayload(int $purchaseId, ?int $merchantId = null): string
     {
         return Crypt::encryptString(json_encode([
             'pid' => $purchaseId,
-            'mid' => $merchantId,
+            'mid' => $merchantId ?? 0, // 0 = carte catalogue admin (pas de marchand)
             'iat' => now()->timestamp,
             'v'   => 1, // version du format payload (pour migrations futures)
         ]));
