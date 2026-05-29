@@ -106,17 +106,20 @@
             <div>
                 {{-- Merchant badge + title + description --}}
                 <div class="mb-6">
-                    @php
-                        $badgeTag = $merchantSlug ? 'a' : 'div';
-                        $badgeAttrs = $merchantSlug ? 'href="'.route('gabon.merchant', $merchantSlug).'"' : '';
-                    @endphp
-                    <{!! $badgeTag !!} {!! $badgeAttrs !!} class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white border border-slate-200 shadow-card mb-4 {{ $merchantSlug ? 'hover:border-[#44A08D] transition' : '' }}">
-                        <span class="w-5 h-5 rounded-full flex items-center justify-center text-white text-[10px] font-black bg-gradient-to-br from-[#44A08D] to-[#4ECDC4]">{{ $merchantInitial }}</span>
-                        <span class="text-xs font-semibold text-slate-700">{{ $merchantName }}</span>
-                        @if($merchantCity)
-                            <span class="text-[10px] text-slate-400">· {{ $merchantCity }}</span>
-                        @endif
-                    </{!! $badgeTag !!}>
+                    @if($merchantSlug)
+                        <a href="{{ route('gabon.merchant', $merchantSlug) }}" class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white border border-slate-200 shadow-card mb-4 hover:border-[#44A08D] transition">
+                            <span class="w-5 h-5 rounded-full flex items-center justify-center text-white text-[10px] font-black bg-gradient-to-br from-[#44A08D] to-[#4ECDC4]">{{ $merchantInitial }}</span>
+                            <span class="text-xs font-semibold text-slate-700">{{ $merchantName }}</span>
+                            @if($merchantCity)
+                                <span class="text-[10px] text-slate-400">· {{ $merchantCity }}</span>
+                            @endif
+                        </a>
+                    @else
+                        <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white border border-slate-200 shadow-card mb-4">
+                            <span class="w-5 h-5 rounded-full flex items-center justify-center text-white text-[10px] font-black bg-gradient-to-br from-[#44A08D] to-[#4ECDC4]">{{ $merchantInitial }}</span>
+                            <span class="text-xs font-semibold text-slate-700">{{ $merchantName }}</span>
+                        </div>
+                    @endif
 
                     @if(isset($categories[$card->category]))
                         <div class="text-[11px] font-bold uppercase tracking-wider text-[#44A08D] mb-1.5">{{ $categories[$card->category] }}</div>
@@ -246,7 +249,14 @@
                     <div x-show="tab === 'terms'" class="p-5 text-sm text-slate-600 leading-relaxed" style="display:none;">
                         <ul class="space-y-2 list-disc list-inside">
                             <li>Valide pendant <strong>{{ $card->validity_months }} mois</strong> à compter de la date d'achat.</li>
-                            <li>Utilisable @if($merchant)uniquement chez <strong>{{ $merchantName }}</strong>{{ $merchantCity ? ' à '.$merchantCity : '' }}@else chez les marchands partenaires Kardafrica au Gabon@endif.</li>
+                            <li>
+                                Utilisable
+                                @if($merchant)
+                                    uniquement chez <strong>{{ $merchantName }}</strong>{{ $merchantCity ? ' à '.$merchantCity : '' }}.
+                                @else
+                                    chez les marchands partenaires Kardafrica au Gabon.
+                                @endif
+                            </li>
                             <li>Non remboursable et non échangeable contre de l'espèce.</li>
                             <li>Peut être utilisée en une ou plusieurs fois jusqu'à épuisement du solde.</li>
                         </ul>
