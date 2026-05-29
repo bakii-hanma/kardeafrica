@@ -53,7 +53,29 @@ class OrderController extends Controller
 
         $order->load('orderItems');
 
-        // Load associated user cards (afrikard catalog items)
+        // ============================================================
+        // Self-heal : si la commande est payée et contient des items carte
+        // locale (Carte Gabon) sans MerchantCardPurchase, on les génère ici
+        // (boucle sur chaque item marchand, idempotent). Couvre aussi le cas
+        // mixte afrikard + local. Évite que le client doive cliquer 'Relancer'.
+        // ============================================================
+        if ($order->payment_status === Order::PAYMENT_STATUS_COMPLETED) {
+            foreach ($order->orderItems as $item) {
+                if (\App\Support\MerchantCardCode::isMerchantOrderItem($item)) {
+                    try {
+                        \App\Support\MerchantCardCode::createPurchaseForOrderItem($order, $item);
+                    } catch (\Throwable $e) {
+                        \Illuminate\Support\Facades\Log::error('OrderController show: self-heal MerchantCardPurchase échoué', [
+                            'order_id'      => $order->id,
+                            'order_item_id' => $item->id,
+                            'error'         => $e->getMessage(),
+                        ]);
+                    }
+                }
+            }
+        }
+
+        // Load associated user cards (afrikard catalog items + miroirs carte locale)
         $userCards = UserCard::where('order_id', $order->id)
             ->where('user_id', Auth::id())
             ->with('orderItem')
