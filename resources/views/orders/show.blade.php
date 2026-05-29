@@ -264,10 +264,10 @@
                                             @endif
                                         </div>
                                         <div>
-                                            <div class="text-[10px] font-bold opacity-80 uppercase tracking-wider">{{ \Illuminate\Support\Str::upper($merchant->business_name ?? $merchant->name) }}</div>
+                                            <div class="text-[10px] font-bold opacity-80 uppercase tracking-wider">{{ \Illuminate\Support\Str::upper($merchant?->business_name ?? $merchant?->name ?? 'KardAfrica') }}</div>
                                             <div class="font-display text-lg font-bold leading-tight mt-0.5">{{ $card->name ?? 'Carte cadeau' }}</div>
                                             <div class="text-[10px] mt-1 opacity-70">
-                                                @if($merchant->city) {{ $merchant->city }} · @endif Marchand local
+                                                @if($merchant?->city) {{ $merchant->city }} · @endif {{ $merchant ? 'Marchand local' : 'Carte locale' }}
                                             </div>
                                         </div>
                                     </div>
