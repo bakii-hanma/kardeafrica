@@ -82,32 +82,14 @@ class Reseller extends Authenticatable
         return $this->hasMany(ResellerCashRemittance::class)->latest();
     }
 
-    // ---- Carte Gabon (Phase 1) ----
-
-    public function merchantCards()
-    {
-        return $this->hasMany(MerchantCard::class);
-    }
-
-    public function merchantCardPurchases()
-    {
-        return $this->hasMany(MerchantCardPurchase::class);
-    }
-
-    public function merchantRedemptions()
-    {
-        return $this->hasMany(MerchantCardRedemption::class);
-    }
+    // ---- Carte Gabon ----
+    // Les cartes locales sont désormais un catalogue admin global (aucun lien
+    // reseller). Seuls les employés caissiers (MerchantUser) restent rattachés
+    // à un reseller pour le futur scan au comptoir.
 
     public function merchantUsers()
     {
         return $this->hasMany(MerchantUser::class);
-    }
-
-    /** True si ce vendor a une activité "Carte Gabon" (= KYC validé) */
-    public function isApprovedMerchant(): bool
-    {
-        return $this->kyc_status === 'approved' && $this->is_active;
     }
 
     // ---- Helpers ----

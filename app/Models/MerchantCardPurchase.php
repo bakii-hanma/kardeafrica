@@ -34,7 +34,7 @@ class MerchantCardPurchase extends Model
     public const PAYMENT_REFUNDED  = 'refunded';
 
     protected $fillable = [
-        'merchant_card_id', 'reseller_id',
+        'merchant_card_id',
         'order_id', 'order_item_id',
         'unique_code', 'pin_code', 'qr_payload',
         'buyer_name', 'buyer_phone', 'buyer_email',
@@ -67,11 +67,6 @@ class MerchantCardPurchase extends Model
     public function merchantCard(): BelongsTo
     {
         return $this->belongsTo(MerchantCard::class);
-    }
-
-    public function reseller(): BelongsTo
-    {
-        return $this->belongsTo(Reseller::class);
     }
 
     public function redemptions(): HasMany

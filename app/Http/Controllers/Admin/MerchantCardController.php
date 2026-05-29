@@ -28,8 +28,7 @@ class MerchantCardController extends Controller
         $status = $request->query('status', '');
         $search = trim((string) $request->query('search', ''));
 
-        $query = MerchantCard::with('reseller:id,name,business_name,slug,city,vendor_code')
-            ->withCount('purchases');
+        $query = MerchantCard::withCount('purchases');
 
         if ($status === 'pending') {
             $query->where('is_active', false)->whereNull('rejection_reason');
@@ -42,11 +41,7 @@ class MerchantCardController extends Controller
         if ($search !== '') {
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhereHas('reseller', function ($r) use ($search) {
-                      $r->where('business_name', 'like', "%{$search}%")
-                        ->orWhere('name', 'like', "%{$search}%")
-                        ->orWhere('vendor_code', 'like', "%{$search}%");
-                  });
+                  ->orWhere('description', 'like', "%{$search}%");
             });
         }
 
@@ -88,7 +83,6 @@ class MerchantCardController extends Controller
         $data = $this->validated($request);
 
         $card = new MerchantCard($data);
-        $card->reseller_id   = null; // catalogue admin global
         $card->is_active     = (bool) ($data['is_active'] ?? false);
         $card->activated_at  = $card->is_active ? now() : null;
         $card->total_sold    = 0;
@@ -111,7 +105,7 @@ class MerchantCardController extends Controller
     /** Détail + form approve/reject */
     public function show(MerchantCard $merchantCard)
     {
-        $merchantCard->load('reseller', 'purchases');
+        $merchantCard->load('purchases');
 
         return view('admin.merchant-cards.show', [
             'card'       => $merchantCard,

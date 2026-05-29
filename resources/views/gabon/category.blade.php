@@ -106,7 +106,7 @@
                 <a href="{{ route('gabon.card', $card) }}" class="gcat-link">
                     @include('partials._merchant-card-visual', ['card' => $card])
                     <div class="gcat-info">
-                        <span class="gcat-merch">{{ $card->reseller->business_name ?? $card->reseller->name }}</span>
+                        <span class="gcat-merch">KardAfrica</span>
                         <h3 class="gcat-title">{{ $card->name }}</h3>
                     </div>
                 </a>

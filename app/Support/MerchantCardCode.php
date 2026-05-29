@@ -107,7 +107,7 @@ class MerchantCardCode
         OrderItem $item,
         Order $order
     ): void {
-        $purchase->loadMissing(['merchantCard.reseller']);
+        $purchase->loadMissing('merchantCard');
         $card = $purchase->merchantCard;
 
         // Génère un PIN unique à cet achat s'il manque (vieilles purchases)
@@ -124,10 +124,6 @@ class MerchantCardCode
             ->exists();
 
         if (!$hasMirror) {
-            $merchantName = $card?->reseller?->business_name
-                ?? $card?->reseller?->name
-                ?? 'KardAfrica';
-
             UserCard::create([
                 'user_id'         => $order->user_id,
                 'order_id'        => $order->id,
@@ -135,7 +131,7 @@ class MerchantCardCode
                 'product_id'      => $item->product_id,
                 'checkout_card_id'=> null, // colonne INT afrikard, N/A ici (réf dans metadata)
                 'name'            => $card?->name ?? 'Carte locale',
-                'brand'           => $merchantName,
+                'brand'           => 'KardAfrica',
                 'serial_number'   => 'MGAB-' . str_pad((string) $purchase->id, 8, '0', STR_PAD_LEFT),
                 'card_code'       => $purchase->unique_code,
                 'pin'             => $purchase->pin_code,
@@ -148,9 +144,6 @@ class MerchantCardCode
                     'source'              => 'merchant',
                     'merchant_purchase_id'=> $purchase->id,
                     'merchant_card_id'    => $card?->id,
-                    'reseller_id'         => $purchase->reseller_id,
-                    'merchant_name'       => $merchantName,
-                    'merchant_city'       => $card?->reseller?->city ?? null,
                 ],
             ]);
 
@@ -222,7 +215,6 @@ class MerchantCardCode
 
             $purchase = MerchantCardPurchase::create([
                 'merchant_card_id'  => $card->id,
-                'reseller_id'       => $card->reseller_id,
                 'order_id'          => $order->id,
                 'order_item_id'     => $item->id,
                 'unique_code'       => $uniqueCode,
@@ -246,13 +238,12 @@ class MerchantCardCode
 
             // 2. Finalise le qr_payload signé avec l'ID réel
             $purchase->update([
-                'qr_payload' => self::buildQrPayload($purchase->id, $card->reseller_id),
+                'qr_payload' => self::buildQrPayload($purchase->id),
             ]);
 
             // 3. Mirroir UserCard : la carte apparaît dans /cards à côté des
             //    cartes afrikard, mêmes champs (code + PIN + date d'expiration).
             //    L'utilisateur a UNE liste unifiée de ses cartes-cadeau.
-            $merchantName = $card->reseller?->business_name ?? $card->reseller?->name ?? 'KardAfrica';
             UserCard::create([
                 'user_id'         => $order->user_id,
                 'order_id'        => $order->id,
@@ -260,7 +251,7 @@ class MerchantCardCode
                 'product_id'      => $item->product_id,
                 'checkout_card_id'=> null, // colonne INT afrikard, N/A ici (réf dans metadata.merchant_purchase_id)
                 'name'            => $card->name,
-                'brand'           => $merchantName,
+                'brand'           => 'KardAfrica',
                 'serial_number'   => 'MGAB-' . str_pad((string) $purchase->id, 8, '0', STR_PAD_LEFT),
                 'card_code'       => $uniqueCode,
                 'pin'             => $pinCode,
@@ -273,9 +264,6 @@ class MerchantCardCode
                     'source'              => 'merchant',         // distingue de 'afrikard'
                     'merchant_purchase_id'=> $purchase->id,      // lien vers la purchase
                     'merchant_card_id'    => $card->id,
-                    'reseller_id'         => $card->reseller_id,
-                    'merchant_name'       => $merchantName,
-                    'merchant_city'       => $card->reseller?->city ?? null,
                 ],
             ]);
 

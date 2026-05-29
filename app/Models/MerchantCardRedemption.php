@@ -23,7 +23,7 @@ class MerchantCardRedemption extends Model
     public const METHOD_CODE = 'code';
 
     protected $fillable = [
-        'merchant_card_purchase_id', 'reseller_id', 'merchant_user_id',
+        'merchant_card_purchase_id', 'merchant_user_id',
         'amount_used', 'balance_before', 'balance_after',
         'scan_method', 'location', 'notes',
         'redeemed_at',
@@ -43,11 +43,6 @@ class MerchantCardRedemption extends Model
     public function purchase(): BelongsTo
     {
         return $this->belongsTo(MerchantCardPurchase::class, 'merchant_card_purchase_id');
-    }
-
-    public function reseller(): BelongsTo
-    {
-        return $this->belongsTo(Reseller::class);
     }
 
     /** Employé qui a fait le scan (nullable si owner direct) */

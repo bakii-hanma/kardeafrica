@@ -224,7 +224,7 @@
                 <div class="space-y-4">
                     @foreach($mp as $i => $purchase)
                         @php
-                            $merchant = $purchase->reseller;
+                            $merchant = null;
                             $card     = $purchase->merchantCard;
                             $isActive = in_array($purchase->status, ['active','partially_used'], true);
                         @endphp

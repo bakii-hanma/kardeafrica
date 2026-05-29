@@ -103,11 +103,8 @@
                         <div style="font-size:12px;color:#64748B;margin-bottom:10px;">
                             <span style="display:inline-flex;align-items:center;gap:5px;">
                                 <svg style="width:11px;height:11px;color:#94A3B8;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
-                                {{ $card->reseller?->business_name ?? $card->reseller?->name ?? 'Catalogue admin' }}
+                                Catalogue admin
                             </span>
-                            @if($card->reseller?->vendor_code)
-                                <span style="margin-left:6px;font-family:ui-monospace,monospace;font-size:10px;color:#94A3B8;">{{ $card->reseller->vendor_code }}</span>
-                            @endif
                         </div>
 
                         <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px;">

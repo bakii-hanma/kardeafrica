@@ -75,12 +75,11 @@ Route::middleware('auth')->group(function () {
 Route::any('/payment/callback', [App\Http\Controllers\PaymentController::class, 'handleCallback'])->name('payment.callback');
 
 // ================================================================
-// MARKETPLACE PUBLIC : cartes-cadeau marchand (Phase 3)
+// MARKETPLACE PUBLIC : cartes-cadeau locales (catalogue admin global)
 // ================================================================
 Route::prefix('gabon')->group(function () {
     Route::get('/',                          [GabonController::class, 'index'])->name('gabon.index');
     Route::get('/categorie/{slug}',          [GabonController::class, 'category'])->name('gabon.category');
-    Route::get('/marchand/{slug}',           [GabonController::class, 'merchant'])->name('gabon.merchant');
     Route::get('/carte/{merchantCard}',      [GabonController::class, 'card'])->name('gabon.card');
 });
 

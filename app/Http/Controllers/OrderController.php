@@ -83,7 +83,7 @@ class OrderController extends Controller
 
         // Load merchant card purchases (Carte Gabon items)
         $merchantPurchases = MerchantCardPurchase::where('order_id', $order->id)
-            ->with(['merchantCard', 'reseller'])
+            ->with('merchantCard')
             ->get();
 
         if ($request->expectsJson() || $request->is('api/*')) {
@@ -95,7 +95,7 @@ class OrderController extends Controller
                     'id'           => $p->id,
                     'unique_code'  => $p->unique_code,
                     'amount'       => $p->amount,
-                    'merchant'     => $p->reseller->business_name ?? $p->reseller->name,
+                    'merchant'     => 'KardAfrica',
                     'expires_at'   => $p->expires_at,
                     'status'       => $p->status,
                 ]),

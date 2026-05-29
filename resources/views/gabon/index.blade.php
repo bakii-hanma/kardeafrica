@@ -90,24 +90,6 @@
                 </div>
             </div>
 
-            {{-- Marchands en vedette --}}
-            @if($featuredMerchants->isNotEmpty() && $activeFiltersCount === 0)
-                <div class="pb-4">
-                    <div class="flex items-center gap-2 flex-wrap">
-                        <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 mr-1 whitespace-nowrap">Marchands</span>
-                        @foreach($featuredMerchants as $m)
-                            <a href="{{ route('gabon.merchant', $m->slug) }}"
-                               class="inline-flex items-center gap-1.5 pl-1.5 pr-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition active:scale-95 bg-white border border-slate-200 text-slate-700 hover:border-slate-400">
-                                <span class="w-5 h-5 rounded-full flex items-center justify-center text-white text-[10px] font-black bg-gradient-to-br from-[#44A08D] to-[#4ECDC4]">
-                                    {{ strtoupper(substr($m->business_name ?? $m->name, 0, 1)) }}
-                                </span>
-                                {{ \Illuminate\Support\Str::limit($m->business_name ?? $m->name, 22) }}
-                            </a>
-                        @endforeach
-                    </div>
-                </div>
-            @endif
-
             {{-- Toolbar : search + actions row --}}
             <div class="pb-4 space-y-2 md:space-y-0 md:flex md:items-center md:gap-3 md:justify-end">
                 {{-- Search --}}
@@ -116,7 +98,7 @@
                     @if($categorySlug)<input type="hidden" name="category" value="{{ $categorySlug }}">@endif
                     <svg class="w-4 h-4 text-slate-400 mr-2 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
                     <input type="text" name="search" value="{{ $search }}"
-                           placeholder="Marchand, carte, ville…"
+                           placeholder="Rechercher une carte…"
                            class="flex-1 min-w-0 bg-transparent border-0 text-slate-900 placeholder-slate-400 focus:ring-0 text-sm focus:outline-none py-2">
                     @if($search)
                         <a href="{{ $urlWith(['search' => null, 'page' => null]) }}" class="w-7 h-7 rounded-md flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 mr-1 shrink-0" aria-label="Effacer">
@@ -196,14 +178,6 @@
                             <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                         </a>
                     @endif
-                    @foreach($selectedCities as $c)
-                        <a href="{{ $urlWith(['city' => array_values(array_diff($selectedCities, [$c])), 'page' => null]) }}"
-                           class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-medium hover:bg-slate-200 transition">
-                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                            <span>{{ $c }}</span>
-                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-                        </a>
-                    @endforeach
                     @foreach($priceRanges as $range)
                         <a href="{{ $urlWith(['price_range' => array_values(array_diff($priceRanges, [$range])), 'page' => null]) }}"
                            class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-medium hover:bg-slate-200 transition">
@@ -332,32 +306,6 @@
                         </div>
                     </div>
 
-                    {{-- ===== Section : Villes ===== --}}
-                    @if($availableCities->isNotEmpty())
-                        <div x-data="{ open: true }" class="border-b border-slate-100">
-                            <button @click="open = !open" type="button" class="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-slate-50/50 transition">
-                                <span class="flex items-center gap-2 text-sm font-semibold text-slate-900">
-                                    Villes
-                                    @if(count($selectedCities))
-                                        <span class="px-1.5 py-0.5 rounded-md bg-teal-50 text-[#44A08D] text-[10px] font-bold">{{ count($selectedCities) }}</span>
-                                    @endif
-                                </span>
-                                <svg class="w-4 h-4 text-slate-400 transition-transform" :class="open && 'rotate-180'" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
-                            </button>
-                            <div x-show="open" x-collapse class="px-5 pb-4 space-y-1.5 max-h-72 overflow-y-auto">
-                                @foreach($availableCities as $city)
-                                    @php $cityActive = in_array($city, $selectedCities, true); @endphp
-                                    <label class="flex items-center gap-2.5 px-2 py-1.5 rounded-lg cursor-pointer hover:bg-slate-50 transition">
-                                        <input type="checkbox" name="city[]" value="{{ $city }}" onchange="this.form.submit()"
-                                               {{ $cityActive ? 'checked' : '' }}
-                                               class="w-4 h-4 rounded border-slate-300 text-[#44A08D] focus:ring-[#44A08D]/30">
-                                        <span class="flex-1 text-sm {{ $cityActive ? 'text-slate-900 font-semibold' : 'text-slate-700' }}">{{ $city }}</span>
-                                    </label>
-                                @endforeach
-                            </div>
-                        </div>
-                    @endif
-
                     {{-- Footer mobile : "Voir les résultats" --}}
                     <div class="lg:hidden sticky bottom-0 left-0 right-0 px-5 py-3 bg-white border-t border-slate-100 flex items-center gap-2">
                         @if($activeFiltersCount > 0)
@@ -379,7 +327,7 @@
                         </div>
                         <h3 class="font-display text-lg font-bold text-slate-900 mb-1">Aucune carte trouvée</h3>
                         <p class="text-sm text-slate-500 mb-4">
-                            @if($search || $categorySlug || count($selectedCities) || count($priceRanges))
+                            @if($search || $categorySlug || count($priceRanges))
                                 Aucun résultat pour ces filtres. Essaie d'élargir ta recherche.
                             @else
                                 Aucune carte locale n'est encore publiée. Reviens bientôt !
@@ -448,14 +396,14 @@
                                 <div class="flex-1 p-4 flex items-center gap-3">
                                     <div class="flex-1 min-w-0">
                                         <div class="text-[10px] font-bold uppercase tracking-wider text-[#44A08D]">
-                                            {{ $card->reseller?->business_name ?? $card->reseller?->name ?? 'KardAfrica' }}
+                                            KardAfrica
                                         </div>
                                         <h3 class="font-display text-base font-bold text-slate-900 mt-0.5 line-clamp-1 group-hover:text-[#44A08D] transition">
                                             {{ $card->name }}
                                         </h3>
                                         <p class="text-xs text-slate-500 mt-1 line-clamp-1">
                                             @if(isset($categories[$card->category])){{ $categories[$card->category] }} · @endif
-                                            {{ $card->reseller?->city ?? 'Gabon' }} · {{ $card->validity_months }} mois
+                                            Gabon · {{ $card->validity_months }} mois
                                         </p>
                                         <div class="flex flex-wrap gap-1 mt-2">
                                             @foreach(array_slice($card->denominations ?? [], 0, 3) as $d)
