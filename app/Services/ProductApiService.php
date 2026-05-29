@@ -486,6 +486,14 @@ class ProductApiService
             if ($match) $categories[] = $cat;
         }
 
+        // Désambiguïsation Voyage : les jeux vidéo dont le TITRE contient un mot
+        // « voyage » (Riders/Outriders, Traveler, Triple, Flight Simulator…) sont
+        // des jeux, pas des cartes voyage. Si la marque est une plateforme de jeu,
+        // on retire la catégorie Voyage faussement attribuée.
+        if ($this->isGamingPlatformBrand($brandName)) {
+            $categories = array_values(array_filter($categories, fn ($c) => (int) $c['id'] !== 6));
+        }
+
         $product['cardType']['categories'] = $categories;
 
         // Drop le bloc `brand` original (~6 KB par produit) maintenant qu'on a
@@ -494,6 +502,21 @@ class ProductApiService
         unset($product['brand'], $product['country']);
 
         return $product;
+    }
+
+    /**
+     * Vrai si la marque est une plateforme de jeu vidéo. Sert à empêcher qu'un
+     * jeu au titre « voyage » (Riders Republic, Flight Simulator…) ne soit
+     * classé dans la catégorie Voyage.
+     */
+    private function isGamingPlatformBrand(string $brandName): bool
+    {
+        foreach (['xbox', 'playstation', 'psn', 'nintendo', 'steam'] as $kw) {
+            if (str_contains($brandName, $kw)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -539,6 +562,7 @@ class ProductApiService
                         return collect(['daywatch', 'day watch', 'watch', 'security', 'monitoring', 'surveillance', 'protection'])
                             ->contains(fn($k) => str_contains($brandName, $k) || str_contains($productName, $k));
                     } elseif ($categoryId == 6) { // Voyage
+                        if ($this->isGamingPlatformBrand($brandName)) return false;
                         return collect(['uber', 'airbnb', 'booking', 'expedia', 'travel', 'flight', 'hotel', 'train', 'bus', 'trip', 'bolt', 'yango', 'taxi', 'ride', 'fly'])
                             ->contains(fn($k) => str_contains($brandName, $k) || str_contains($productName, $k));
                     }
