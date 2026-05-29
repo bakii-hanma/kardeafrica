@@ -133,7 +133,7 @@ class MerchantCardCode
                 'order_id'        => $order->id,
                 'order_item_id'   => $item->id,
                 'product_id'      => $item->product_id,
-                'checkout_card_id'=> 'mp_' . $purchase->id,
+                'checkout_card_id'=> null, // colonne INT afrikard, N/A ici (réf dans metadata)
                 'name'            => $card?->name ?? 'Carte locale',
                 'brand'           => $merchantName,
                 'serial_number'   => 'MGAB-' . str_pad((string) $purchase->id, 8, '0', STR_PAD_LEFT),
@@ -258,7 +258,7 @@ class MerchantCardCode
                 'order_id'        => $order->id,
                 'order_item_id'   => $item->id,
                 'product_id'      => $item->product_id,
-                'checkout_card_id'=> 'mp_' . $purchase->id, // ref interne
+                'checkout_card_id'=> null, // colonne INT afrikard, N/A ici (réf dans metadata.merchant_purchase_id)
                 'name'            => $card->name,
                 'brand'           => $merchantName,
                 'serial_number'   => 'MGAB-' . str_pad((string) $purchase->id, 8, '0', STR_PAD_LEFT),
