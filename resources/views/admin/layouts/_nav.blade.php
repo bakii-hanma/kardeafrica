@@ -68,6 +68,12 @@
     Cartes locales
 </a>
 
+<a href="{{ route('admin.card-owners.index') }}"
+   class="sidebar-link flex items-center px-3 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap {{ request()->routeIs('admin.card-owners.*') ? 'active' : 'text-gray-300' }}">
+    <svg class="w-5 h-5 mr-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+    Propriétaires
+</a>
+
 <a href="{{ route('admin.newsletter.index') }}"
    class="sidebar-link flex items-center px-3 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap {{ request()->routeIs('admin.newsletter.*') ? 'active' : 'text-gray-300' }}">
     <svg class="w-5 h-5 mr-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>

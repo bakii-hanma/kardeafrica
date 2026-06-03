@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\CardOwner;
 use App\Models\MerchantCard;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -28,7 +29,7 @@ class MerchantCardController extends Controller
         $status = $request->query('status', '');
         $search = trim((string) $request->query('search', ''));
 
-        $query = MerchantCard::withCount('purchases');
+        $query = MerchantCard::with('owner:id,business_name,slug')->withCount('purchases');
 
         if ($status === 'pending') {
             $query->where('is_active', false)->whereNull('rejection_reason');
@@ -64,16 +65,20 @@ class MerchantCardController extends Controller
     }
 
     /** Formulaire création — par défaut la carte est active immédiatement */
-    public function create()
+    public function create(Request $request)
     {
+        $preselectOwnerId = (int) $request->query('owner', 0) ?: null;
+
         return view('admin.merchant-cards.create', [
             'card'       => new MerchantCard([
+                'card_owner_id'   => $preselectOwnerId,
                 'currency'        => 'XAF',
                 'validity_months' => 12,
                 'denominations'   => [5000, 10000, 25000, 50000],
                 'is_active'       => true,
             ]),
             'categories' => MerchantCard::CATEGORIES,
+            'owners'     => $this->ownersList(),
         ]);
     }
 
@@ -105,7 +110,7 @@ class MerchantCardController extends Controller
     /** Détail + form approve/reject */
     public function show(MerchantCard $merchantCard)
     {
-        $merchantCard->load('purchases');
+        $merchantCard->load(['purchases', 'owner']);
 
         return view('admin.merchant-cards.show', [
             'card'       => $merchantCard,
@@ -119,6 +124,7 @@ class MerchantCardController extends Controller
         return view('admin.merchant-cards.edit', [
             'card'       => $merchantCard,
             'categories' => MerchantCard::CATEGORIES,
+            'owners'     => $this->ownersList(),
         ]);
     }
 
@@ -196,10 +202,19 @@ class MerchantCardController extends Controller
     // Helpers privés
     // ============================================================
 
+    /** Liste légère des propriétaires actifs pour le select du form. */
+    private function ownersList()
+    {
+        return CardOwner::where('is_active', true)
+            ->orderBy('business_name')
+            ->get(['id', 'business_name', 'contact_name', 'city']);
+    }
+
     /** Validation partagée create + update */
     private function validated(Request $request): array
     {
         $validated = $request->validate([
+            'card_owner_id'       => ['required', 'integer', Rule::exists('card_owners', 'id')->where(fn ($q) => $q->where('is_active', true))],
             'name'                => ['required', 'string', 'max:120'],
             'description'         => ['nullable', 'string', 'max:2000'],
             'category'            => ['required', 'string', Rule::in(array_keys(MerchantCard::CATEGORIES))],

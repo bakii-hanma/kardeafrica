@@ -44,6 +44,10 @@ return [
             'driver'   => 'session',
             'provider' => 'resellers',
         ],
+        'card_owner' => [
+            'driver'   => 'session',
+            'provider' => 'card_owners',
+        ],
     ],
 
     /*
@@ -71,6 +75,10 @@ return [
         'resellers' => [
             'driver' => 'eloquent',
             'model'  => App\Models\Reseller::class,
+        ],
+        'card_owners' => [
+            'driver' => 'eloquent',
+            'model'  => App\Models\CardOwner::class,
         ],
 
         // 'users' => [

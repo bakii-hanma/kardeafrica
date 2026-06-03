@@ -4,15 +4,17 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * MerchantCard
  * ===
  * Template de carte-cadeau locale (Carte Gabon), créé par l'admin dans
- * /admin/merchant-cards. Catalogue global Kardafrica — aucune carte n'appartient
- * à un marchand. Chaque template donne lieu à 0..N MerchantCardPurchase
- * (= achats clients, chacun avec son propre code/PIN généré à la livraison).
+ * /admin/merchant-cards. Chaque carte appartient à un CardOwner (commerçant)
+ * qui peut la valider au comptoir via son dashboard /proprietaire/*. Chaque
+ * template donne lieu à 0..N MerchantCardPurchase (= achats clients, chacun
+ * avec son propre code/PIN généré à la livraison).
  */
 class MerchantCard extends Model
 {
@@ -34,6 +36,7 @@ class MerchantCard extends Model
     ];
 
     protected $fillable = [
+        'card_owner_id',
         'name', 'description', 'category', 'visual_url',
         'denominations', 'allow_custom_amount', 'min_amount', 'max_amount', 'currency',
         'validity_months', 'terms_conditions',
@@ -54,6 +57,11 @@ class MerchantCard extends Model
     // ============================================================
     // Relations
     // ============================================================
+
+    public function owner(): BelongsTo
+    {
+        return $this->belongsTo(CardOwner::class, 'card_owner_id');
+    }
 
     public function purchases(): HasMany
     {

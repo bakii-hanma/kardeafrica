@@ -3,7 +3,7 @@
     Variables :
       - $card       (MerchantCard, vide pour create)
       - $categories (assoc array slug => label)
-      - $merchants  (collection [{id, label, kyc_ok}])
+      - $owners     (collection CardOwner — actifs)
       - $isEdit     (bool)
 --}}
 <style>
@@ -245,10 +245,109 @@
         @csrf
         @if($isEdit) @method('PUT') @endif
 
+        {{-- Propriétaire --}}
+        <div class="amf-section" x-data="ownerQuickCreate()">
+            <div class="amf-section-head">
+                <div class="amf-step">1</div>
+                <div>
+                    <h2 class="amf-section-title">Propriétaire de la carte</h2>
+                    <p class="amf-section-hint">Le commerçant qui pourra scanner / valider les cartes au comptoir depuis son dashboard.</p>
+                </div>
+            </div>
+
+            <div class="amf-field" x-show="!quickOpen">
+                <label class="amf-label" for="card_owner_id">Propriétaire <span class="amf-label-req">*</span></label>
+                <div style="display:flex;gap:8px;align-items:stretch;">
+                    <select id="card_owner_id" name="card_owner_id" class="amf-select" required style="flex:1;">
+                        <option value="">— Choisir un propriétaire —</option>
+                        @foreach($owners as $o)
+                            <option value="{{ $o->id }}" {{ (int) old('card_owner_id', $card->card_owner_id) === (int) $o->id ? 'selected' : '' }}>
+                                {{ $o->business_name }}@if($o->city) — {{ $o->city }}@endif
+                            </option>
+                        @endforeach
+                    </select>
+                    <button type="button" @click="quickOpen = true"
+                            style="padding:0 14px;background:#F8FAFC;color:#0F172A;border:1.5px solid #E2E8F0;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;">
+                        + Nouveau
+                    </button>
+                </div>
+                @error('card_owner_id') <p class="amf-error">{{ $message }}</p> @enderror
+                <p class="amf-hint">Pas encore de propriétaire ? Clique « + Nouveau » ou
+                    <a href="{{ route('admin.card-owners.create') }}" target="_blank" style="color:#44A08D;font-weight:700;">crée-le ici</a>.</p>
+            </div>
+
+            {{-- Quick create inline --}}
+            <div x-show="quickOpen" x-cloak
+                 style="background:#F0FDFA;border:1.5px solid #5EEAD4;border-radius:12px;padding:16px;">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+                    <strong style="font-size:13px;color:#0F4F44;">Créer un propriétaire rapidement</strong>
+                    <button type="button" @click="quickOpen = false; quickError = ''"
+                            style="background:transparent;border:0;color:#64748B;font-size:18px;cursor:pointer;">×</button>
+                </div>
+                <div class="amf-row">
+                    <div class="amf-field">
+                        <label class="amf-label">Raison sociale <span class="amf-label-req">*</span></label>
+                        <input type="text" x-model="qBusinessName" class="amf-input" placeholder="Ex : Restaurant Le Politiqua">
+                    </div>
+                    <div class="amf-field">
+                        <label class="amf-label">Nom du contact <span class="amf-label-req">*</span></label>
+                        <input type="text" x-model="qContactName" class="amf-input" placeholder="Jean Dupont">
+                    </div>
+                </div>
+                <div class="amf-row">
+                    <div class="amf-field">
+                        <label class="amf-label">Email <span class="amf-label-req">*</span></label>
+                        <input type="email" x-model="qEmail" class="amf-input" placeholder="contact@…">
+                    </div>
+                    <div class="amf-field">
+                        <label class="amf-label">Téléphone <span class="amf-label-req">*</span></label>
+                        <input type="text" x-model="qPhone" class="amf-input" placeholder="+241 …">
+                    </div>
+                </div>
+                <div class="amf-row">
+                    <div class="amf-field">
+                        <label class="amf-label">Ville</label>
+                        <input type="text" x-model="qCity" class="amf-input" placeholder="Libreville">
+                    </div>
+                    <div class="amf-field">
+                        <label class="amf-label">Type d'activité</label>
+                        <select x-model="qBusinessType" class="amf-select">
+                            <option value="">— Aucun —</option>
+                            @foreach($categories as $slug => $label)
+                                <option value="{{ $slug }}">{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                </div>
+                <template x-if="quickError">
+                    <p style="color:#DC2626;font-size:12px;font-weight:600;margin:0 0 8px;" x-text="quickError"></p>
+                </template>
+                <template x-if="quickSuccess">
+                    <div style="background:white;border:1px solid #BBF7D0;border-radius:10px;padding:10px 12px;margin-bottom:10px;font-size:12px;">
+                        <strong style="color:#065F46;">✓ Propriétaire créé.</strong>
+                        Mot de passe provisoire : <code style="background:#F0FDFA;padding:2px 6px;border-radius:5px;font-weight:700;" x-text="quickSuccess.temp_password"></code>
+                        <span style="color:#64748B;">— à transmettre au commerçant.</span>
+                    </div>
+                </template>
+                <div style="display:flex;gap:8px;justify-content:flex-end;">
+                    <button type="button" @click="quickOpen = false; quickError = ''"
+                            style="padding:8px 14px;background:#F1F5F9;color:#334155;border:0;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer;">
+                        Annuler
+                    </button>
+                    <button type="button" @click="submitQuick()" :disabled="quickSubmitting"
+                            style="padding:8px 14px;background:linear-gradient(135deg,#44A08D,#4ECDC4);color:white;border:0;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer;"
+                            :style="quickSubmitting && 'opacity:.5;cursor:wait;'">
+                        <span x-show="!quickSubmitting">Créer & sélectionner</span>
+                        <span x-show="quickSubmitting" x-cloak>Création…</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
         {{-- Identité --}}
         <div class="amf-section">
             <div class="amf-section-head">
-                <div class="amf-step">1</div>
+                <div class="amf-step">2</div>
                 <div>
                     <h2 class="amf-section-title">Identité de la carte</h2>
                     <p class="amf-section-hint">Le nom et la catégorie qui s'afficheront aux clients sur Kardafrica.</p>
@@ -284,7 +383,7 @@
         {{-- Visuel --}}
         <div class="amf-section">
             <div class="amf-section-head">
-                <div class="amf-step">2</div>
+                <div class="amf-step">3</div>
                 <div>
                     <h2 class="amf-section-title">Visuel</h2>
                     <p class="amf-section-hint">L'image affichée sur le catalogue et au moment de l'envoi. JPG/PNG/WebP, 3 Mo max.</p>
@@ -312,7 +411,7 @@
         {{-- Montants --}}
         <div class="amf-section">
             <div class="amf-section-head">
-                <div class="amf-step">3</div>
+                <div class="amf-step">4</div>
                 <div>
                     <h2 class="amf-section-title">Montants</h2>
                     <p class="amf-section-hint">Dénominations affichées au client (FCFA).</p>
@@ -378,7 +477,7 @@
         {{-- Validité + activation --}}
         <div class="amf-section">
             <div class="amf-section-head">
-                <div class="amf-step">4</div>
+                <div class="amf-step">5</div>
                 <div>
                     <h2 class="amf-section-title">Validité & activation</h2>
                     <p class="amf-section-hint">Durée + statut de publication.</p>
@@ -450,6 +549,69 @@
                 const reader = new FileReader();
                 reader.onload = ev => this.visualPreview = ev.target.result;
                 reader.readAsDataURL(f);
+            },
+        };
+    }
+
+    function ownerQuickCreate() {
+        return {
+            quickOpen: false,
+            quickSubmitting: false,
+            quickError: '',
+            quickSuccess: null,
+            qBusinessName: '',
+            qContactName: '',
+            qEmail: '',
+            qPhone: '',
+            qCity: '',
+            qBusinessType: '',
+
+            async submitQuick() {
+                this.quickError = '';
+                if (!this.qBusinessName || !this.qContactName || !this.qEmail || !this.qPhone) {
+                    this.quickError = 'Raison sociale, contact, email et téléphone sont obligatoires.';
+                    return;
+                }
+                this.quickSubmitting = true;
+                try {
+                    const res = await fetch('{{ route('admin.card-owners.quick') }}', {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                            'Accept': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            business_name: this.qBusinessName,
+                            contact_name:  this.qContactName,
+                            email:         this.qEmail,
+                            phone:         this.qPhone,
+                            city:          this.qCity || null,
+                            business_type: this.qBusinessType || null,
+                        }),
+                    });
+                    if (!res.ok) {
+                        const err = await res.json().catch(() => ({}));
+                        this.quickError = err.message || (err.errors ? Object.values(err.errors)[0][0] : 'Erreur de création.');
+                        return;
+                    }
+                    const data = await res.json();
+                    this.quickSuccess = { temp_password: data.temp_password };
+                    // Ajoute l'option au select et la sélectionne
+                    const select = document.getElementById('card_owner_id');
+                    const opt = document.createElement('option');
+                    opt.value = data.owner.id;
+                    opt.textContent = data.owner.business_name + (this.qCity ? ' — ' + this.qCity : '');
+                    opt.selected = true;
+                    select.appendChild(opt);
+                    // Ferme le panneau après 4s
+                    setTimeout(() => { this.quickOpen = false; }, 4000);
+                } catch (e) {
+                    this.quickError = 'Erreur réseau : ' + e.message;
+                } finally {
+                    this.quickSubmitting = false;
+                }
             },
         };
     }

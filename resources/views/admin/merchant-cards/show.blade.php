@@ -288,13 +288,35 @@
                 </div>
             @endif
 
-            {{-- ============ CARTE CATALOGUE (catalogue admin global) ============ --}}
-            <div style="background:white;border:1px solid #E2E8F0;border-radius:14px;padding:18px;text-align:center;font-size:13px;color:#64748B;">
-                <div style="font-family:'Space Grotesk','Inter',sans-serif;font-weight:800;color:#0F172A;font-size:14px;margin-bottom:4px;">
-                    Carte catalogue
+            {{-- ============ PROPRIÉTAIRE ============ --}}
+            @if($card->owner)
+                <div style="background:white;border:1px solid #E2E8F0;border-radius:14px;padding:18px;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+                        <h3 style="margin:0;font-family:'Space Grotesk','Inter',sans-serif;font-size:13px;font-weight:800;color:#0F172A;text-transform:uppercase;letter-spacing:0.06em;">Propriétaire</h3>
+                        <a href="{{ route('admin.card-owners.show', $card->owner) }}"
+                           style="font-size:11px;font-weight:700;color:#44A08D;text-decoration:none;">Voir fiche →</a>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:12px;">
+                        @if($card->owner->logo_url)
+                            <img src="{{ asset($card->owner->logo_url) }}" style="width:44px;height:44px;border-radius:50%;object-fit:cover;border:1px solid #E2E8F0;" alt="">
+                        @else
+                            <div style="width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#44A08D,#4ECDC4);color:white;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;">
+                                {{ strtoupper(substr($card->owner->business_name, 0, 1)) }}
+                            </div>
+                        @endif
+                        <div>
+                            <div style="font-weight:700;color:#0F172A;font-size:14px;">{{ $card->owner->business_name }}</div>
+                            <div style="font-size:12px;color:#64748B;">{{ $card->owner->contact_name }}@if($card->owner->city) · {{ $card->owner->city }}@endif</div>
+                            <div style="font-size:11px;color:#94A3B8;margin-top:2px;">{{ $card->owner->email }} · {{ $card->owner->phone }}</div>
+                        </div>
+                    </div>
                 </div>
-                Cette carte appartient au catalogue Kardafrica. Toutes les boutiques peuvent la vendre.
-            </div>
+            @else
+                <div style="background:#FEF3C7;border:1px solid #FCD34D;border-radius:14px;padding:14px 18px;font-size:12px;color:#92400E;">
+                    <strong style="display:block;margin-bottom:2px;">⚠️ Aucun propriétaire</strong>
+                    Carte legacy sans propriétaire. <a href="{{ route('admin.merchant-cards.edit', $card) }}" style="color:#92400E;font-weight:700;">Éditer</a> pour en assigner un.
+                </div>
+            @endif
 
             {{-- ============ Timeline (sticky note bottom) ============ --}}
             <div class="mcs-timeline">

@@ -281,6 +281,16 @@ Route::prefix('admin')->middleware(['auth', 'is_admin'])->group(function () {
     Route::post('/resellers/{reseller}/orders/{order}/refund',         [AdminVendorOrderController::class, 'refund'])->name('admin.resellers.orders.refund');
     Route::post('/resellers/{reseller}/orders/{order}/inject-cards',   [AdminVendorOrderController::class, 'injectCards'])->name('admin.resellers.orders.inject-cards');
 
+    // Propriétaires de cartes locales (commerçants — Carte Gabon)
+    Route::get('/card-owners',                         [\App\Http\Controllers\Admin\CardOwnerController::class, 'index'])->name('admin.card-owners.index');
+    Route::get('/card-owners/nouveau',                 [\App\Http\Controllers\Admin\CardOwnerController::class, 'create'])->name('admin.card-owners.create');
+    Route::post('/card-owners',                        [\App\Http\Controllers\Admin\CardOwnerController::class, 'store'])->name('admin.card-owners.store');
+    Route::post('/card-owners/quick',                  [\App\Http\Controllers\Admin\CardOwnerController::class, 'quickStore'])->name('admin.card-owners.quick');
+    Route::get('/card-owners/{cardOwner}',             [\App\Http\Controllers\Admin\CardOwnerController::class, 'show'])->name('admin.card-owners.show');
+    Route::get('/card-owners/{cardOwner}/edit',        [\App\Http\Controllers\Admin\CardOwnerController::class, 'edit'])->name('admin.card-owners.edit');
+    Route::put('/card-owners/{cardOwner}',             [\App\Http\Controllers\Admin\CardOwnerController::class, 'update'])->name('admin.card-owners.update');
+    Route::delete('/card-owners/{cardOwner}',          [\App\Http\Controllers\Admin\CardOwnerController::class, 'destroy'])->name('admin.card-owners.destroy');
+
     // Cartes-cadeau Carte Gabon — créées par l'admin, vendues par les boutiques
     Route::get('/merchant-cards',                            [AdminMerchantCardController::class, 'index'])->name('admin.merchant-cards.index');
     Route::get('/merchant-cards/nouvelle',                   [AdminMerchantCardController::class, 'create'])->name('admin.merchant-cards.create');
