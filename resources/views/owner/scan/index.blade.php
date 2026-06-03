@@ -54,15 +54,70 @@
             font-size: 13px; color: #64748B;
         }
 
-        /* ===== Inputs OTP ===== */
+        /* ===== Labels & generic grids ===== */
         .scan-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 12px; }
         @media (max-width: 540px) { .scan-grid { grid-template-columns: 1fr; } }
         .scan-field-label {
             display: block;
             font-size: 11px; font-weight: 700; color: #334155;
             text-transform: uppercase; letter-spacing: .06em;
-            margin-bottom: 6px;
+            margin-bottom: 10px;
+            text-align: center;
         }
+
+        /* ===== OTP inputs (soft & modern) ===== */
+        .otp-section { margin-bottom: 22px; }
+        .otp-section:last-of-type { margin-bottom: 6px; }
+        .otp-row {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: nowrap;
+        }
+        .otp-box {
+            width: 52px; height: 60px;
+            border: 1.5px solid #E2E8F0; border-radius: 14px;
+            background: #F8FAFC;
+            color: #0F172A;
+            font-family: ui-monospace, 'JetBrains Mono', 'SF Mono', monospace;
+            font-size: 24px; font-weight: 800;
+            text-align: center;
+            outline: none;
+            padding: 0;
+            transition: all .18s ease;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.4);
+            -moz-appearance: textfield;
+        }
+        .otp-box::-webkit-outer-spin-button,
+        .otp-box::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        .otp-box.is-filled {
+            background: white;
+            border-color: #94A3B8;
+        }
+        .otp-box:focus {
+            border-color: #44A08D;
+            background: white;
+            box-shadow: 0 0 0 4px rgba(68,160,141,.16), inset 0 1px 0 rgba(255,255,255,.4);
+            transform: translateY(-2px);
+        }
+        .otp-sep {
+            display: inline-flex;
+            width: 8px; align-items: center; justify-content: center;
+            color: #CBD5E1; font-weight: 700; font-size: 18px;
+            user-select: none;
+        }
+        @media (max-width: 540px) {
+            .otp-box { width: 38px; height: 50px; font-size: 19px; border-radius: 11px; }
+            .otp-row { gap: 6px; }
+            .otp-sep { width: 4px; font-size: 14px; }
+        }
+        @media (max-width: 360px) {
+            .otp-box { width: 32px; height: 44px; font-size: 16px; border-radius: 10px; }
+            .otp-row { gap: 4px; }
+        }
+
+        /* ===== Plain inputs (montant, notes) ===== */
         .scan-input {
             width: 100%;
             padding: 14px 16px;
@@ -305,25 +360,48 @@
                 <h3 class="scan-card-title">Saisis le code + le PIN</h3>
                 <p class="scan-card-sub">Le code à 8 chiffres et le PIN à 4 chiffres figurent sur la carte du client.</p>
 
-                <div class="scan-grid">
-                    <div>
-                        <label class="scan-field-label">Code (8 chiffres)</label>
-                        <input type="text" x-model="form.code" maxlength="8" inputmode="numeric"
-                               @input="form.code = form.code.replace(/\D/g,'').slice(0,8)"
-                               placeholder="• • • • • • • •"
-                               class="scan-input">
+                <div class="otp-section">
+                    <label class="scan-field-label">Code de la carte</label>
+                    <div class="otp-row">
+                        @for ($i = 0; $i < 4; $i++)
+                            <input type="tel" inputmode="numeric" maxlength="1" pattern="[0-9]*"
+                                   :value="form.code[{{ $i }}] || ''"
+                                   :class="{ 'is-filled': form.code[{{ $i }}] }"
+                                   @input="otpInput($event, 'code', {{ $i }}, 8)"
+                                   @keydown="otpKey($event, {{ $i }})"
+                                   @paste="otpPaste($event, 'code', 8)"
+                                   class="otp-box">
+                        @endfor
+                        <span class="otp-sep">·</span>
+                        @for ($i = 4; $i < 8; $i++)
+                            <input type="tel" inputmode="numeric" maxlength="1" pattern="[0-9]*"
+                                   :value="form.code[{{ $i }}] || ''"
+                                   :class="{ 'is-filled': form.code[{{ $i }}] }"
+                                   @input="otpInput($event, 'code', {{ $i }}, 8)"
+                                   @keydown="otpKey($event, {{ $i }})"
+                                   @paste="otpPaste($event, 'code', 8)"
+                                   class="otp-box">
+                        @endfor
                     </div>
-                    <div>
-                        <label class="scan-field-label">PIN (4 chiffres)</label>
-                        <input type="text" x-model="form.pin" maxlength="4" inputmode="numeric"
-                               @input="form.pin = form.pin.replace(/\D/g,'').slice(0,4)"
-                               placeholder="• • • •"
-                               class="scan-input">
+                </div>
+
+                <div class="otp-section">
+                    <label class="scan-field-label">PIN à 4 chiffres</label>
+                    <div class="otp-row">
+                        @for ($i = 0; $i < 4; $i++)
+                            <input type="tel" inputmode="numeric" maxlength="1" pattern="[0-9]*"
+                                   :value="form.pin[{{ $i }}] || ''"
+                                   :class="{ 'is-filled': form.pin[{{ $i }}] }"
+                                   @input="otpInput($event, 'pin', {{ $i }}, 4)"
+                                   @keydown="otpKey($event, {{ $i }})"
+                                   @paste="otpPaste($event, 'pin', 4)"
+                                   class="otp-box">
+                        @endfor
                     </div>
                 </div>
 
                 <button type="button" class="scan-btn scan-btn--primary scan-btn-mt"
-                        @click="lookupManual()" :disabled="loading">
+                        @click="lookupManual()" :disabled="loading || !isComplete('code', 8) || !isComplete('pin', 4)">
                     <span x-show="!loading">Vérifier la carte</span>
                     <span x-show="loading" x-cloak>Recherche…</span>
                     <svg x-show="!loading" width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
@@ -405,19 +483,25 @@
                     </template>
                 </div>
 
-                <div class="scan-grid">
-                    <div>
-                        <label class="scan-field-label">Montant à débiter (FCFA)</label>
-                        <input type="number" x-model.number="form.amount"
-                               :max="purchase.remaining_balance" min="1" step="500"
-                               class="scan-amount-input">
-                    </div>
-                    <div>
-                        <label class="scan-field-label">PIN client</label>
-                        <input type="text" x-model="form.confirmPin" maxlength="4" inputmode="numeric"
-                               @input="form.confirmPin = form.confirmPin.replace(/\D/g,'').slice(0,4)"
-                               placeholder="• • • •"
-                               class="scan-input">
+                <div>
+                    <label class="scan-field-label" style="text-align:left;">Montant à débiter (FCFA)</label>
+                    <input type="number" x-model.number="form.amount"
+                           :max="purchase.remaining_balance" min="1" step="500"
+                           class="scan-amount-input">
+                </div>
+
+                <div class="otp-section" style="margin-top:16px;">
+                    <label class="scan-field-label">PIN du client (4 chiffres)</label>
+                    <div class="otp-row">
+                        @for ($i = 0; $i < 4; $i++)
+                            <input type="tel" inputmode="numeric" maxlength="1" pattern="[0-9]*"
+                                   :value="form.confirmPin[{{ $i }}] || ''"
+                                   :class="{ 'is-filled': form.confirmPin[{{ $i }}] }"
+                                   @input="otpInput($event, 'confirmPin', {{ $i }}, 4)"
+                                   @keydown="otpKey($event, {{ $i }})"
+                                   @paste="otpPaste($event, 'confirmPin', 4)"
+                                   class="otp-box">
+                        @endfor
                     </div>
                 </div>
 
@@ -440,7 +524,7 @@
                         Annuler
                     </button>
                     <button type="button" class="scan-btn scan-btn--success"
-                            @click="redeem()" :disabled="submitting || !form.amount || !form.confirmPin">
+                            @click="redeem()" :disabled="submitting || !form.amount || !isComplete('confirmPin', 4)">
                         <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
                         <span x-show="!submitting">Confirmer la validation</span>
                         <span x-show="submitting" x-cloak>Validation…</span>
@@ -479,13 +563,84 @@ function ownerScan() {
         success: null,
         lookupError: '',
         redeemError: '',
-        form: { code: '', pin: '', amount: 0, confirmPin: '', notes: '' },
+        form: {
+            code:        ['','','','','','','',''],
+            pin:         ['','','',''],
+            confirmPin:  ['','','',''],
+            amount:      0,
+            notes:       '',
+        },
         qrActive: false,
         html5Qr: null,
         scanMethod: 'code',
 
         init() {
             window.addEventListener('beforeunload', () => this.stopQr());
+        },
+
+        /* ===== OTP handlers (modèle array : chaque slot = '' ou un chiffre) ===== */
+        joined(key) { return this.form[key].join(''); },
+        isComplete(key, len) {
+            return this.form[key].length === len
+                && this.form[key].every(d => d !== '');
+        },
+
+        otpInput(e, key, idx, len) {
+            const raw = (e.target.value || '').replace(/\D/g, '');
+
+            // Multi-chiffres (autofill SMS / paste partiel) : étale à partir de idx
+            if (raw.length > 1) {
+                for (let k = 0; k < raw.length && idx + k < len; k++) {
+                    this.form[key][idx + k] = raw[k];
+                }
+                const target = Math.min(idx + raw.length, len - 1);
+                this.$nextTick(() => {
+                    e.target.parentElement.querySelectorAll('input.otp-box')[target]?.focus();
+                });
+                return;
+            }
+
+            // Single digit (ou vide après backspace)
+            this.form[key][idx] = raw; // '' ou un chiffre
+
+            if (raw) {
+                this.$nextTick(() => {
+                    e.target.parentElement.querySelectorAll('input.otp-box')[idx + 1]?.focus();
+                });
+            }
+        },
+
+        otpKey(e, idx) {
+            if (e.key === 'Backspace') {
+                if (!e.target.value) {
+                    const prev = e.target.parentElement.querySelectorAll('input.otp-box')[idx - 1];
+                    if (prev) { prev.focus(); e.preventDefault(); }
+                }
+            } else if (e.key === 'ArrowLeft') {
+                const prev = e.target.parentElement.querySelectorAll('input.otp-box')[idx - 1];
+                if (prev) { prev.focus(); e.preventDefault(); }
+            } else if (e.key === 'ArrowRight') {
+                const next = e.target.parentElement.querySelectorAll('input.otp-box')[idx + 1];
+                if (next) { next.focus(); e.preventDefault(); }
+            }
+        },
+
+        otpPaste(e, key, len) {
+            e.preventDefault();
+            const text = (e.clipboardData || window.clipboardData).getData('text');
+            const clean = text.replace(/\D/g, '').slice(0, len);
+            if (!clean) return;
+            for (let i = 0; i < len; i++) {
+                this.form[key][i] = clean[i] || '';
+            }
+            const target = Math.min(clean.length, len - 1);
+            this.$nextTick(() => {
+                e.target.parentElement.querySelectorAll('input.otp-box')[target]?.focus();
+            });
+        },
+
+        resetSlots(key, len) {
+            this.form[key] = Array(len).fill('');
         },
 
         setMode(m) {
@@ -506,7 +661,7 @@ function ownerScan() {
 
         async lookupManual() {
             this.lookupError = '';
-            if (this.form.code.length !== 8 || this.form.pin.length !== 4) {
+            if (!this.isComplete('code', 8) || !this.isComplete('pin', 4)) {
                 this.lookupError = 'Code (8 chiffres) et PIN (4 chiffres) requis.';
                 return;
             }
@@ -520,7 +675,7 @@ function ownerScan() {
                         'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
                         'Accept': 'application/json',
                     },
-                    body: JSON.stringify({ mode: 'manual', code: this.form.code, pin: this.form.pin }),
+                    body: JSON.stringify({ mode: 'manual', code: this.joined('code'), pin: this.joined('pin') }),
                 });
                 const data = await res.json();
                 if (!res.ok || !data.ok) {
@@ -530,7 +685,8 @@ function ownerScan() {
                 this.purchase = data.purchase;
                 this.scanMethod = 'code';
                 this.form.amount = data.purchase.remaining_balance;
-                this.form.confirmPin = this.form.pin;
+                // Pré-remplit confirmPin avec le PIN saisi
+                this.form.confirmPin = [...this.form.pin];
             } catch (e) {
                 this.lookupError = 'Erreur réseau : ' + e.message;
             } finally {
@@ -612,7 +768,7 @@ function ownerScan() {
                     body: JSON.stringify({
                         purchase_id: this.purchase.id,
                         amount: this.form.amount,
-                        pin: this.form.confirmPin,
+                        pin: this.joined('confirmPin'),
                         scan_method: this.scanMethod,
                         notes: this.form.notes || null,
                     }),
@@ -633,7 +789,13 @@ function ownerScan() {
 
         reset() {
             this.purchase = null;
-            this.form = { code: '', pin: '', amount: 0, confirmPin: '', notes: '' };
+            this.form = {
+                code:       ['','','','','','','',''],
+                pin:        ['','','',''],
+                confirmPin: ['','','',''],
+                amount:     0,
+                notes:      '',
+            };
             this.redeemError = '';
         },
 
