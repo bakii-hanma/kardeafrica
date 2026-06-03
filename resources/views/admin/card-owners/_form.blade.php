@@ -175,22 +175,21 @@
                     <p class="acf-section-hint">L'email sert d'identifiant de connexion sur /proprietaire.</p>
                 </div>
             </div>
-            <div class="acf-row">
-                <div class="acf-field">
-                    <label class="acf-label">Email <span class="acf-label-req">*</span></label>
-                    <input type="email" name="email" class="acf-input" required maxlength="190"
-                           value="{{ old('email', $owner->email) }}" placeholder="contact@…">
-                    @error('email') <p class="acf-error">{{ $message }}</p> @enderror
-                </div>
-                <div class="acf-field">
-                    <label class="acf-label">Mot de passe</label>
-                    <input type="text" name="password" class="acf-input" minlength="6" maxlength="120"
-                           placeholder="{{ $isEdit ? 'Laisse vide pour conserver' : 'Auto-généré si vide' }}">
-                    @error('password') <p class="acf-error">{{ $message }}</p> @enderror
-                    <p class="acf-hint">{{ $isEdit
-                        ? 'Laisse vide pour conserver le mot de passe actuel.'
-                        : 'Si vide, un mot de passe à 8 chiffres sera généré et affiché après la création.' }}</p>
-                </div>
+            <div class="acf-field">
+                <label class="acf-label">Email <span class="acf-label-req">*</span></label>
+                <input type="email" name="email" class="acf-input" required maxlength="190"
+                       value="{{ old('email', $owner->email) }}" placeholder="contact@…">
+                @error('email') <p class="acf-error">{{ $message }}</p> @enderror
+                @if(!$isEdit)
+                    <p class="acf-hint">
+                        🔑 Un mot de passe à 8 chiffres sera <strong>généré automatiquement</strong>
+                        et affiché après la création — pour le transmettre au commerçant.
+                    </p>
+                @else
+                    <p class="acf-hint">
+                        🔑 Le mot de passe actuel est conservé. Pour le réinitialiser, contacte l'équipe technique.
+                    </p>
+                @endif
             </div>
             <div class="acf-row">
                 <div class="acf-field">

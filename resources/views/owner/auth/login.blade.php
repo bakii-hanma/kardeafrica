@@ -7,19 +7,35 @@
     <link rel="icon" type="image/png" href="{{ asset('assets/logo/FAVCON-KARDAFRICA-.png') }}">
     @vite(['resources/css/app.css'])
     <style>
-        *,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
         body {
-            min-height:100vh; min-height:100dvh;
-            font-family:'Inter',system-ui,-apple-system,sans-serif;
-            color:#fff;
-            display:flex; position:relative; overflow:hidden;
-            background:
-                radial-gradient(circle at 20% 0%, rgba(78,205,196,0.20) 0%, transparent 50%),
-                radial-gradient(circle at 80% 100%, rgba(68,160,141,0.18) 0%, transparent 50%),
-                linear-gradient(135deg,#060A14 0%,#0F172A 50%,#1E293B 100%);
+            min-height: 100vh; min-height: 100dvh;
+            font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+            color: #ffffff;
+            display: flex;
+            position: relative;
+            overflow: hidden;
         }
-        body::before {
-            content:''; position:absolute; inset:0; pointer-events:none;
+
+        /* ============== Left visual ============== */
+        .ka-side {
+            display: none;
+            flex: 1; min-width: 0;
+            position: relative;
+            background:
+                radial-gradient(circle at 20% 0%, rgba(78,205,196,0.25) 0%, transparent 45%),
+                radial-gradient(circle at 80% 100%, rgba(68,160,141,0.20) 0%, transparent 45%),
+                radial-gradient(circle at 50% 60%, rgba(94,234,212,0.10) 0%, transparent 60%),
+                linear-gradient(135deg, #060A14 0%, #0F172A 50%, #1E293B 100%);
+            padding: 56px;
+            flex-direction: column; justify-content: space-between;
+            overflow: hidden;
+        }
+        @media (min-width: 1024px) { .ka-side { display: flex; } }
+
+        .ka-side::before {
+            content: ''; position: absolute; inset: 0; pointer-events: none;
             background-image:
                 linear-gradient(to right, rgba(255,255,255,0.04) 1px, transparent 1px),
                 linear-gradient(to bottom, rgba(255,255,255,0.04) 1px, transparent 1px);
@@ -28,107 +44,498 @@
                     mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 30%, transparent 100%);
         }
 
-        .ka-form {
-            position:relative; z-index:1;
-            margin:auto;
-            width:100%; max-width:440px;
-            padding:32px;
+        .ka-logo {
+            position: relative;
+            display: flex; align-items: center; gap: 12px;
         }
-        .ka-card {
+        .ka-logo img { width: 44px; height: 44px; }
+        .ka-logo-text {
+            font-family: 'Space Grotesk', 'Inter', sans-serif;
+            font-size: 20px; font-weight: 700; letter-spacing: -0.01em;
+        }
+        .ka-logo-tag {
+            font-size: 9px; font-weight: 700; letter-spacing: 0.18em;
+            text-transform: uppercase; color: #5EEAD4; margin-top: 1px;
+        }
+
+        /* Stage : zone propre dédiée aux cartes */
+        .ka-cards-stage {
+            position: relative;
+            width: 100%;
+            height: 280px;
+            display: flex; align-items: center; justify-content: center;
+            margin: 24px 0;
+            perspective: 1200px;
+        }
+
+        @keyframes ka-card-floatA { 0%,100% { transform: rotate(-10deg) translate(-120px, 0); } 50% { transform: rotate(-10deg) translate(-120px, -10px); } }
+        @keyframes ka-card-floatB { 0%,100% { transform: rotate(0deg)   translate(0, 0); }     50% { transform: rotate(0deg)   translate(0, -16px); } }
+        @keyframes ka-card-floatC { 0%,100% { transform: rotate(10deg)  translate(120px, 20px); } 50% { transform: rotate(10deg)  translate(120px, 8px); } }
+
+        .ka-deco-card {
+            position: absolute;
+            width: 220px; height: 140px;
+            border-radius: 18px;
+            padding: 18px;
+            color: white;
+            box-shadow: 0 30px 50px -15px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.18);
+            display: flex; flex-direction: column; justify-content: space-between;
+            cursor: pointer;
+            transform-style: preserve-3d;
+            will-change: transform, box-shadow;
+            transition: box-shadow .35s ease, filter .35s ease;
+            overflow: hidden;
+        }
+        .ka-deco-card::before {
+            content: '';
+            position: absolute; top: -30px; right: -30px;
+            width: 100px; height: 100px; border-radius: 50%;
+            background: radial-gradient(circle, rgba(255,255,255,0.18) 0%, transparent 70%);
+            pointer-events: none;
+        }
+        .ka-deco-card::after {
+            content: '';
+            position: absolute; inset: 0;
+            background: linear-gradient(105deg, transparent 30%, rgba(255,255,255,0.18) 50%, transparent 70%);
+            transform: translateX(-100%);
+            transition: transform .8s cubic-bezier(.22, 1, .36, 1);
+            pointer-events: none;
+        }
+        .ka-deco-card:hover::after { transform: translateX(100%); }
+        .ka-deco-card:hover {
+            box-shadow: 0 40px 70px -15px rgba(0,0,0,0.65), inset 0 1px 0 rgba(255,255,255,0.25);
+            filter: brightness(1.08);
+            z-index: 10 !important;
+        }
+        /* Couleurs propriétaire — boutique / scan / validations */
+        .ka-deco-card.c1 {
+            background: linear-gradient(135deg, #44A08D 0%, #0F4F44 100%);
+            animation: ka-card-floatA 6.5s ease-in-out infinite;
+            z-index: 1;
+        }
+        .ka-deco-card.c2 {
+            background: linear-gradient(135deg, #4ECDC4 0%, #2A9D95 100%);
+            animation: ka-card-floatB 7s ease-in-out infinite .2s;
+            z-index: 3;
+        }
+        .ka-deco-card.c3 {
+            background: linear-gradient(135deg, #F59E0B 0%, #B45309 100%);
+            animation: ka-card-floatC 7.5s ease-in-out infinite .4s;
+            z-index: 2;
+        }
+
+        .ka-deco-card .label {
+            font-size: 9px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; opacity: 0.85;
+        }
+        .ka-deco-card .name {
+            font-family: 'Space Grotesk', 'Inter', sans-serif;
+            font-size: 18px; font-weight: 700; margin-top: 2px;
+        }
+        .ka-deco-card .price {
+            font-family: 'Space Grotesk', 'Inter', sans-serif;
+            font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums;
+        }
+        .ka-deco-card .chip {
+            position: absolute; bottom: 14px; right: 14px;
+            width: 32px; height: 22px; border-radius: 5px;
+            background: linear-gradient(135deg, #FCD34D, #F59E0B);
+            border: 1px solid rgba(255,255,255,0.4);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.5);
+        }
+        /* Scan icon plutôt que chip pour la carte c3 (validation) */
+        .ka-deco-card .scan-ic {
+            position: absolute; bottom: 14px; right: 14px;
+            width: 28px; height: 28px;
+            display: flex; align-items: center; justify-content: center;
+            color: rgba(255,255,255,0.85);
+        }
+
+        .ka-side-info {
+            position: relative;
+            max-width: 420px;
+        }
+        .ka-side-info h2 {
+            font-family: 'Space Grotesk', 'Inter', sans-serif;
+            font-weight: 700;
+            font-size: 30px; line-height: 1.15; letter-spacing: -0.02em;
+            color: white; margin-bottom: 12px;
+        }
+        .ka-side-info h2 .highlight {
+            background: linear-gradient(120deg, #4ECDC4 0%, #44A08D 50%, #5EEAD4 100%);
+            -webkit-background-clip: text; background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .ka-side-info p { color: #94A3B8; font-size: 14px; line-height: 1.6; }
+
+        .ka-side-perks {
+            position: relative;
+            display: flex; gap: 14px; margin-top: 18px; flex-wrap: wrap;
+        }
+        .ka-perk {
+            display: inline-flex; align-items: center; gap: 8px;
+            padding: 7px 12px; border-radius: 9999px;
             background: rgba(255,255,255,0.05);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border: 1px solid rgba(255,255,255,0.10);
-            border-radius: 22px;
-            padding: 36px 32px;
-            box-shadow: 0 30px 80px -25px rgba(0,0,0,0.6);
+            border: 1px solid rgba(255,255,255,0.08);
+            font-size: 12px; color: #CBD5E1; font-weight: 600;
         }
-        .ka-brand { display:flex; align-items:center; gap:10px; margin-bottom:24px; }
-        .ka-brand img { width:38px; height:38px; }
-        .ka-brand-text { font-family:'Space Grotesk','Inter',sans-serif; font-size:17px; font-weight:700; letter-spacing:-0.01em; }
-        .ka-brand-tag { font-size:8px; font-weight:700; letter-spacing:.18em; text-transform:uppercase; color:#5EEAD4; margin-top:1px; }
+        .ka-perk svg { width: 14px; height: 14px; color: #5EEAD4; }
 
-        h1 { font-family:'Space Grotesk','Inter',sans-serif; font-size:24px; font-weight:800; letter-spacing:-0.02em; margin-bottom:6px; }
-        .ka-sub { color:rgba(255,255,255,.62); font-size:13px; margin-bottom:24px; line-height:1.5; }
+        .ka-side-foot {
+            position: relative;
+            display: flex; align-items: center; gap: 8px;
+            font-size: 11px; color: #64748B;
+        }
+        .ka-side-foot .dot {
+            width: 6px; height: 6px; border-radius: 50%;
+            background: #34D399;
+            box-shadow: 0 0 8px rgba(52,211,153,0.6);
+        }
 
-        .ka-field { margin-bottom:14px; }
-        .ka-label { display:block; font-size:11px; font-weight:700; color:rgba(255,255,255,.7); text-transform:uppercase; letter-spacing:.06em; margin-bottom:6px; }
+        /* ============== Right form panel ============== */
+        .ka-form-wrap {
+            flex: 1; min-width: 0;
+            background: #ffffff;
+            display: flex; align-items: center; justify-content: center;
+            padding: 32px 24px;
+        }
+        .ka-form { width: 100%; max-width: 420px; }
+
+        .ka-mobile-logo {
+            display: flex; align-items: center; justify-content: center; gap: 10px;
+            margin-bottom: 36px;
+        }
+        @media (min-width: 1024px) { .ka-mobile-logo { display: none; } }
+        .ka-mobile-logo img { width: 36px; height: 36px; }
+        .ka-mobile-logo-text {
+            font-family: 'Space Grotesk', 'Inter', sans-serif;
+            font-size: 18px; font-weight: 700; color: #0F172A;
+        }
+
+        .ka-badge {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 5px 12px; border-radius: 9999px;
+            background: rgba(68,160,141,0.10); border: 1px solid rgba(68,160,141,0.25);
+            margin-bottom: 16px;
+        }
+        .ka-badge-dot {
+            position: relative; width: 8px; height: 8px; display: flex;
+        }
+        .ka-badge-dot::before {
+            content: ''; position: absolute; inset: 0; border-radius: 50%;
+            background: #44A08D; opacity: 0.6;
+            animation: ka-ping 1.5s cubic-bezier(0,0,0.2,1) infinite;
+        }
+        .ka-badge-dot::after {
+            content: ''; position: relative; width: 8px; height: 8px;
+            border-radius: 50%; background: #44A08D;
+        }
+        @keyframes ka-ping { 75%, 100% { transform: scale(2); opacity: 0; } }
+        .ka-badge-text {
+            font-size: 10px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #44A08D;
+        }
+
+        .ka-form h1 {
+            font-family: 'Space Grotesk', 'Inter', sans-serif;
+            font-weight: 700;
+            font-size: 32px; line-height: 1.1; letter-spacing: -0.02em;
+            color: #0F172A; margin-bottom: 8px;
+        }
+        .ka-form .sub {
+            font-size: 14px; color: #64748B; margin-bottom: 32px;
+        }
+
+        .ka-field { margin-bottom: 16px; }
+        .ka-label {
+            display: block; font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 6px;
+        }
+        .ka-input-wrap { position: relative; }
+        .ka-input-icon {
+            position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+            width: 18px; height: 18px; color: #94A3B8; pointer-events: none;
+        }
         .ka-input {
-            width:100%; padding:12px 14px;
-            background: rgba(255,255,255,0.06);
-            border: 1.5px solid rgba(255,255,255,0.12);
-            border-radius: 11px;
-            color:#fff; font-size:14px; font-family:inherit;
-            outline:none; transition: border-color .15s, background .15s;
+            width: 100%; padding: 12px 16px 12px 44px;
+            background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 12px;
+            font-size: 14px; color: #0F172A; outline: none;
+            transition: all .15s ease;
+            font-family: inherit;
         }
-        .ka-input::placeholder { color: rgba(255,255,255,0.30); }
-        .ka-input:focus { border-color:#5EEAD4; background: rgba(255,255,255,0.08); }
-        .ka-error { background:rgba(220,38,38,.16); border:1px solid rgba(220,38,38,.32); color:#FCA5A5; padding:10px 12px; border-radius:10px; font-size:12px; margin-bottom:14px; font-weight:600; }
+        .ka-input:focus { background: white; border-color: #44A08D; box-shadow: 0 0 0 3px rgba(68,160,141,0.15); }
+        .ka-input.has-error { border-color: #F43F5E; background: #FEF2F2; }
 
-        .ka-row { display:flex; align-items:center; justify-content:space-between; margin: 6px 0 18px; font-size:12px; color:rgba(255,255,255,0.6); }
-        .ka-check { display:inline-flex; align-items:center; gap:7px; cursor:pointer; }
-        .ka-check input { accent-color:#44A08D; }
-
-        .ka-btn {
-            width:100%; padding:14px;
-            background: linear-gradient(135deg,#44A08D,#4ECDC4);
-            color:white; font-size:14px; font-weight:800;
-            border:0; border-radius:12px; cursor:pointer;
-            box-shadow: 0 10px 28px -8px rgba(78,205,196,.45);
-            font-family:inherit;
+        .ka-pw-toggle {
+            position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+            width: 30px; height: 30px; border: 0; border-radius: 8px;
+            background: transparent; color: #94A3B8; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
         }
-        .ka-btn:hover { filter: brightness(1.05); }
+        .ka-pw-toggle:hover { background: #F1F5F9; color: #475569; }
 
-        .ka-hint { margin-top:18px; text-align:center; font-size:12px; color:rgba(255,255,255,.45); }
-        .ka-hint a { color:#5EEAD4; text-decoration:none; font-weight:700; }
+        .ka-row {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 24px;
+        }
+        .ka-remember {
+            display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
+            font-size: 13px; color: #475569;
+        }
+        .ka-remember input { width: 16px; height: 16px; accent-color: #44A08D; }
+        .ka-link { font-size: 13px; color: #44A08D; text-decoration: none; font-weight: 600; }
+        .ka-link:hover { color: #3d9180; text-decoration: underline; }
+
+        .ka-submit {
+            width: 100%; padding: 13px 20px;
+            border: 0; border-radius: 12px;
+            background: linear-gradient(135deg, #44A08D, #4ECDC4);
+            color: white; font-weight: 700; font-size: 14px;
+            cursor: pointer;
+            box-shadow: 0 14px 30px -8px rgba(78,205,196,0.55), inset 0 1px 0 rgba(255,255,255,0.3);
+            transition: transform .15s ease;
+            display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+            font-family: inherit;
+        }
+        .ka-submit:hover { transform: translateY(-1px); }
+        .ka-submit:active { transform: translateY(0); }
+
+        .ka-error {
+            display: flex; align-items: center; gap: 10px;
+            padding: 12px 14px; margin-bottom: 18px;
+            background: #FEF2F2; border: 1px solid #FECACA; border-radius: 12px;
+            color: #991B1B; font-size: 13px;
+        }
+        .ka-error svg { width: 18px; height: 18px; flex-shrink: 0; color: #F43F5E; }
+
+        .ka-foot {
+            margin-top: 28px; padding-top: 24px;
+            border-top: 1px solid #F1F5F9;
+            font-size: 12px; color: #94A3B8;
+            text-align: center; line-height: 1.6;
+        }
+        .ka-foot a { color: #44A08D; text-decoration: none; font-weight: 600; }
+        .ka-foot a:hover { text-decoration: underline; }
     </style>
 </head>
 <body>
-    <div class="ka-form">
-        <div class="ka-card">
-            <div class="ka-brand">
-                <img src="{{ asset('assets/logo/FAVCON-KARDAFRICA-.png') }}" alt="">
+
+    {{-- ============================== LEFT VISUAL ============================== --}}
+    <aside class="ka-side">
+        <div class="ka-logo">
+            <img src="{{ asset('assets/logo/FAVCON-KARDAFRICA-.png') }}" alt="KardAfrica">
+            <div>
+                <div class="ka-logo-tag">Espace propriétaire</div>
+                <span class="ka-logo-text">KardAfrica</span>
+            </div>
+        </div>
+
+        {{-- Stage : zone dédiée aux cartes (parallax mouse + tilt 3D + click flip) --}}
+        <div class="ka-cards-stage" id="kaCardsStage">
+            <div class="ka-deco-card c1" data-tilt>
                 <div>
-                    <div class="ka-brand-text">KardAfrica</div>
-                    <div class="ka-brand-tag">Espace propriétaire</div>
+                    <div class="label">Cartes vendues</div>
+                    <div class="name">Ce mois-ci</div>
+                </div>
+                <div class="price">128 <span style="font-size:10px;opacity:.7;">cartes</span></div>
+                <span class="chip"></span>
+            </div>
+            <div class="ka-deco-card c2" data-tilt>
+                <div>
+                    <div class="label">Solde en circulation</div>
+                    <div class="name">À valider</div>
+                </div>
+                <div class="price">485 000 <span style="font-size:11px;opacity:.7;">FCFA</span></div>
+                <span class="chip"></span>
+            </div>
+            <div class="ka-deco-card c3" data-tilt>
+                <div>
+                    <div class="label">Scan comptoir</div>
+                    <div class="name">Validations</div>
+                </div>
+                <div class="price">37 <span style="font-size:10px;opacity:.7;">aujourd'hui</span></div>
+                <span class="scan-ic">
+                    <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.4"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/></svg>
+                </span>
+            </div>
+        </div>
+
+        <div class="ka-side-info">
+            <h2>Suis tes ventes et <span class="highlight">scanne les cartes</span> au comptoir.</h2>
+            <p>Visualise les cartes que tu as vendues, leur solde restant et valide instantanément un paiement client par QR ou code+PIN.</p>
+
+            <div class="ka-side-perks">
+                <span class="ka-perk">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                    Stats en temps réel
+                </span>
+                <span class="ka-perk">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/></svg>
+                    Scan QR caméra
+                </span>
+                <span class="ka-perk">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    Validation sécurisée
+                </span>
+            </div>
+        </div>
+
+        <div class="ka-side-foot">
+            <span class="dot"></span>
+            <span>v{{ config('app.name') }} · Réseau propriétaires · {{ now()->format('Y') }}</span>
+        </div>
+    </aside>
+
+    {{-- Interactions cartes : parallax mouse + tilt 3D + flip au click --}}
+    <script>
+        (function () {
+            const stage = document.getElementById('kaCardsStage');
+            if (!stage) return;
+            const cards = Array.from(stage.querySelectorAll('[data-tilt]'));
+
+            const baseTransforms = {
+                c1: 'rotate(-10deg) translate(-120px, 0)',
+                c2: 'rotate(0deg)   translate(0, 0)',
+                c3: 'rotate(10deg)  translate(120px, 20px)',
+            };
+            const depth = { c1: 14, c2: 22, c3: 16 };
+
+            let rafId = null;
+            let lastMouse = { x: 0, y: 0 };
+
+            stage.addEventListener('mouseenter', () => {
+                cards.forEach(card => { card.style.animationPlayState = 'paused'; });
+            });
+
+            stage.addEventListener('mousemove', (e) => {
+                const rect = stage.getBoundingClientRect();
+                lastMouse.x = (e.clientX - rect.left - rect.width / 2) / (rect.width / 2);
+                lastMouse.y = (e.clientY - rect.top  - rect.height / 2) / (rect.height / 2);
+
+                if (rafId) return;
+                rafId = requestAnimationFrame(() => {
+                    cards.forEach((card) => {
+                        const cls = card.classList.contains('c1') ? 'c1'
+                                  : card.classList.contains('c3') ? 'c3' : 'c2';
+                        const d = depth[cls];
+                        const dx = -lastMouse.x * d;
+                        const dy = -lastMouse.y * d;
+                        const rotX = (-lastMouse.y * 7).toFixed(2);
+                        const rotY = ( lastMouse.x * 7).toFixed(2);
+                        card.style.transition = 'transform .12s ease-out';
+                        card.style.transform = `${baseTransforms[cls]} translate(${dx}px, ${dy}px) rotateX(${rotX}deg) rotateY(${rotY}deg) scale(1.03)`;
+                    });
+                    rafId = null;
+                });
+            });
+
+            stage.addEventListener('mouseleave', () => {
+                cards.forEach((card) => {
+                    card.style.transition = 'transform .6s cubic-bezier(.22, 1, .36, 1)';
+                    card.style.transform = '';
+                    setTimeout(() => { card.style.animationPlayState = ''; }, 50);
+                });
+            });
+
+            cards.forEach((card) => {
+                card.addEventListener('click', () => {
+                    const cls = card.classList.contains('c1') ? 'c1'
+                              : card.classList.contains('c3') ? 'c3' : 'c2';
+                    card.style.animationPlayState = 'paused';
+                    card.style.transition = 'transform .7s cubic-bezier(.22, 1, .36, 1)';
+                    card.style.transform = `${baseTransforms[cls]} rotateY(360deg) scale(1.08)`;
+                    setTimeout(() => {
+                        card.style.transform = '';
+                        card.style.animationPlayState = '';
+                    }, 720);
+                });
+            });
+        })();
+    </script>
+
+    {{-- ============================== RIGHT FORM ============================== --}}
+    <div class="ka-form-wrap">
+        <form method="POST" action="{{ route('owner.login.submit') }}" class="ka-form" id="loginForm">
+            @csrf
+
+            <div class="ka-mobile-logo">
+                <img src="{{ asset('assets/logo/FAVCON-KARDAFRICA-.png') }}" alt="KardAfrica">
+                <span class="ka-mobile-logo-text">KardAfrica</span>
+            </div>
+
+            <div class="ka-badge">
+                <span class="ka-badge-dot"></span>
+                <span class="ka-badge-text">Espace propriétaire</span>
+            </div>
+
+            <h1>Bonjour, propriétaire 👋</h1>
+            <p class="sub">Connecte-toi pour suivre tes ventes et valider les cartes au comptoir.</p>
+
+            @if($errors->any())
+                <div class="ka-error">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                    <span>{{ $errors->first() }}</span>
+                </div>
+            @endif
+
+            <div class="ka-field">
+                <label class="ka-label" for="email">Email</label>
+                <div class="ka-input-wrap">
+                    <svg class="ka-input-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                    <input id="email" name="email" type="email" required autofocus autocomplete="email"
+                           value="{{ old('email') }}"
+                           placeholder="contact@…"
+                           class="ka-input {{ $errors->has('email') ? 'has-error' : '' }}">
                 </div>
             </div>
 
-            <h1>Connexion</h1>
-            <p class="ka-sub">Accède à ton dashboard pour suivre tes ventes et valider les cartes au comptoir.</p>
-
-            @if($errors->any())
-                <div class="ka-error">{{ $errors->first() }}</div>
-            @endif
-
-            <form method="POST" action="{{ route('owner.login.submit') }}">
-                @csrf
-                <div class="ka-field">
-                    <label class="ka-label" for="email">Email</label>
-                    <input id="email" type="email" name="email" class="ka-input"
-                           value="{{ old('email') }}" placeholder="contact@…" required autofocus>
+            <div class="ka-field">
+                <label class="ka-label" for="password">Mot de passe</label>
+                <div class="ka-input-wrap">
+                    <svg class="ka-input-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                    <input id="password" name="password" type="password" required autocomplete="current-password"
+                           placeholder="••••••••"
+                           class="ka-input {{ $errors->has('password') ? 'has-error' : '' }}">
+                    <button type="button" class="ka-pw-toggle" onclick="togglePassword()" aria-label="Afficher / masquer le mot de passe">
+                        <svg id="eyeOpen" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" style="width:18px;height:18px;"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                        <svg id="eyeClosed" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" style="width:18px;height:18px;display:none;"><path stroke-linecap="round" stroke-linejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/></svg>
+                    </button>
                 </div>
+            </div>
 
-                <div class="ka-field">
-                    <label class="ka-label" for="password">Mot de passe</label>
-                    <input id="password" type="password" name="password" class="ka-input"
-                           placeholder="••••••••" required>
-                </div>
+            <div class="ka-row">
+                <label class="ka-remember">
+                    <input type="checkbox" name="remember" value="1">
+                    Se souvenir de moi
+                </label>
+                <a href="{{ route('home') }}" class="ka-link">← Retour au site</a>
+            </div>
 
-                <div class="ka-row">
-                    <label class="ka-check">
-                        <input type="checkbox" name="remember" value="1">
-                        Se souvenir de moi
-                    </label>
-                </div>
+            <button type="submit" class="ka-submit">
+                Accéder à mon espace
+                <svg style="width:14px;height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
+            </button>
 
-                <button type="submit" class="ka-btn">Se connecter →</button>
-            </form>
-
-            <p class="ka-hint">
-                Pas encore de compte ? Contacte l'admin Kardafrica pour qu'il te crée un accès propriétaire.
-            </p>
-        </div>
+            <div class="ka-foot">
+                Tu n'as pas encore d'accès propriétaire ?<br>
+                Contacte un administrateur via <a href="mailto:hello@kardafrica.com">hello@kardafrica.com</a>
+            </div>
+        </form>
     </div>
+
+    <script>
+        function togglePassword() {
+            const input = document.getElementById('password');
+            const open = document.getElementById('eyeOpen');
+            const closed = document.getElementById('eyeClosed');
+            if (input.type === 'password') {
+                input.type = 'text';
+                open.style.display = 'none';
+                closed.style.display = '';
+            } else {
+                input.type = 'password';
+                open.style.display = '';
+                closed.style.display = 'none';
+            }
+        }
+    </script>
+
 </body>
 </html>
