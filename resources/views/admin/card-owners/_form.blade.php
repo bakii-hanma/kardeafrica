@@ -183,11 +183,13 @@
                     @error('email') <p class="acf-error">{{ $message }}</p> @enderror
                 </div>
                 <div class="acf-field">
-                    <label class="acf-label">Mot de passe @if(!$isEdit) <span class="acf-label-req">*</span> @endif</label>
+                    <label class="acf-label">Mot de passe</label>
                     <input type="text" name="password" class="acf-input" minlength="6" maxlength="120"
-                           placeholder="{{ $isEdit ? 'Laisse vide pour conserver' : '6 caractères minimum' }}">
+                           placeholder="{{ $isEdit ? 'Laisse vide pour conserver' : 'Auto-généré si vide' }}">
                     @error('password') <p class="acf-error">{{ $message }}</p> @enderror
-                    <p class="acf-hint">À transmettre au commerçant, il pourra le changer ensuite.</p>
+                    <p class="acf-hint">{{ $isEdit
+                        ? 'Laisse vide pour conserver le mot de passe actuel.'
+                        : 'Si vide, un mot de passe à 8 chiffres sera généré et affiché après la création.' }}</p>
                 </div>
             </div>
             <div class="acf-row">

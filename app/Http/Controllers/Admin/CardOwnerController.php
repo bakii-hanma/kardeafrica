@@ -63,8 +63,14 @@ class CardOwnerController extends Controller
     {
         $data = $this->validated($request, null);
 
+        // Mot de passe : utilisé tel quel si fourni, sinon généré (8 chiffres)
+        // pour que l'admin puisse le transmettre au commerçant.
+        $plainPassword = !empty($data['password'])
+            ? $data['password']
+            : (string) random_int(10_000_000, 99_999_999);
+
         $owner = new CardOwner($data);
-        $owner->password = Hash::make($data['password']);
+        $owner->password = Hash::make($plainPassword);
         $owner->slug     = CardOwner::uniqueSlug($data['business_name']);
 
         if ($request->hasFile('logo')) {
@@ -75,7 +81,8 @@ class CardOwnerController extends Controller
 
         return redirect()
             ->route('admin.card-owners.show', $owner)
-            ->with('success', "Propriétaire « {$owner->business_name} » créé. Identifiants : {$owner->email}.");
+            ->with('success', "Propriétaire « {$owner->business_name} » créé.")
+            ->with('temp_password', $plainPassword);
     }
 
     public function show(CardOwner $cardOwner)
@@ -200,7 +207,7 @@ class CardOwnerController extends Controller
             ],
             'phone'           => ['required', 'string', 'max:30'],
             'whatsapp_number' => ['nullable', 'string', 'max:30'],
-            'password'        => [$existing ? 'nullable' : 'required', 'string', 'min:6', 'max:120'],
+            'password'        => ['nullable', 'string', 'min:6', 'max:120'],
             'city'            => ['nullable', 'string', 'max:100'],
             'address'         => ['nullable', 'string', 'max:255'],
             'business_type'   => ['nullable', 'string', Rule::in(array_keys(MerchantCard::CATEGORIES))],

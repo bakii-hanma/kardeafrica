@@ -12,6 +12,39 @@
         </div>
     @endif
 
+    @if(session('temp_password'))
+        <div x-data="{ copied: false }"
+             style="background:linear-gradient(135deg,#FEF3C7,#FDE68A);border:1px solid #F59E0B;border-radius:14px;padding:16px 18px;margin-bottom:14px;">
+            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+                <div style="flex:1;min-width:240px;">
+                    <div style="font-family:'Space Grotesk','Inter',sans-serif;font-size:13px;font-weight:800;color:#92400E;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">🔑 Identifiants à transmettre au commerçant</div>
+                    <div style="font-size:12px;color:#78350F;">Ces infos ne seront plus affichées après cette page. <strong>Note-les ou envoie-les maintenant.</strong></div>
+                </div>
+            </div>
+            <div style="margin-top:12px;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;">
+                <div style="background:white;border:1px solid #FCD34D;border-radius:10px;padding:10px 12px;">
+                    <div style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;font-weight:700;color:#92400E;">Email</div>
+                    <div style="font-family:ui-monospace,monospace;font-size:14px;font-weight:700;color:#78350F;margin-top:2px;word-break:break-all;">{{ $owner->email }}</div>
+                </div>
+                <div style="background:white;border:1px solid #FCD34D;border-radius:10px;padding:10px 12px;">
+                    <div style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;font-weight:700;color:#92400E;">Mot de passe</div>
+                    <div style="display:flex;align-items:center;gap:8px;margin-top:2px;">
+                        <code style="font-family:ui-monospace,monospace;font-size:16px;font-weight:800;color:#78350F;letter-spacing:.10em;flex:1;">{{ session('temp_password') }}</code>
+                        <button type="button"
+                                @click="navigator.clipboard.writeText('{{ session('temp_password') }}').then(()=>{ copied=true; setTimeout(()=>copied=false,1800); })"
+                                style="padding:6px 12px;background:#92400E;color:white;border:0;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;">
+                            <span x-show="!copied">Copier</span>
+                            <span x-show="copied" x-cloak>✓ Copié</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div style="margin-top:10px;font-size:11px;color:#78350F;">
+                Connexion : <a href="{{ route('owner.login') }}" target="_blank" style="color:#78350F;font-weight:800;text-decoration:underline;">{{ url('/proprietaire/login') }}</a>
+            </div>
+        </div>
+    @endif
+
     {{-- Header --}}
     <div style="background:linear-gradient(135deg,#0F172A 0%,#1E293B 60%,#0F4F44 100%);color:white;border-radius:18px;padding:24px 28px;margin-bottom:18px;display:flex;align-items:center;gap:18px;flex-wrap:wrap;">
         @if($owner->logo_url)
