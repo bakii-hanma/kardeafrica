@@ -40,8 +40,9 @@ return Application::configure(basePath: dirname(__DIR__))
         });
 
         $middleware->alias([
-            'is_admin'  => \App\Http\Middleware\IsAdmin::class,
-            'is_vendor' => \App\Http\Middleware\IsVendor::class,
+            'is_admin'       => \App\Http\Middleware\IsAdmin::class,
+            'is_vendor'      => \App\Http\Middleware\IsVendor::class,
+            'is_card_owner'  => \App\Http\Middleware\IsCardOwner::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

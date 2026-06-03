@@ -83,6 +83,28 @@ Route::prefix('gabon')->group(function () {
     Route::get('/carte/{merchantCard}',      [GabonController::class, 'card'])->name('gabon.card');
 });
 
+// ================================================================
+// ESPACE PROPRIÉTAIRE DE CARTE LOCALE (/proprietaire)
+// ================================================================
+Route::prefix('proprietaire')->group(function () {
+    // Auth (publique)
+    Route::get('/login',  [\App\Http\Controllers\Owner\AuthController::class, 'showLoginForm'])->name('owner.login');
+    Route::post('/login', [\App\Http\Controllers\Owner\AuthController::class, 'login'])->name('owner.login.submit');
+    Route::post('/logout',[\App\Http\Controllers\Owner\AuthController::class, 'logout'])->name('owner.logout');
+
+    // Dashboard + tout le reste (protégé)
+    Route::middleware('is_card_owner')->group(function () {
+        Route::get('/',                   [\App\Http\Controllers\Owner\DashboardController::class, 'index'])->name('owner.dashboard');
+        Route::get('/cartes',             [\App\Http\Controllers\Owner\DashboardController::class, 'cards'])->name('owner.cards');
+        Route::get('/cartes/{merchantCard}', [\App\Http\Controllers\Owner\DashboardController::class, 'cardShow'])->name('owner.card.show');
+        Route::get('/historique',         [\App\Http\Controllers\Owner\DashboardController::class, 'history'])->name('owner.history');
+
+        Route::get('/scanner',            [\App\Http\Controllers\Owner\ScanController::class, 'index'])->name('owner.scan');
+        Route::post('/scanner/lookup',    [\App\Http\Controllers\Owner\ScanController::class, 'lookup'])->name('owner.scan.lookup');
+        Route::post('/scanner/redeem',    [\App\Http\Controllers\Owner\ScanController::class, 'redeem'])->name('owner.scan.redeem');
+    });
+});
+
 // Routes pour les produits de l'API
 Route::get('/boutique', [ProductController::class, 'boutique'])->name('boutique');
 Route::get('/category/{categoryId}', [ProductController::class, 'category'])->name('category');
