@@ -474,10 +474,42 @@
             </div>
         </div>
 
-        {{-- Validité + activation --}}
+        {{-- Commissions --}}
         <div class="amf-section">
             <div class="amf-section-head">
                 <div class="amf-step">5</div>
+                <div>
+                    <h2 class="amf-section-title">Commissions admin / vendeur</h2>
+                    <p class="amf-section-hint">Pourcentages prélevés sur chaque vente. Le propriétaire encaisse le reste.</p>
+                </div>
+            </div>
+
+            <div class="amf-row">
+                <div class="amf-field">
+                    <label class="amf-label" for="admin_commission_rate">Commission admin (%)</label>
+                    <input type="number" id="admin_commission_rate" name="admin_commission_rate" class="amf-input"
+                           value="{{ old('admin_commission_rate', $card->admin_commission_rate ?? 0) }}"
+                           min="0" max="100" step="0.5" placeholder="Ex : 10">
+                    @error('admin_commission_rate') <p class="amf-error">{{ $message }}</p> @enderror
+                </div>
+                <div class="amf-field">
+                    <label class="amf-label" for="vendor_commission_rate">Commission vendeur (%)</label>
+                    <input type="number" id="vendor_commission_rate" name="vendor_commission_rate" class="amf-input"
+                           value="{{ old('vendor_commission_rate', $card->vendor_commission_rate ?? 0) }}"
+                           min="0" max="100" step="0.5" placeholder="Ex : 5">
+                    @error('vendor_commission_rate') <p class="amf-error">{{ $message }}</p> @enderror
+                </div>
+            </div>
+            <p class="amf-hint" style="margin-top:6px;">
+                💡 Sur une vente de 10 000 F avec 10 % admin + 5 % vendeur, le propriétaire reçoit 8 500 F.
+                La somme ne peut pas dépasser 100 %.
+            </p>
+        </div>
+
+        {{-- Validité + activation --}}
+        <div class="amf-section">
+            <div class="amf-section-head">
+                <div class="amf-step">6</div>
                 <div>
                     <h2 class="amf-section-title">Validité & activation</h2>
                     <p class="amf-section-hint">Durée + statut de publication.</p>

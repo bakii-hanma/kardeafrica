@@ -42,16 +42,19 @@ class MerchantCard extends Model
         'validity_months', 'terms_conditions',
         'is_active', 'activated_at', 'rejection_reason',
         'total_sold', 'total_revenue',
+        'admin_commission_rate', 'vendor_commission_rate',
     ];
 
     protected $casts = [
-        'denominations'        => 'array',           // JSON ↔ array d'entiers
-        'allow_custom_amount'  => 'boolean',
-        'is_active'            => 'boolean',
-        'min_amount'           => 'decimal:2',
-        'max_amount'           => 'decimal:2',
-        'total_revenue'        => 'decimal:2',
-        'activated_at'         => 'datetime',
+        'denominations'           => 'array',           // JSON ↔ array d'entiers
+        'allow_custom_amount'     => 'boolean',
+        'is_active'               => 'boolean',
+        'min_amount'              => 'decimal:2',
+        'max_amount'              => 'decimal:2',
+        'total_revenue'           => 'decimal:2',
+        'admin_commission_rate'   => 'decimal:2',
+        'vendor_commission_rate'  => 'decimal:2',
+        'activated_at'            => 'datetime',
     ];
 
     // ============================================================

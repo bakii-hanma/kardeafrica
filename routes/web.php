@@ -96,7 +96,12 @@ Route::prefix('proprietaire')->group(function () {
     Route::middleware('is_card_owner')->group(function () {
         Route::get('/',                   [\App\Http\Controllers\Owner\DashboardController::class, 'index'])->name('owner.dashboard');
         Route::get('/cartes',             [\App\Http\Controllers\Owner\DashboardController::class, 'cards'])->name('owner.cards');
+        Route::get('/cartes/nouvelle',    [\App\Http\Controllers\Owner\CardController::class, 'create'])->name('owner.card.create');
+        Route::post('/cartes',            [\App\Http\Controllers\Owner\CardController::class, 'store'])->name('owner.card.store');
         Route::get('/cartes/{merchantCard}', [\App\Http\Controllers\Owner\DashboardController::class, 'cardShow'])->name('owner.card.show');
+        Route::get('/cartes/{merchantCard}/edit',   [\App\Http\Controllers\Owner\CardController::class, 'edit'])->name('owner.card.edit');
+        Route::put('/cartes/{merchantCard}',         [\App\Http\Controllers\Owner\CardController::class, 'update'])->name('owner.card.update');
+        Route::delete('/cartes/{merchantCard}',      [\App\Http\Controllers\Owner\CardController::class, 'destroy'])->name('owner.card.destroy');
         Route::get('/historique',         [\App\Http\Controllers\Owner\DashboardController::class, 'history'])->name('owner.history');
 
         Route::get('/scanner',            [\App\Http\Controllers\Owner\ScanController::class, 'index'])->name('owner.scan');

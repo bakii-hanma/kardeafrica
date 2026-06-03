@@ -29,7 +29,12 @@
     <div style="background:linear-gradient(135deg,#0F172A,#0F4F44);color:white;border-radius:14px;padding:16px 18px;box-shadow:0 8px 24px -10px rgba(68,160,141,.4);">
         <div style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;font-weight:700;color:rgba(255,255,255,.7);">Revenus générés</div>
         <div style="font-family:'Space Grotesk','Inter',sans-serif;font-size:24px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.1;margin-top:4px;">{{ $fmt($stats['revenue_total']) }} <span style="font-size:13px;opacity:.8;">FCFA</span></div>
-        <div style="font-size:11px;color:rgba(255,255,255,.55);margin-top:4px;">paiements clients</div>
+        <div style="font-size:11px;color:rgba(255,255,255,.55);margin-top:4px;">paiements clients bruts</div>
+    </div>
+    <div style="background:linear-gradient(135deg,#10B981,#059669);color:white;border-radius:14px;padding:16px 18px;box-shadow:0 8px 24px -10px rgba(16,185,129,.4);">
+        <div style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;font-weight:700;color:rgba(255,255,255,.7);">Net après commissions</div>
+        <div style="font-family:'Space Grotesk','Inter',sans-serif;font-size:24px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.1;margin-top:4px;">{{ $fmt($stats['net_total']) }} <span style="font-size:13px;opacity:.8;">FCFA</span></div>
+        <div style="font-size:11px;color:rgba(255,255,255,.55);margin-top:4px;">ta part nette</div>
     </div>
     <div style="background:white;border:1px solid #E2E8F0;border-radius:14px;padding:16px 18px;box-shadow:0 1px 2px rgba(15,23,42,.04);">
         <div style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;font-weight:700;color:#94A3B8;">Solde restant en circulation</div>

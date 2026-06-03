@@ -4,6 +4,14 @@
 @section('page-title', 'Mes cartes')
 @section('page-subtitle', $cards->total() . ' carte' . ($cards->total() > 1 ? 's' : '') . ' rattachée' . ($cards->total() > 1 ? 's' : '') . ' à votre compte')
 
+@section('topbar-actions')
+    <a href="{{ route('owner.card.create') }}"
+       style="display:inline-flex;align-items:center;gap:6px;padding:10px 16px;background:linear-gradient(135deg,#44A08D,#4ECDC4);color:white;border-radius:11px;font-size:13px;font-weight:700;text-decoration:none;box-shadow:0 10px 24px -10px rgba(68,160,141,.5);">
+        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+        Nouvelle carte
+    </a>
+@endsection
+
 @section('content')
 {{-- Filtre statut --}}
 <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px;">
@@ -15,8 +23,12 @@
 @if($cards->count() === 0)
     <div style="background:white;border:2px dashed #CBD5E1;border-radius:14px;padding:48px 24px;text-align:center;">
         <div style="font-size:48px;margin-bottom:8px;">🎴</div>
-        <h3 style="font-family:'Space Grotesk','Inter',sans-serif;font-size:18px;font-weight:800;color:#0F172A;margin:0 0 4px;">Aucune carte rattachée</h3>
-        <p style="color:#64748B;font-size:13px;margin:0;">Contacte l'admin Kardafrica pour qu'il te rattache des cartes locales.</p>
+        <h3 style="font-family:'Space Grotesk','Inter',sans-serif;font-size:18px;font-weight:800;color:#0F172A;margin:0 0 4px;">Aucune carte pour l'instant</h3>
+        <p style="color:#64748B;font-size:13px;margin:0 0 14px;">Crée ta première carte cadeau. Notre équipe la validera avant publication sur Kardafrica.</p>
+        <a href="{{ route('owner.card.create') }}"
+           style="display:inline-flex;align-items:center;gap:6px;padding:10px 18px;background:linear-gradient(135deg,#44A08D,#4ECDC4);color:white;border-radius:11px;font-size:13px;font-weight:700;text-decoration:none;">
+            + Créer ma première carte
+        </a>
     </div>
 @else
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;">

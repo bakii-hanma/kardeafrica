@@ -224,10 +224,23 @@ class MerchantCardController extends Controller
             'allow_custom_amount' => ['nullable', 'boolean'],
             'min_amount'          => ['nullable', 'required_if:allow_custom_amount,1', 'numeric', 'min:500'],
             'max_amount'          => ['nullable', 'required_if:allow_custom_amount,1', 'numeric', 'gte:min_amount', 'max:1000000'],
-            'validity_months'     => ['required', 'integer', 'min:1', 'max:60'],
-            'terms_conditions'    => ['nullable', 'string', 'max:5000'],
-            'is_active'           => ['nullable', 'boolean'],
+            'validity_months'         => ['required', 'integer', 'min:1', 'max:60'],
+            'terms_conditions'        => ['nullable', 'string', 'max:5000'],
+            'is_active'               => ['nullable', 'boolean'],
+            'admin_commission_rate'   => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'vendor_commission_rate'  => ['nullable', 'numeric', 'min:0', 'max:100'],
         ]);
+
+        // Total des commissions ≤ 100 %
+        $adminRate  = (float) ($validated['admin_commission_rate']  ?? 0);
+        $vendorRate = (float) ($validated['vendor_commission_rate'] ?? 0);
+        if ($adminRate + $vendorRate > 100) {
+            abort(redirect()->back()->withInput()->withErrors([
+                'admin_commission_rate' => 'La somme des commissions admin + vendeur ne peut pas dépasser 100 %.',
+            ]));
+        }
+        $validated['admin_commission_rate']  = $adminRate;
+        $validated['vendor_commission_rate'] = $vendorRate;
 
         $denoms = array_values(array_unique(array_map('intval', $validated['denominations'])));
         sort($denoms);

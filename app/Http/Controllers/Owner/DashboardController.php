@@ -30,6 +30,9 @@ class DashboardController extends Controller
             'revenue_total'      => (float) MerchantCardPurchase::whereIn('merchant_card_id', $cardIds)
                                         ->where('payment_status', MerchantCardPurchase::PAYMENT_PAID)
                                         ->sum('amount'),
+            'net_total'          => (float) MerchantCardPurchase::whereIn('merchant_card_id', $cardIds)
+                                        ->where('payment_status', MerchantCardPurchase::PAYMENT_PAID)
+                                        ->sum('owner_net_amount'),
             'redemptions_total'  => MerchantCardRedemption::whereHas('purchase', fn ($q) =>
                                         $q->whereIn('merchant_card_id', $cardIds))->count(),
             'balance_outstanding'=> (float) MerchantCardPurchase::whereIn('merchant_card_id', $cardIds)

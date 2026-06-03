@@ -213,27 +213,37 @@ class MerchantCardCode
             $pinCode    = str_pad((string) random_int(0, 9999), 4, '0', STR_PAD_LEFT);
             $expiresAt  = now()->addMonths((int) ($card->validity_months ?? 12));
 
+            // Snapshot commissions au moment de la vente (taux figés sur la purchase)
+            $adminRate     = (float) ($card->admin_commission_rate ?? 0);
+            $vendorRate    = (float) ($card->vendor_commission_rate ?? 0);
+            $adminAmount   = round($amount * $adminRate / 100, 2);
+            $vendorAmount  = round($amount * $vendorRate / 100, 2);
+            $ownerNet      = round($amount - $adminAmount - $vendorAmount, 2);
+
             $purchase = MerchantCardPurchase::create([
-                'merchant_card_id'  => $card->id,
-                'order_id'          => $order->id,
-                'order_item_id'     => $item->id,
-                'unique_code'       => $uniqueCode,
-                'pin_code'          => $pinCode,
-                'qr_payload'        => 'pending-' . uniqid('', true),
-                'buyer_name'        => $billing['name']  ?? $user->name  ?? 'Client KardAfrica',
-                'buyer_phone'       => $billing['phone'] ?? $user->phone ?? '',
-                'buyer_email'       => $billing['email'] ?? $user->email ?? null,
-                'amount'            => $amount,
-                'remaining_balance' => $amount,
-                'currency'          => 'XAF',
-                'payment_method'    => $order->payment_method ?? 'ebilling',
-                'payment_status'    => MerchantCardPurchase::PAYMENT_PAID,
-                'payment_ref'       => $order->external_reference,
-                'status'            => MerchantCardPurchase::STATUS_ACTIVE,
-                'delivery_channel'  => ['email', 'orders_page'],
-                'delivered_at'      => now(),
-                'paid_at'           => now(),
-                'expires_at'        => $expiresAt,
+                'merchant_card_id'         => $card->id,
+                'order_id'                 => $order->id,
+                'order_item_id'            => $item->id,
+                'unique_code'              => $uniqueCode,
+                'pin_code'                 => $pinCode,
+                'qr_payload'               => 'pending-' . uniqid('', true),
+                'buyer_name'               => $billing['name']  ?? $user->name  ?? 'Client KardAfrica',
+                'buyer_phone'              => $billing['phone'] ?? $user->phone ?? '',
+                'buyer_email'              => $billing['email'] ?? $user->email ?? null,
+                'amount'                   => $amount,
+                'remaining_balance'        => $amount,
+                'currency'                 => 'XAF',
+                'admin_commission_amount'  => $adminAmount,
+                'vendor_commission_amount' => $vendorAmount,
+                'owner_net_amount'         => $ownerNet,
+                'payment_method'           => $order->payment_method ?? 'ebilling',
+                'payment_status'           => MerchantCardPurchase::PAYMENT_PAID,
+                'payment_ref'              => $order->external_reference,
+                'status'                   => MerchantCardPurchase::STATUS_ACTIVE,
+                'delivery_channel'         => ['email', 'orders_page'],
+                'delivered_at'             => now(),
+                'paid_at'                  => now(),
+                'expires_at'               => $expiresAt,
             ]);
 
             // 2. Finalise le qr_payload signé avec l'ID réel

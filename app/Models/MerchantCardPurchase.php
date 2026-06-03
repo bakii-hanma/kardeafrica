@@ -40,18 +40,22 @@ class MerchantCardPurchase extends Model
         'buyer_name', 'buyer_phone', 'buyer_email',
         'recipient_name', 'recipient_phone', 'recipient_message',
         'amount', 'remaining_balance', 'currency',
+        'admin_commission_amount', 'vendor_commission_amount', 'owner_net_amount',
         'payment_method', 'payment_status', 'payment_ref', 'ebilling_transaction_id',
         'status', 'delivery_channel', 'delivered_at',
         'expires_at', 'paid_at',
     ];
 
     protected $casts = [
-        'amount'            => 'decimal:2',
-        'remaining_balance' => 'decimal:2',
-        'delivery_channel'  => 'array',
-        'expires_at'        => 'datetime',
-        'paid_at'           => 'datetime',
-        'delivered_at'      => 'datetime',
+        'amount'                    => 'decimal:2',
+        'remaining_balance'         => 'decimal:2',
+        'admin_commission_amount'   => 'decimal:2',
+        'vendor_commission_amount'  => 'decimal:2',
+        'owner_net_amount'          => 'decimal:2',
+        'delivery_channel'          => 'array',
+        'expires_at'                => 'datetime',
+        'paid_at'                   => 'datetime',
+        'delivered_at'              => 'datetime',
     ];
 
     /**
