@@ -9,9 +9,38 @@
         '#DC2626', '#EA580C', '#059669', '#0D9488', '#6D28D9', '#BE185D',
     ];
 
-    $brandColor = function ($name) use ($brandPalette) {
+    // Couleurs de marque officielles — priment sur le hash pour que chaque
+    // marque connue ait SA couleur (ex. Nintendo = rouge, pas une couleur au
+    // hasard). Match par sous-chaîne (insensible à la casse) sur le nom.
+    $brandColorMap = [
+        'nintendo'     => '#E60012',
+        'netflix'      => '#E50914',
+        'spotify'      => '#1DB954',
+        'apple'        => '#1A1A1A',
+        'itunes'       => '#1A1A1A',
+        'app store'    => '#1A1A1A',
+        'steam'        => '#1B2838',
+        'playstation'  => '#003791',
+        'psn'          => '#003791',
+        'xbox'         => '#107C10',
+        'google play'  => '#01875F',
+        'play store'   => '#01875F',
+        'roblox'       => '#E2231A',
+        'prime video'  => '#00A8E1',
+        'amazon'       => '#FF9900',
+        'deezer'       => '#A238FF',
+        'disney'       => '#113CCF',
+    ];
+
+    $brandColor = function ($name) use ($brandPalette, $brandColorMap) {
         $name = (string) $name;
         if ($name === '') return $brandPalette[0];
+        // 1) Couleur officielle si marque connue
+        $lower = strtolower($name);
+        foreach ($brandColorMap as $kw => $hex) {
+            if (str_contains($lower, $kw)) return $hex;
+        }
+        // 2) Sinon, couleur déterministe par hash du nom
         $hash = 0;
         for ($i = 0; $i < strlen($name); $i++) {
             $hash = ord($name[$i]) + (($hash << 5) - $hash);

@@ -34,8 +34,10 @@ class ProductApiService
      * Pays bloqués : cartes inutilisables en Afrique (UAE / Émirats Arabes Unis).
      * Détectés par brand.countryCode='AE', currencyCode='AED' ou nom contenant "UAE"/"Emirates".
      */
-    private $blockedCountries = ['AE'];
-    private $blockedCurrencies = ['AED'];
+    // AE/AED : Émirats (cartes inutilisables en Afrique).
+    // CH/CHF : Suisse — hors zone EUR, non souhaitée (demande produit : EU/FR).
+    private $blockedCountries = ['AE', 'CH'];
+    private $blockedCurrencies = ['AED', 'CHF'];
 
     /**
      * Mapping pays → région pour l'affichage et le filtre.
