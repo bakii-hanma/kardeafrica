@@ -316,9 +316,11 @@
                 <a href="{{ route('boutique') }}"
                    class="group relative col-span-2 sm:col-span-3 lg:col-span-2 lg:row-span-2 lg:auto-rows-auto overflow-hidden rounded-3xl bg-gradient-to-br from-[#1F2937] via-[#0F172A] to-[#1F2937] p-6 md:p-8 transition-all duration-300 hover:scale-[1.01] active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4ECDC4]">
 
-                    {{-- Photo de fond : cartes flottantes --}}
-                    <div class="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-105"
-                         style="background-image: url('{{ asset('assets/banner/universes/default.jpg') }}');"></div>
+                    {{-- Photo de fond : cartes flottantes — size:contain (style inline
+                         pour ne pas dépendre du build Tailwind) = image entière 16:9
+                         proportionnelle au cadre, sans zoom/recadrage --}}
+                    <div class="absolute inset-0 transition-transform duration-700 group-hover:scale-105"
+                         style="background-image: url('{{ asset('assets/banner/universes/default.jpg') }}'); background-size: contain; background-repeat: no-repeat; background-position: center;"></div>
 
                     {{-- Voile noir léger uniquement à gauche (où se trouve le texte) — l'image reste majoritairement visible --}}
                     <div class="absolute inset-y-0 left-0 w-2/3 bg-gradient-to-r from-[#0F172A]/75 via-[#0F172A]/30 to-transparent pointer-events-none"></div>
@@ -364,9 +366,11 @@
                         <a href="{{ route('category', $category['id']) }}"
                            class="group relative overflow-hidden rounded-2xl bg-gradient-to-br {{ $style['gradient'] }} p-4 md:p-5 transition-all duration-300 hover:scale-[1.02] hover:shadow-xl active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50">
 
-                            {{-- Photo de fond plein cadre (le gradient sous reste en fallback si 404) --}}
-                            <div class="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-110"
-                                 style="background-image: url('{{ asset($style['bg']) }}');"></div>
+                            {{-- Photo de fond : size:contain (style inline) = image entière
+                                 proportionnelle au cadre (pas de zoom) ; le gradient
+                                 thématique reste visible derrière --}}
+                            <div class="absolute inset-0 transition-transform duration-700 group-hover:scale-110"
+                                 style="background-image: url('{{ asset($style['bg']) }}'); background-size: contain; background-repeat: no-repeat; background-position: center;"></div>
 
                             {{-- Voile sombre concentré sur le bas (juste pour rendre le label lisible) --}}
                             <div class="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/80 via-black/30 to-transparent pointer-events-none"></div>

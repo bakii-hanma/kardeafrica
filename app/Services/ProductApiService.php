@@ -1458,7 +1458,9 @@ class ProductApiService
         $query = trim((string) $query);
         if ($query === '') return [];
 
-        $cacheKey = "search_individual_v3_" . md5(strtolower($query)) . "_page_{$pageIndex}_size_{$pageSize}";
+        // v4 : résultats triés EU/FR d'abord (bump du suffixe → ignore l'ancien
+        // cache v3 non trié sans avoir à flush tout le cache catalogue).
+        $cacheKey = "search_individual_v4_eufr_" . md5(strtolower($query)) . "_page_{$pageIndex}_size_{$pageSize}";
 
         return Cache::remember($cacheKey, $this->cacheDuration, function () use ($query, $pageIndex, $pageSize) {
             try {
@@ -1490,12 +1492,47 @@ class ProductApiService
                     $merged[]  = $p;
                 }
 
+                // Remonte les cartes EU/FR EN PREMIER (demande produit) : Europe
+                // avant USA/global/autres, et dans l'Europe FR > BE > EU > UK/DE…
+                // Sans ça, l'ordre brut d'afrikard fait remonter Hong Kong, etc.
+                usort($merged, fn($a, $b) => $this->euFrPriorityKey($a) <=> $this->euFrPriorityKey($b));
+
                 return array_slice($merged, $pageIndex * $pageSize, $pageSize);
             } catch (\Exception $e) {
                 Log::error('Erreur recherche produits individuels: ' . $e->getMessage());
                 return [];
             }
         });
+    }
+
+    /**
+     * Clé de tri "EU/FR d'abord" pour un produit du catalogue.
+     * Ordre : Europe (0) > USA (1) > Global (2) > autres (3), puis à l'intérieur
+     * de l'Europe par pays FR (0) > BE (1) > EU (2) > CH/LU > UK/IE > DE/IT/ES…
+     * Plus la clé est petite, plus le produit remonte.
+     *
+     * @return array{0:int,1:int} [rangRegion, rangPays]
+     */
+    private function euFrPriorityKey(array $product): array
+    {
+        $region = $product['cardType']['region'] ?? 'other';
+        $regionRank = match ($region) {
+            'europe' => 0,
+            'usa'    => 1,
+            'global' => 2,
+            default  => 3,
+        };
+
+        $cc = strtoupper($product['cardType']['countryCode'] ?? '');
+        $ccRank = match ($cc) {
+            'FR' => 0, 'BE' => 1, 'EU' => 2, 'CH' => 3, 'LU' => 3,
+            'GB' => 4, 'IE' => 4, 'DE' => 5, 'IT' => 5, 'ES' => 5, 'PT' => 5, 'NL' => 5,
+            'US' => 6, 'CA' => 6,
+            'GLC' => 7, 'WW' => 7, 'GLOBAL' => 7, 'GL' => 7,
+            default => 99,
+        };
+
+        return [$regionRank, $ccRank];
     }
 
     /**
