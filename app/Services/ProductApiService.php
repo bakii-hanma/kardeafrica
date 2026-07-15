@@ -9,6 +9,18 @@ use Illuminate\Support\Facades\Log;
 
 class ProductApiService
 {
+    /** Cache catalogue FRAIS (TTL court = $cacheDuration). Source primaire. */
+    private const CACHE_FRESH = 'processed_all_products_v7_slim';
+
+    /** Snapshot "dernier bon catalogue connu" (TTL long). Sert le web en stale-while-revalidate. */
+    private const CACHE_SNAPSHOT = 'processed_all_products_snapshot_v1';
+
+    /** Durée de vie du snapshot (24h) — assez long pour survivre à un outage afrikard. */
+    private const SNAPSHOT_TTL = 86400;
+
+    /** Lock anti-flood pour le dispatch du warm asynchrone (5 min). */
+    private const WARM_LOCK = 'catalog_warm_dispatch_lock';
+
     private $baseUrl;
     private $cacheDuration = 3600; // 1 heure
 
@@ -51,11 +63,79 @@ class ProductApiService
     /**
      * Marques considérées les plus populaires en Afrique.
      * Mises en avant sur la page d'accueil + filtre dédié dans la boutique.
+     *
+     * Liste validée produit (juillet 2026) : Apple, Netflix, Steam, PSN,
+     * Nintendo, Xbox, Spotify, Google Play, Roblox (+ Prime Video, Deezer
+     * conservés). Les synonymes (itunes/app store pour Apple, playstation pour
+     * PSN, amazon prime pour Prime Video, playstore/play store pour Google Play)
+     * sont inclus pour couvrir la nomenclature variable d'afrikard.
      */
     private $popularBrands = [
-        'steam', 'psn', 'playstation', 'xbox', 'roblox', 'riot',
-        'league of legends', 'valorant', 'epic games', 'epic', 'fortnite',
-        'netflix', 'spotify', 'apple', 'itunes', 'app store', 'google play',
+        'xbox',
+        'netflix',
+        'apple', 'itunes', 'app store',
+        'prime video', 'amazon prime',
+        'steam',
+        'psn', 'playstation',
+        'nintendo',
+        'spotify',
+        'deezer',
+        'google play', 'play store', 'playstore',
+        'roblox',
+    ];
+
+    /**
+     * Marques que la pagination /catalog standard d'afrikard NE renvoie PAS
+     * (résultat empirique : Spotify France, Prime Video…). Pour qu'elles
+     * apparaissent dans la boutique + filtres, on les force via /catalog?name=<X>.
+     *
+     * IMPORTANT : afrikard fait un match exact sur le nom de marque entier
+     * (ex. "Spotify France" match, "Spotify" ne match pas). On liste donc les
+     * variantes pays directement.
+     */
+    private $catalogEnrichmentQueries = [
+        // Spotify
+        'Spotify France', 'Spotify Belgium', 'Spotify Germany', 'Spotify Spain',
+        'Spotify USA', 'Spotify UK', 'Spotify Brazil', 'Spotify Mexico', 'Spotify Colombia',
+        // Prime Video / Amazon Prime
+        'Prime Video', 'Amazon Prime Video', 'Amazon Prime',
+        // Deezer
+        'Deezer Premium France', 'Deezer France', 'Deezer Belgium',
+        // Apple (compléments)
+        'Apple France', 'Apple Belgium',
+        // Xbox (compléments)
+        'Xbox France', 'Xbox Belgium', 'Xbox UK',
+        // PlayStation (compléments)
+        'PlayStation France', 'PlayStation Belgium',
+        // Netflix
+        'Netflix France', 'Netflix UK', 'Netflix USA',
+        // Steam (compléments)
+        'Steam France', 'Steam Belgium',
+        // Nintendo eShop (variantes EU/FR — demande produit "cartes Mr Franck")
+        'Nintendo eShop France', 'Nintendo France', 'Nintendo eShop',
+        'Nintendo eShop Belgium', 'Nintendo eShop UK', 'Nintendo eShop Germany',
+        // Google Play (variantes EU/FR — souvent absentes du /catalog paginé)
+        'Google Play France', 'Google Play', 'Google Play Belgium', 'Google Play UK',
+        // Roblox (généralement global/USD, mais on tente les variantes EU)
+        'Roblox', 'Roblox France', 'Roblox UK',
+    ];
+
+    /**
+     * Marques CURÉES mises en avant sur la page d'accueil (demande produit —
+     * "les cartes de Mr Franck"). Ordre d'affichage fixe. Variantes EU/FR
+     * privilégiées (voir getFeaturedCardTypes()). Clé = libellé de repli,
+     * valeur = mots-clés matchés sur le nom de marque afrikard (lowercased).
+     */
+    private $featuredBrands = [
+        'Apple'       => ['apple', 'itunes', 'app store'],
+        'Netflix'     => ['netflix'],
+        'Steam'       => ['steam'],
+        'PlayStation' => ['psn', 'playstation'],
+        'Nintendo'    => ['nintendo'],
+        'Xbox'        => ['xbox'],
+        'Spotify'     => ['spotify'],
+        'Google Play' => ['google play', 'play store', 'playstore'],
+        'Roblox'      => ['roblox'],
     ];
 
     public function __construct()
@@ -198,7 +278,10 @@ class ProductApiService
      */
     public function fetchAllCatalogPages(int $pageSize = 100, int $maxPages = 50, ?int $timeBudgetSec = null): array
     {
-        $cacheKey = "catalog_all_pages_v3_robust_size_{$pageSize}";
+        // v4 : items processés (slim) directement avant cache. Sinon le cache
+        // raw (~25 Mo avec brand.description + terms + redemptionInstructions)
+        // dépasse max_allowed_packet MySQL → INSERT fail → log saturé.
+        $cacheKey = "catalog_all_pages_v4_slim_size_{$pageSize}";
 
         // Lecture cache manuelle pour pouvoir filtrer les cache "partiels"
         // (un fetch foireux de 39 items ne doit pas polluer le cache 1h).
@@ -261,7 +344,9 @@ class ProductApiService
                     if ($id === null || isset($seenIds[$id])) continue;
                     if ($this->isBlockedProduct($item)) continue;
                     $seenIds[$id] = true;
-                    $all[]        = $item;
+                    // Process inline (slim : drop brand+country, garde cardType).
+                    // Évite un cache raw énorme côté MySQL.
+                    $all[] = $this->processCatalogItem($item);
                 }
             } catch (\Throwable $e) {
                 Log::warning("afrikard pageIndex={$i} exception : " . $e->getMessage());
@@ -298,29 +383,40 @@ class ProductApiService
         $query = trim($query);
         if ($query === '') return [];
 
-        $cacheKey = 'api_search_v1_' . md5(strtolower($query)) . "_size_{$pageSize}";
+        $cacheKey = 'api_search_v2_' . md5(strtolower($query)) . "_size_{$pageSize}";
 
-        return Cache::remember($cacheKey, 1800, function () use ($query, $pageSize) {
-            try {
-                $response = Http::timeout(15)->get("{$this->baseUrl}/catalog", [
-                    'name'      => $query,
-                    'pageIndex' => 0,
-                    'pageSize'  => $pageSize,
-                ]);
+        // Lecture manuelle : on NE cache PAS les misses (afrikard renvoie 500
+        // de façon transitoire, on aurait sinon 30 min de résultat vide bloqué).
+        if (Cache::has($cacheKey)) {
+            $cached = Cache::get($cacheKey);
+            if (is_array($cached) && !empty($cached)) return $cached;
+            Cache::forget($cacheKey);
+        }
 
-                if (!$response->successful()) {
-                    Log::warning("afrikard search '{$query}' → HTTP {$response->status()}");
-                    return [];
-                }
+        try {
+            $response = Http::timeout(15)->get("{$this->baseUrl}/catalog", [
+                'name'      => $query,
+                'pageIndex' => 0,
+                'pageSize'  => $pageSize,
+            ]);
 
-                $items = $response->json()['items'] ?? [];
-                $filtered = array_filter($items, fn($p) => !$this->isBlockedProduct($p));
-                return array_map(fn($p) => $this->processCatalogItem($p), array_values($filtered));
-            } catch (\Throwable $e) {
-                Log::warning("afrikard search '{$query}' exception : " . $e->getMessage());
+            if (!$response->successful()) {
+                Log::warning("afrikard search '{$query}' → HTTP {$response->status()}");
                 return [];
             }
-        });
+
+            $items = $response->json()['items'] ?? [];
+            $filtered = array_filter($items, fn($p) => !$this->isBlockedProduct($p));
+            $processed = array_map(fn($p) => $this->processCatalogItem($p), array_values($filtered));
+
+            if (!empty($processed)) {
+                Cache::put($cacheKey, $processed, 1800);
+            }
+            return $processed;
+        } catch (\Throwable $e) {
+            Log::warning("afrikard search '{$query}' exception : " . $e->getMessage());
+            return [];
+        }
     }
 
     /**
@@ -713,11 +809,11 @@ class ProductApiService
      */
     private function fetchAndProcessAllProducts()
     {
-        $cacheKey = 'processed_all_products_v5_slim';
+        // ⚠ bump le suffixe quand on change la composition du catalogue.
+        $cacheKey = self::CACHE_FRESH;
 
-        // Lecture manuelle pour pouvoir filtrer un cache "vide" pollué par un
-        // outage afrikard (sinon empty array reste 1h en cache → toutes les
-        // livraisons cartes échouent par lookup values manquant).
+        // 1. Cache FRAIS valide (< 1h) → réponse instantanée. Lecture manuelle
+        //    pour filtrer un cache "vide" pollué par un outage afrikard.
         if (Cache::has($cacheKey)) {
             $cached = Cache::get($cacheKey);
             if (is_array($cached) && count($cached) >= 500) {
@@ -726,25 +822,133 @@ class ProductApiService
             Cache::forget($cacheKey);
         }
 
+        // 2. Contexte WEB : on ne bloque JAMAIS un visiteur sur le fetch afrikard
+        //    (~45-70s). On sert le dernier SNAPSHOT connu (stale-while-revalidate)
+        //    et on déclenche un refresh asynchrone (queue Redis). Résultat :
+        //    chargement instantané tant qu'un snapshot existe.
+        if (!app()->runningInConsole()) {
+            $this->dispatchWarmIfNeeded();
+
+            $snap = Cache::get(self::CACHE_SNAPSHOT);
+            if (is_array($snap) && count($snap) >= 500) {
+                return $snap; // dernière version connue — instantané
+            }
+            // Aucun snapshot (tout premier chargement, jamais warmé) : on tolère
+            // un unique fetch borné pour amorcer, puis le snapshot prend le relais.
+            return $this->buildCatalog(false);
+        }
+
+        // 3. CLI (commande catalog:warm) : build complet + enrichissement.
+        return $this->buildCatalog(true);
+    }
+
+    /**
+     * Reconstruit le cache catalogue complet (fetch afrikard + enrichissement
+     * EU/FR) et met à jour le cache FRAIS + le SNAPSHOT longue durée. Appelé
+     * par la commande cron `catalog:warm` ET par le job asynchrone WarmCatalogJob.
+     *
+     * @return array le catalogue processé (ou snapshot si l'API afrikard est down)
+     */
+    public function rebuildCatalogCache(): array
+    {
+        return $this->buildCatalog(true);
+    }
+
+    /**
+     * Cœur du build catalogue.
+     *
+     * @param bool $enrich  true = lance les ~40 requêtes /catalog?name= pour
+     *                      récupérer les variantes EU/FR absentes de la
+     *                      pagination standard (Spotify France, Nintendo eShop
+     *                      France, Google Play France…). Coûteux → réservé au
+     *                      CLI / job async, jamais sur une requête web.
+     */
+    private function buildCatalog(bool $enrich): array
+    {
         try {
-            // En CLI (warm cache) : pas de budget temps. En HTTP : budget 45s
-            // pour rester sous max_execution_time même si réglé à 60s.
+            // Pas de budget en CLI/job ; budget serré (45s) pour l'amorçage web.
             $budget = app()->runningInConsole() ? null : 45;
             $items = $this->fetchAllCatalogPages(100, 50, $budget);
-            if (empty($items)) return [];
 
-            $processed = array_map(fn($p) => $this->processCatalogItem($p), $items);
+            if (empty($items)) {
+                // afrikard injoignable : on retombe sur le snapshot s'il existe
+                // plutôt que de renvoyer un catalogue vide (livraisons cartes,
+                // pages boutique…).
+                $snap = Cache::get(self::CACHE_SNAPSHOT);
+                return (is_array($snap) && count($snap) >= 500) ? $snap : [];
+            }
 
-            // Ne cache QUE si on a un dataset réaliste — pareil que fetchAllCatalogPages.
+            // Items déjà slim (processCatalogItem appelé inline dans fetchAllCatalogPages).
+            $processed = $items;
+
+            // Enrichissement des variantes EU/FR (voir $catalogEnrichmentQueries).
+            if ($enrich) {
+                $byId = [];
+                foreach ($processed as $p) {
+                    $id = $p['id'] ?? null;
+                    if ($id !== null) $byId[$id] = $p;
+                }
+                foreach ($this->catalogEnrichmentQueries as $query) {
+                    try {
+                        $extra = $this->searchProductsViaApi($query, 100);
+                        foreach ($extra as $p) {
+                            $id = $p['id'] ?? null;
+                            if ($id !== null && !isset($byId[$id])) {
+                                $byId[$id] = $p;
+                            }
+                        }
+                    } catch (\Throwable $e) {
+                        Log::warning("catalog enrich '{$query}' failed: " . $e->getMessage());
+                    }
+                }
+                $processed = array_values($byId);
+            }
+
+            // Ne cache QUE si le dataset est réaliste (garde-fou anti-outage).
             if (count($processed) >= 500) {
-                Cache::put($cacheKey, $processed, $this->cacheDuration);
+                Cache::put(self::CACHE_FRESH, $processed, $this->cacheDuration);
+                // Snapshot longue durée (24h) = "dernier bon catalogue connu".
+                // Sert de source stale-while-revalidate en contexte web.
+                Cache::put(self::CACHE_SNAPSHOT, $processed, self::SNAPSHOT_TTL);
             } else {
                 Log::warning('processed_all_products: only ' . count($processed) . ' items, NOT caching');
             }
             return $processed;
         } catch (\Exception $e) {
             Log::error('Erreur traitement produits: ' . $e->getMessage());
-            return [];
+            $snap = Cache::get(self::CACHE_SNAPSHOT);
+            return (is_array($snap) && count($snap) >= 500) ? $snap : [];
+        }
+    }
+
+    /**
+     * Déclenche un rafraîchissement asynchrone du catalogue via la queue Redis,
+     * SANS bloquer la requête web courante.
+     *
+     * - En connexion 'sync' (pas de worker), on NE dispatch PAS : le job
+     *   s'exécuterait inline et bloquerait le visiteur — c'est le cron
+     *   `catalog:warm` qui assure alors le rafraîchissement.
+     * - Anti-flood : un seul warm en vol à la fois (lock de 5 min).
+     */
+    private function dispatchWarmIfNeeded(): void
+    {
+        // On ne dispatch le warm async QUE sur une file Redis (le setup prévu
+        // avec worker dédié). Sur 'sync' ça bloquerait la requête ; sur
+        // 'database' sans worker les jobs s'accumuleraient. Dans ces cas c'est
+        // le cron `catalog:warm` (toutes les 30 min) qui rafraîchit le cache.
+        if (config('queue.default') !== 'redis') {
+            return;
+        }
+        // Cache::add() est atomique : renvoie false si le lock existe déjà.
+        if (Cache::add(self::WARM_LOCK, 1, 300)) {
+            try {
+                \App\Jobs\WarmCatalogJob::dispatch()->onQueue('catalog');
+            } catch (\Throwable $e) {
+                // Dispatch impossible (queue mal configurée) : on libère le lock
+                // pour retenter au prochain hit, et on log sans casser la page.
+                Cache::forget(self::WARM_LOCK);
+                Log::warning('WarmCatalogJob dispatch failed: ' . $e->getMessage());
+            }
         }
     }
 
@@ -1005,6 +1209,77 @@ class ProductApiService
             Log::error('Erreur types de cartes: ' . $e->getMessage());
             return [];
         }
+    }
+
+    /**
+     * Liste CURÉE de marques mises en avant sur la page d'accueil (demande
+     * produit — "les cartes de Mr Franck") : Apple, Netflix, Steam, PSN,
+     * Nintendo, Xbox, Spotify, Google Play, Roblox.
+     *
+     * Pour chaque marque, on privilégie la variante EU/FR (region=europe,
+     * puis pays FR > BE > EU > autres UE). Si aucune variante EU/FR n'existe
+     * dans le catalogue afrikard (cas Roblox / Google Play souvent global),
+     * on retombe sur la meilleure variante disponible pour que la carte
+     * apparaisse quand même. Ordre d'affichage = ordre de $featuredBrands.
+     *
+     * @return array<int, array> cardTypes prêts pour <x-product-card>
+     */
+    public function getFeaturedCardTypes(): array
+    {
+        $cacheKey = 'featured_card_types_eu_fr_v1';
+        if (Cache::has($cacheKey)) {
+            $cached = Cache::get($cacheKey);
+            if (is_array($cached) && count($cached) > 0) return $cached;
+        }
+
+        // Tous les cardTypes déjà agrégés (nom → produits) — source unique.
+        $all = $this->getCardTypes(200);
+        if (empty($all)) return [];
+
+        // Priorité pays pour choisir LA variante EU/FR d'une marque.
+        $ccPriority = [
+            'FR' => 0, 'BE' => 1, 'EU' => 2, 'CH' => 3, 'LU' => 3,
+            'GB' => 4, 'IE' => 4, 'DE' => 5, 'IT' => 5, 'ES' => 5, 'PT' => 5, 'NL' => 5,
+        ];
+
+        $featured = [];
+        foreach ($this->featuredBrands as $label => $keywords) {
+            // Candidats : cardTypes dont le NOM matche un mot-clé de la marque.
+            $candidates = array_values(array_filter($all, function ($ct) use ($keywords) {
+                $name = strtolower($ct['name'] ?? '');
+                foreach ($keywords as $kw) {
+                    if ($kw !== '' && str_contains($name, $kw)) return true;
+                }
+                return false;
+            }));
+            if (empty($candidates)) continue;
+
+            // EU/FR d'abord : on ne garde que les variantes region=europe si
+            // au moins une existe ; sinon on retombe sur tout (Roblox global…).
+            $euOnly = array_values(array_filter(
+                $candidates,
+                fn($ct) => ($ct['region'] ?? '') === 'europe'
+            ));
+            $pool = !empty($euOnly) ? $euOnly : $candidates;
+
+            // Meilleure variante = plus petit rang pays (FR en tête).
+            usort($pool, function ($a, $b) use ($ccPriority) {
+                $ra = $ccPriority[strtoupper($a['countryCode'] ?? '')] ?? 99;
+                $rb = $ccPriority[strtoupper($b['countryCode'] ?? '')] ?? 99;
+                if ($ra !== $rb) return $ra <=> $rb;
+                // À rang égal, la variante avec le plus de produits (montants)
+                return count($b['products'] ?? []) <=> count($a['products'] ?? []);
+            });
+
+            $best = $pool[0];
+            if (empty($best['name'])) $best['name'] = $label;
+            $featured[] = $best;
+        }
+
+        if (!empty($featured)) {
+            Cache::put($cacheKey, $featured, $this->cacheDuration);
+        }
+        return $featured;
     }
 
     /**

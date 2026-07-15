@@ -320,8 +320,8 @@
                     <div class="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-105"
                          style="background-image: url('{{ asset('assets/banner/universes/default.jpg') }}');"></div>
 
-                    {{-- Voile noir uniquement à gauche (où se trouve le texte) — l'image reste visible à droite --}}
-                    <div class="absolute inset-y-0 left-0 w-3/4 bg-gradient-to-r from-[#0F172A]/90 via-[#0F172A]/55 to-transparent pointer-events-none"></div>
+                    {{-- Voile noir léger uniquement à gauche (où se trouve le texte) — l'image reste majoritairement visible --}}
+                    <div class="absolute inset-y-0 left-0 w-2/3 bg-gradient-to-r from-[#0F172A]/75 via-[#0F172A]/30 to-transparent pointer-events-none"></div>
 
                     {{-- Glow background (mix-blend-screen → s'ajoute à l'image au lieu de la masquer) --}}
                     <div class="absolute -top-16 -right-16 w-64 h-64 bg-[#44A08D]/30 rounded-full blur-3xl group-hover:bg-[#44A08D]/40 transition-colors mix-blend-screen pointer-events-none"></div>
@@ -368,8 +368,8 @@
                             <div class="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-110"
                                  style="background-image: url('{{ asset($style['bg']) }}');"></div>
 
-                            {{-- Voile sombre uniquement sur la moitié basse (lisibilité du label) --}}
-                            <div class="absolute inset-x-0 bottom-0 h-3/4 bg-gradient-to-t from-black/85 via-black/45 to-transparent pointer-events-none"></div>
+                            {{-- Voile sombre concentré sur le bas (juste pour rendre le label lisible) --}}
+                            <div class="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/80 via-black/30 to-transparent pointer-events-none"></div>
 
                             {{-- Glow accent — mix-blend-screen pour s'intégrer sans masquer l'image --}}
                             <div class="absolute -top-8 -right-8 w-32 h-32 {{ $style['glow'] }} rounded-full blur-2xl group-hover:scale-110 transition-transform duration-500 mix-blend-screen pointer-events-none"></div>

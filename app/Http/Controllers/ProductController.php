@@ -19,7 +19,16 @@ class ProductController extends Controller
      */
     public function home()
     {
-        $cardTypes = $this->productService->getCardTypes(12);
+        // Liste curée EU/FR : Apple, Netflix, Steam, PSN, Nintendo, Xbox,
+        // Spotify, Google Play, Roblox (demande produit "cartes Mr Franck").
+        $cardTypes = $this->productService->getFeaturedCardTypes();
+
+        // Repli : si le catalogue afrikard ne renvoie pas encore les marques
+        // curées (cache froid), on affiche le top marques générique.
+        if (empty($cardTypes)) {
+            $cardTypes = $this->productService->getCardTypes(12);
+        }
+
         $categories = $this->productService->getCategories();
 
         return view('welcome', compact('cardTypes', 'categories'));

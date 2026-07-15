@@ -30,21 +30,22 @@ class WarmCatalogCache extends Command
     {
         if ($this->option('force')) {
             $this->info('Vidage du cache catalogue…');
-            Cache::forget('catalog_all_pages_v3_robust_size_100');
-            Cache::forget('processed_all_products_v4_regions');
-            Cache::forget('processed_all_products_v5_slim');
+            Cache::forget('processed_all_products_v7_slim');
+            Cache::forget('processed_all_products_snapshot_v1');
+            Cache::forget('featured_card_types_eu_fr_v1');
+            Cache::forget('card_type_counts_v1');
             // Bumper aussi les caches dérivés
             for ($i = 1; $i <= 200; $i++) {
-                Cache::forget("card_types_v3_{$i}");
                 Cache::forget("card_types_v4_slim_{$i}");
             }
         }
 
-        $this->info('Récupération de toutes les pages afrikard (peut prendre 1-2 min)…');
+        $this->info('Récupération + enrichissement EU/FR du catalogue afrikard (peut prendre 1-2 min)…');
         $start = microtime(true);
 
-        // Pas de budget temps en CLI : on prend tout le temps qu'il faut
-        $items = $service->fetchAllCatalogPages(100, 50, null);
+        // Build complet (fetch toutes pages + enrichissement variantes EU/FR),
+        // écrit le cache FRAIS + le SNAPSHOT longue durée servi au web.
+        $items = $service->rebuildCatalogCache();
         $elapsed = round(microtime(true) - $start, 1);
 
         if (count($items) < 500) {
@@ -55,12 +56,17 @@ class WarmCatalogCache extends Command
 
         $this->info("✓ Catalogue récupéré : " . count($items) . " produits en {$elapsed}s.");
 
-        // Touche getCardTypes pour que la home soit instantanée elle aussi
-        $this->info('Pré-calcul des types de cartes pour la page d\'accueil…');
-        $service->getCardTypes(12);
-        $service->getCardTypes(20);
+        // Pré-calcule les listes servies au premier écran (accueil + top marques
+        // + liste curée EU/FR) pour qu'elles soient instantanées elles aussi.
+        $this->info('Pré-calcul des types de cartes + liste curée EU/FR…');
+        Cache::forget('card_types_v4_slim_200');
+        Cache::forget('card_types_v4_slim_12');
+        Cache::forget('featured_card_types_eu_fr_v1');
+        $service->getCardTypes(200);
+        $featured = $service->getFeaturedCardTypes();
+        $this->info('✓ ' . count($featured) . ' marques curées prêtes pour l\'accueil.');
 
-        $this->info('✓ Cache catalogue prêt. Les pages web vont répondre depuis le cache.');
+        $this->info('✓ Cache catalogue prêt. Les pages web répondent depuis le cache.');
         return self::SUCCESS;
     }
 }
