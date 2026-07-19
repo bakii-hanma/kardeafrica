@@ -378,12 +378,27 @@
                     // Try to find the current product in the list to select it by default
                     const currentId = @json($product['id']);
                     const found = this.products.find(p => p.id === currentId);
-                    
+
                     if (found) {
                         this.selectedProduct = found;
                     } else {
                         this.selectedProduct = this.products[0];
                     }
+                }
+
+                // Meta Pixel — ViewContent (consultation d'une fiche produit)
+                if (window.fbq && this.selectedProduct) {
+                    let v = this.selectedProduct.price.min;
+                    if (typeof window.convertToFCFA === 'function') {
+                        v = window.convertToFCFA(v, this.selectedProduct.price.currencyCode);
+                    }
+                    fbq('track', 'ViewContent', {
+                        content_name: this.productInfo.name,
+                        content_ids: [String(this.selectedProduct.id)],
+                        content_type: 'product',
+                        value: Math.round(v),
+                        currency: 'XAF'
+                    });
                 }
             },
             
@@ -459,6 +474,17 @@
                 // Convert to FCFA for cart
                 if (typeof window.convertToFCFA === 'function') {
                     price = window.convertToFCFA(price, this.selectedProduct.price.currencyCode);
+                }
+
+                // Meta Pixel — AddToCart
+                if (window.fbq) {
+                    fbq('track', 'AddToCart', {
+                        content_name: this.selectedProduct.name,
+                        content_ids: [String(this.selectedProduct.id)],
+                        content_type: 'product',
+                        value: Math.round(price),
+                        currency: 'XAF'
+                    });
                 }
 
                 // Call global addToCart function

@@ -479,6 +479,15 @@
             subEl.textContent   = formatFCFA(data.total);
             metaEl.textContent  = `${totalUnits} article${totalUnits > 1 ? 's' : ''}`;
 
+            // Meta Pixel — InitiateCheckout (panier chargé sur la page de paiement)
+            if (window.fbq) {
+                fbq('track', 'InitiateCheckout', {
+                    value: Math.round(data.total),
+                    currency: 'XAF',
+                    num_items: totalUnits
+                });
+            }
+
         } catch (error) {
             console.error('Error loading cart for checkout:', error);
             document.getElementById('checkout-cart-items').innerHTML =

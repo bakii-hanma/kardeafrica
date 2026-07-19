@@ -152,8 +152,15 @@ class CatalogController extends Controller
      */
     public function popular(Request $request)
     {
-        $limit = min(50, max(1, (int) $request->input('limit', 12)));
-        $cardTypes = $this->service->getCardTypes($limit);
+        // Liste curée EU/FR (Apple, Netflix, Steam, PSN, Nintendo, Xbox,
+        // Spotify, Google Play, Roblox) — identique à l'accueil du site web.
+        $cardTypes = $this->service->getFeaturedCardTypes();
+
+        // Repli sur le top marques générique si la liste curée n'est pas prête.
+        if (empty($cardTypes)) {
+            $limit = min(50, max(1, (int) $request->input('limit', 12)));
+            $cardTypes = $this->service->getCardTypes($limit);
+        }
 
         return response()->json([
             'success' => true,
