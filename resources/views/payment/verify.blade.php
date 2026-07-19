@@ -81,6 +81,17 @@
 
                     if (data.success) {
                         this.status = 'success';
+                        @if(!empty($purchaseValue) && !empty($purchaseOrderId))
+                        // Meta Pixel — Purchase (l'événement n°1). eventID = order_<id>
+                        // pour que Meta déduplique si la page est rechargée.
+                        if (window.fbq) {
+                            fbq('track', 'Purchase', {
+                                value: {{ $purchaseValue }},
+                                currency: '{{ $purchaseCurrency }}',
+                                content_type: 'product'
+                            }, { eventID: 'order_{{ $purchaseOrderId }}' });
+                        }
+                        @endif
                         setTimeout(() => {
                             window.location.href = data.redirect_url;
                         }, 2000);

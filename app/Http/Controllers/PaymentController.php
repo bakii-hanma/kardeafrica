@@ -218,7 +218,16 @@ class PaymentController extends Controller
             return redirect()->route('cart.index')->with('error', 'Reference de paiement manquante.');
         }
 
-        return view('payment.verify', ['ref' => $externalRef]);
+        // Récupère la commande pour alimenter l'événement Meta Pixel "Purchase"
+        // (tiré côté client une fois le paiement confirmé — voir payment/verify).
+        $order = \App\Models\Order::where('external_reference', $externalRef)->first();
+
+        return view('payment.verify', [
+            'ref'              => $externalRef,
+            'purchaseValue'    => $order ? (int) round($order->total_amount) : null,
+            'purchaseCurrency' => 'XAF',
+            'purchaseOrderId'  => $order?->id,
+        ]);
     }
 
     /**
