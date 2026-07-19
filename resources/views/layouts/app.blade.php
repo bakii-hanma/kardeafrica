@@ -4,6 +4,26 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
+
+    {{-- Vérification de domaine Meta (Business Settings › Brand safety › Domaines) --}}
+    <meta name="facebook-domain-verification" content="duax8hngmy9sdxqelrochkh9npwvdh" />
+
+    {{-- Meta Pixel — Kardafrica Pixel (ID 2076543316626202). Chargé sur toutes les
+         pages front (ce layout). PageView à chaque chargement. Les événements
+         e-commerce (Purchase, InitiateCheckout…) sont posés sur leurs pages dédiées. --}}
+    <script>
+    !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+    n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;
+    n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;
+    t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,
+    document,'script','https://connect.facebook.net/en_US/fbevents.js');
+    fbq('init','2076543316626202');
+    fbq('track','PageView');
+    </script>
+    <noscript><img height="1" width="1" style="display:none"
+    src="https://www.facebook.com/tr?id=2076543316626202&ev=PageView&noscript=1"/></noscript>
+    {{-- End Meta Pixel --}}
+
     <title>@yield('title', 'Kardafrica - Cartes numériques en un clic !')</title>
     <link rel="icon" type="image/png" href="{{ asset('assets/logo/FAVCON-KARDAFRICA-.png') }}">
     
