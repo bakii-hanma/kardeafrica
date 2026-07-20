@@ -1576,11 +1576,10 @@
 
                 <!-- Controles a droite : recherche, panier, user -->
                 <div class="hidden md:flex items-center gap-2">
-                    <!-- Obtenir l'app : pilule glass, distincte des CTA verts -->
-                    <a href="{{ route('download') }}" title="Télécharger l'application Android"
-                       class="inline-flex items-center gap-2 px-4 py-2 rounded-full border text-[13px] font-semibold leading-none whitespace-nowrap {{ request()->routeIs('download') ? 'border-[#4ECDC4]/50 bg-[#4ECDC4]/15 text-white' : 'border-white/15 bg-white/[0.06] text-slate-200 hover:text-white hover:bg-white/[0.12] hover:border-white/25' }} transition-all">
-                        <svg class="w-4 h-4 shrink-0 text-[#4ECDC4]" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.4"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"/></svg>
-                        Obtenir l'app
+                    <!-- Télécharger l'app : icône seule (même style que loupe / panier) -->
+                    <a href="{{ route('download') }}" aria-label="Télécharger l'application Android" title="Télécharger l'app"
+                       class="w-10 h-10 rounded-xl flex items-center justify-center active:scale-95 transition {{ request()->routeIs('download') ? 'text-white bg-white/[0.08]' : 'text-slate-300 hover:text-white hover:bg-white/[0.06]' }}">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"/></svg>
                     </a>
 
                     <!-- Search trigger (desktop) — icone seule, Ctrl+K disponible -->
