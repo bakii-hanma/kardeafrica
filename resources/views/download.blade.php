@@ -92,15 +92,19 @@
                 {{-- Gros bouton de téléchargement (style app-landing) --}}
                 <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-top: 34px;">
                     <a href="{{ $apkUrl }}" download class="dl-dlbtn"
-                       style="display: inline-flex; align-items: center; gap: 14px;
-                              padding: 15px 26px; border-radius: 16px;
-                              background: linear-gradient(135deg, #4ECDC4 0%, #44A08D 100%);
+                       style="display: inline-flex; align-items: center; gap: 13px;
+                              padding: 11px 24px 11px 13px; border-radius: 18px;
+                              background: linear-gradient(135deg, #4ECDC4 0%, #3E9A88 100%);
                               color: #ffffff; text-decoration: none;
-                              box-shadow: 0 16px 34px -10px rgba(78,205,196,0.55), inset 0 1px 0 rgba(255,255,255,0.45);">
-                        <svg style="width: 30px; height: 30px;" viewBox="0 0 24 24" fill="#ffffff"><path d="M17.6 9.48l1.84-3.18a.4.4 0 00-.15-.55.4.4 0 00-.54.15l-1.86 3.22a11.4 11.4 0 00-8.78 0L6.25 5.9a.4.4 0 00-.54-.15.4.4 0 00-.15.55L7.4 9.48A10.8 10.8 0 002 18h20a10.8 10.8 0 00-5.4-8.52zM7 15.25a1 1 0 110-2 1 1 0 010 2zm10 0a1 1 0 110-2 1 1 0 010 2z"/></svg>
-                        <span style="display: flex; flex-direction: column; line-height: 1.15;">
-                            <span style="font-size: 11px; font-weight: 600; opacity: 0.7;">Télécharger pour</span>
-                            <span style="font-family: 'Space Grotesk','Inter',sans-serif; font-size: 20px; font-weight: 800;">Android · APK</span>
+                              box-shadow: 0 18px 36px -12px rgba(78,205,196,0.6), inset 0 1px 0 rgba(255,255,255,0.35);">
+                        <span style="display: flex; align-items: center; justify-content: center;
+                                     width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0;
+                                     background: rgba(255,255,255,0.18); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.22);">
+                            <svg style="width: 26px; height: 26px;" viewBox="0 0 24 24" fill="#ffffff"><path d="M17.6 9.48l1.84-3.18a.4.4 0 00-.15-.55.4.4 0 00-.54.15l-1.86 3.22a11.4 11.4 0 00-8.78 0L6.25 5.9a.4.4 0 00-.54-.15.4.4 0 00-.15.55L7.4 9.48A10.8 10.8 0 002 18h20a10.8 10.8 0 00-5.4-8.52zM7 15.25a1 1 0 110-2 1 1 0 010 2zm10 0a1 1 0 110-2 1 1 0 010 2z"/></svg>
+                        </span>
+                        <span style="display: flex; flex-direction: column; line-height: 1.2; text-align: left;">
+                            <span style="font-size: 11px; font-weight: 600; letter-spacing: 0.02em; color: rgba(255,255,255,0.9);">Télécharger l'application</span>
+                            <span style="font-family: 'Space Grotesk','Inter',sans-serif; font-size: 19px; font-weight: 800; letter-spacing: -0.01em;">Android&nbsp;·&nbsp;APK</span>
                         </span>
                     </a>
                     <div style="display: flex; flex-direction: column; gap: 3px;">
