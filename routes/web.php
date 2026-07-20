@@ -117,6 +117,14 @@ Route::get('/card-type/{cardTypeId}', [ProductController::class, 'cardType'])->n
 Route::get('/product/{productId}', [ProductController::class, 'show'])->name('product.show');
 Route::get('/search', [ProductController::class, 'search'])->name('search');
 
+// Page de téléchargement de l'app mobile Android (APK hébergé sous public/downloads)
+Route::get('/telecharger', function () {
+    return view('download', [
+        'apkUrl'  => asset('downloads/kardafrica.apk'),
+        'version' => '1.0.0',
+    ]);
+})->name('download');
+
 // Routes API pour les produits (web context)
 Route::prefix('api')->group(function () {
     Route::get('/products', [ProductController::class, 'apiProducts'])->name('api.products');
