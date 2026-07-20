@@ -1496,11 +1496,11 @@
                         Accueil
                     </a>
 
-                    <!-- Bouton Télécharger l'app -->
+                    <!-- Bouton Télécharger l'app (CTA pilule, style app-landing) -->
                     <a href="{{ route('download') }}"
-                       class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-semibold text-[#4ECDC4] hover:text-white hover:bg-white/[0.06] transition {{ request()->routeIs('download') ? 'bg-white/[0.08] text-white' : '' }}">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"/></svg>
-                        Télécharger l'app
+                       class="inline-flex items-center gap-2 pl-3 pr-4 py-2 ml-1 rounded-full text-sm font-bold text-[#0F172A] bg-gradient-to-br from-[#4ECDC4] to-[#44A08D] hover:from-[#5EEAD4] hover:to-[#4ECDC4] transition-all shadow-lg shadow-[#4ECDC4]/25 hover:shadow-[#4ECDC4]/40 hover:-translate-y-0.5">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.4"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"/></svg>
+                        Obtenir l'app
                     </a>
 
                     <!-- Dropdown Catalogue -->
