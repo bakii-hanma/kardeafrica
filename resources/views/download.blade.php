@@ -95,9 +95,9 @@
                        style="display: inline-flex; align-items: center; gap: 14px;
                               padding: 15px 26px; border-radius: 16px;
                               background: linear-gradient(135deg, #4ECDC4 0%, #44A08D 100%);
-                              color: #0F172A; text-decoration: none;
+                              color: #ffffff; text-decoration: none;
                               box-shadow: 0 16px 34px -10px rgba(78,205,196,0.55), inset 0 1px 0 rgba(255,255,255,0.45);">
-                        <svg style="width: 30px; height: 30px;" viewBox="0 0 24 24" fill="#0F172A"><path d="M17.6 9.48l1.84-3.18a.4.4 0 00-.15-.55.4.4 0 00-.54.15l-1.86 3.22a11.4 11.4 0 00-8.78 0L6.25 5.9a.4.4 0 00-.54-.15.4.4 0 00-.15.55L7.4 9.48A10.8 10.8 0 002 18h20a10.8 10.8 0 00-5.4-8.52zM7 15.25a1 1 0 110-2 1 1 0 010 2zm10 0a1 1 0 110-2 1 1 0 010 2z"/></svg>
+                        <svg style="width: 30px; height: 30px;" viewBox="0 0 24 24" fill="#ffffff"><path d="M17.6 9.48l1.84-3.18a.4.4 0 00-.15-.55.4.4 0 00-.54.15l-1.86 3.22a11.4 11.4 0 00-8.78 0L6.25 5.9a.4.4 0 00-.54-.15.4.4 0 00-.15.55L7.4 9.48A10.8 10.8 0 002 18h20a10.8 10.8 0 00-5.4-8.52zM7 15.25a1 1 0 110-2 1 1 0 010 2zm10 0a1 1 0 110-2 1 1 0 010 2z"/></svg>
                         <span style="display: flex; flex-direction: column; line-height: 1.15;">
                             <span style="font-size: 11px; font-weight: 600; opacity: 0.7;">Télécharger pour</span>
                             <span style="font-family: 'Space Grotesk','Inter',sans-serif; font-size: 20px; font-weight: 800;">Android · APK</span>
@@ -252,7 +252,7 @@
         <div style="margin-top: 40px; text-align: center;">
             <a href="{{ $apkUrl }}" download class="dl-dlbtn"
                style="display: inline-flex; align-items: center; gap: 12px; padding: 15px 30px; border-radius: 16px;
-                      background: linear-gradient(135deg, #4ECDC4 0%, #44A08D 100%); color: #0F172A; text-decoration: none; font-weight: 800;
+                      background: linear-gradient(135deg, #4ECDC4 0%, #44A08D 100%); color: #ffffff; text-decoration: none; font-weight: 800;
                       font-family:'Space Grotesk','Inter',sans-serif; font-size: 17px;
                       box-shadow: 0 16px 34px -10px rgba(78,205,196,0.55), inset 0 1px 0 rgba(255,255,255,0.45);">
                 <svg style="width: 22px; height: 22px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"/></svg>
