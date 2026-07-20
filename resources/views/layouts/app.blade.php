@@ -1578,11 +1578,9 @@
                 <div class="hidden md:flex items-center gap-2">
                     <!-- Obtenir l'app : pilule glass, distincte des CTA verts -->
                     <a href="{{ route('download') }}" title="Télécharger l'application Android"
-                       class="group inline-flex items-center gap-2 pl-2.5 pr-3.5 py-2 rounded-full border {{ request()->routeIs('download') ? 'border-[#4ECDC4]/50 bg-[#4ECDC4]/15 text-white' : 'border-white/15 bg-white/[0.06] text-slate-200 hover:text-white hover:bg-white/[0.12] hover:border-white/25' }} transition-all">
-                        <span class="w-6 h-6 rounded-full bg-gradient-to-br from-[#4ECDC4] to-[#44A08D] flex items-center justify-center shrink-0">
-                            <svg class="w-3.5 h-3.5 text-[#0F172A]" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.6"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"/></svg>
-                        </span>
-                        <span class="text-[13px] font-semibold whitespace-nowrap">Obtenir l'app</span>
+                       class="inline-flex items-center gap-2 px-4 py-2 rounded-full border text-[13px] font-semibold leading-none whitespace-nowrap {{ request()->routeIs('download') ? 'border-[#4ECDC4]/50 bg-[#4ECDC4]/15 text-white' : 'border-white/15 bg-white/[0.06] text-slate-200 hover:text-white hover:bg-white/[0.12] hover:border-white/25' }} transition-all">
+                        <svg class="w-4 h-4 shrink-0 text-[#4ECDC4]" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.4"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"/></svg>
+                        Obtenir l'app
                     </a>
 
                     <!-- Search trigger (desktop) — icone seule, Ctrl+K disponible -->
