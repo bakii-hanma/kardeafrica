@@ -999,7 +999,21 @@ class ProductApiService
      * server-side d'afrikard (param `name`) en source primaire — sinon on
      * raterait toutes les marques absentes des ~200 premiers items du cache.
      */
+    /**
+     * Wrapper de cache : mémorise le résultat filtré/trié/paginé par combinaison
+     * de filtres+page (TTL 15 min). Évite de relire 7 Mo de cache + refiltrer/
+     * trier 9000+ produits à CHAQUE requête boutique → affichage instantané sur
+     * les vues courantes (défaut, régions, catégories).
+     */
     public function getFilteredProducts($filters = [], $page = 1, $perPage = 12)
+    {
+        $key = 'filtered_v1_' . md5(json_encode($filters) . "_p{$page}_pp{$perPage}");
+        return Cache::remember($key, 900, function () use ($filters, $page, $perPage) {
+            return $this->computeFilteredProducts($filters, $page, $perPage);
+        });
+    }
+
+    private function computeFilteredProducts($filters = [], $page = 1, $perPage = 12)
     {
         $searchTerm = trim((string) ($filters['search'] ?? ''));
 
