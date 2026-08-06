@@ -865,9 +865,48 @@ class ProductApiService
      *                      France, Google Play France…). Coûteux → réservé au
      *                      CLI / job async, jamais sur une requête web.
      */
+    /**
+     * Récupère TOUT le catalogue en 1 requête via le blob agrégé afrikard
+     * (/catalog/all, servi depuis Redis). Renvoie [] si indispo → le caller
+     * retombe sur la pagination.
+     */
+    private function fetchCatalogBlob(): array
+    {
+        try {
+            $res = Http::timeout(app()->runningInConsole() ? 60 : 20)
+                ->get("{$this->baseUrl}/catalog/all");
+            if (!$res->successful()) return [];
+
+            $items = $res->json()['items'] ?? [];
+            if (!is_array($items) || count($items) < 500) return [];
+
+            $out = [];
+            foreach ($items as $item) {
+                if (($item['id'] ?? null) === null) continue;
+                if ($this->isBlockedProduct($item)) continue;   // exclut CH/CHF, AE/AED…
+                $out[] = $this->processCatalogItem($item);
+            }
+            return $out;
+        } catch (\Throwable $e) {
+            Log::warning('fetchCatalogBlob (/catalog/all) failed: ' . $e->getMessage());
+            return [];
+        }
+    }
+
     private function buildCatalog(bool $enrich): array
     {
         try {
+            // 0. PRIORITÉ : blob agrégé afrikard (/catalog/all) — 1 seule requête,
+            //    tout le catalogue déjà agrégé + enrichi côté afrikard (cache Redis).
+            //    Remplace la pagination 50 pages + ~40 requêtes d'enrichissement.
+            $blob = $this->fetchCatalogBlob();
+            if (count($blob) >= 500) {
+                Cache::put(self::CACHE_FRESH, $blob, $this->cacheDuration);
+                Cache::put(self::CACHE_SNAPSHOT, $blob, self::SNAPSHOT_TTL);
+                return $blob;
+            }
+
+            // Fallback (blob indispo) : ancienne pagination + enrichissement.
             // Pas de budget en CLI/job ; budget serré (45s) pour l'amorçage web.
             $budget = app()->runningInConsole() ? null : 45;
             $items = $this->fetchAllCatalogPages(100, 50, $budget);
