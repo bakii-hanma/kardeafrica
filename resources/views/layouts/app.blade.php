@@ -2282,12 +2282,12 @@
         
         function hideLoader() {
             const loader = document.getElementById('pageLoader');
+            // Masquage IMMÉDIAT (fondu 300ms). L'ancien délai de 2000ms faisait
+            // rester le loader ~2,5s de trop — c'était ça la lenteur perçue.
+            loader.classList.add('loader-fadeout');
             setTimeout(function() {
-                loader.classList.add('loader-fadeout');
-                setTimeout(function() {
-                    loader.style.display = 'none';
-                }, 500);
-            }, 2000); // Augmenté à 2 secondes
+                loader.style.display = 'none';
+            }, 300);
         }
         
         // Afficher le loader au début
@@ -2305,11 +2305,11 @@
                 loaderHidden = true;
                 hideLoader();
             }
-            // Le DOM est prêt ici → la page est affichable : on cache tout de suite
-            // (petit délai pour la transition), sans attendre les ressources lentes.
-            setTimeout(safeHide, 400);
-            // Filet de sécurité absolu : jamais plus de 2,5s de loader.
-            setTimeout(safeHide, 2500);
+            // Le DOM est prêt ici → la page est affichable : on cache quasi
+            // tout de suite (le contenu est déjà rendu côté serveur).
+            setTimeout(safeHide, 120);
+            // Filet de sécurité absolu.
+            setTimeout(safeHide, 1500);
             // Si tout charge très vite, on cache aussi sur 'load'.
             window.addEventListener('load', safeHide);
             
@@ -2337,10 +2337,12 @@
                             showLoader();
                         }
                         
-                        // Naviguer après un court délai
+                        // Naviguer quasi immédiatement (juste le temps que le
+                        // loader s'affiche). L'ancien délai de 300ms ralentissait
+                        // chaque navigation pour rien.
                         setTimeout(function() {
                             window.location.href = link.href;
-                        }, 300);
+                        }, 60);
                     }
                 });
             });
