@@ -10,6 +10,11 @@
     <title>@yield('title', 'Kardafrica - Cartes numériques en un clic !')</title>
     <link rel="icon" type="image/png" href="{{ asset('assets/logo/FAVCON-KARDAFRICA-.png') }}">
     
+    {{-- Preconnect au host des images de marques (S3) — accélère le chargement
+         des visuels de cartes (handshake DNS/TLS anticipé). --}}
+    <link rel="preconnect" href="https://bamboo-assets.s3.amazonaws.com" crossorigin>
+    <link rel="dns-prefetch" href="https://bamboo-assets.s3.amazonaws.com">
+
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=figtree:400,600&display=swap" rel="stylesheet" />
@@ -2184,10 +2189,8 @@
                     <h4 class="text-white text-sm font-bold uppercase tracking-wider mb-4">Légal</h4>
                     <ul class="space-y-2.5 text-sm">
                         <li><a href="{{ route('about') }}" class="hover:text-[#4ECDC4] transition">À propos</a></li>
-                        <li><a href="#" class="hover:text-[#4ECDC4] transition">Conditions d'utilisation</a></li>
-                        <li><a href="#" class="hover:text-[#4ECDC4] transition">Politique de confidentialité</a></li>
-                        <li><a href="#" class="hover:text-[#4ECDC4] transition">Mentions légales</a></li>
-                        <li><a href="#" class="hover:text-[#4ECDC4] transition">Cookies</a></li>
+                        <li><a href="{{ route('privacy') }}" class="hover:text-[#4ECDC4] transition">Politique de confidentialité</a></li>
+                        <li><a href="{{ route('data-deletion') }}" class="hover:text-[#4ECDC4] transition">Suppression des données</a></li>
                     </ul>
                 </div>
             </div>
@@ -2311,9 +2314,12 @@
             window.addEventListener('load', safeHide);
             
             // Afficher le loader lors de la navigation
-            const links = document.querySelectorAll('a:not([href^="#"]):not([href^="mailto"]):not([href^="tel"]):not([target="_blank"])');
+            const links = document.querySelectorAll('a:not([href^="#"]):not([href^="mailto"]):not([href^="tel"]):not([target="_blank"]):not([download]):not([data-no-loader])');
             links.forEach(function(link) {
                 link.addEventListener('click', function(e) {
+                    // Jamais de loader pour un téléchargement de fichier (la page ne
+                    // se recharge pas → le loader resterait bloqué indéfiniment).
+                    if (link.hasAttribute('download') || link.hasAttribute('data-no-loader')) return;
                     // Vérifier si c'est un lien interne
                     if (link.hostname === window.location.hostname) {
                         // Ajouter un délai pour s'assurer que le loader est visible
