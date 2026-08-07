@@ -155,12 +155,14 @@
                 <div class="mb-6">
                     <div class="flex items-center justify-between mb-3">
                         <h3 class="text-sm font-bold text-slate-900" x-text="selectedTitle"></h3>
-                        <span class="text-xs text-slate-500" x-show="products.length">
-                            <span x-text="products.length"></span> montant<span x-show="products.length > 1">s</span>
+                        <span class="text-xs text-slate-500" x-show="products.length > 1">
+                            +<span x-text="products.length - 1"></span> autre<span x-show="products.length > 2">s</span> ci-dessous
                         </span>
                     </div>
                     <div class="flex flex-wrap gap-2">
-                        <template x-for="product in products" :key="product.id">
+                        {{-- N'affiche QUE la carte sélectionnée ; les autres montants
+                             sont proposés plus bas dans « Cartes similaires ». --}}
+                        <template x-for="product in (selectedProduct ? [selectedProduct] : products.slice(0,1))" :key="product.id">
                             <button @click="selectProduct(product)" type="button"
                                     class="relative px-5 py-3 rounded-xl border-2 transition-all duration-200 font-bold text-sm min-w-[90px] active:scale-95"
                                     :class="selectedProduct && selectedProduct.id === product.id
@@ -245,6 +247,38 @@
                         @endif
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- ================================================================
+         CARTES SIMILAIRES : les autres montants de la même carte (même type),
+         qui étaient auparavant dans la grille de sélection. Cliquer sélectionne
+         le montant et remonte en haut de la fiche.
+         ================================================================ --}}
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-32" x-show="products.length > 1" x-cloak>
+        <div class="border-t border-slate-100 pt-8">
+            <h2 class="text-lg font-bold text-slate-900 mb-1">Cartes similaires</h2>
+            <p class="text-sm text-slate-500 mb-5">Autres montants disponibles pour cette carte.</p>
+            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                <template x-for="product in products.filter(p => !selectedProduct || p.id !== selectedProduct.id)" :key="'sim-' + product.id">
+                    <button type="button"
+                            @click="selectProduct(product); window.scrollTo({ top: 0, behavior: 'smooth' })"
+                            class="group text-left bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md hover:border-[#44A08D]/50 transition-all overflow-hidden">
+                        <div class="h-20 flex items-center justify-center p-3" :style="'background-color:' + cardInfo.brandColor + '14'">
+                            <template x-if="cardInfo.logoUrl">
+                                <img :src="cardInfo.logoUrl" :alt="cardInfo.name" class="max-h-12 max-w-[70%] object-contain">
+                            </template>
+                            <template x-if="!cardInfo.logoUrl">
+                                <span class="text-2xl font-black" :style="'color:' + cardInfo.brandColor" x-text="cardInfo.name.charAt(0)"></span>
+                            </template>
+                        </div>
+                        <div class="p-3">
+                            <div class="text-xs text-slate-500 truncate" x-text="cardInfo.name"></div>
+                            <div class="text-sm font-bold text-[#44A08D] mt-0.5" x-text="formatPrice(product.price.min, product.price.currencyCode)"></div>
+                        </div>
+                    </button>
+                </template>
             </div>
         </div>
     </div>
