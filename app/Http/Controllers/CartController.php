@@ -39,6 +39,24 @@ class CartController extends Controller
             'quantity' => 'nullable|integer|min:1'
         ]);
 
+        // C1 — DÉTECTION (Palier 1, sans blocage) : compare le prix envoyé par le
+        // client au prix serveur faisant autorité (Money::toFcfa). On ne rejette
+        // rien encore ; on journalise les écarts pour valider avant enforcement.
+        try {
+            $authPrice = app(\App\Services\ProductApiService::class)
+                ->authoritativePriceFcfa($request->product_id);
+            if ($authPrice !== null && (int) round((float) $request->price) !== $authPrice) {
+                \Illuminate\Support\Facades\Log::warning('C1 price mismatch (cart:add)', [
+                    'product_id'    => $request->product_id,
+                    'client_price'  => $request->price,
+                    'authoritative' => $authPrice,
+                    'user_id'       => Auth::id(),
+                ]);
+            }
+        } catch (\Throwable $e) {
+            // détection strictement non bloquante — ne jamais interrompre l'ajout
+        }
+
         $userId = Auth::id();
         $sessionId = Session::getId();
         

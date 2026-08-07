@@ -1402,6 +1402,42 @@ class ProductApiService
     }
 
     /**
+     * Prix FCFA FAISANT AUTORITÉ pour un produit (anti-fraude C1). Recalculé
+     * côté serveur depuis le catalogue via Money::toFcfa, indépendamment de tout
+     * prix envoyé par le client.
+     *
+     * Retourne null si le produit n'est pas un produit afrikard résolvable
+     * (cartes marchand `merchant_*`, Daywatch `daywatch_*`, id porteur d'un
+     * suffixe de valeur, ou introuvable au catalogue) — ces cas ont un prix
+     * géré ailleurs et ne doivent pas générer de faux positifs.
+     */
+    public function authoritativePriceFcfa(int|string $productId): ?int
+    {
+        $pid = (string) $productId;
+
+        // Prix géré séparément → ne pas contrôler ici.
+        if (str_starts_with($pid, 'merchant_') || str_starts_with($pid, 'daywatch_')) {
+            return null;
+        }
+        // Id afrikard "propre" attendu (entier). Les ids suffixés "-<valeur>"
+        // encodent une dénomination spécifique : on les laisse à un palier ultérieur.
+        if (!ctype_digit($pid)) {
+            return null;
+        }
+
+        $numericId = (int) $pid;
+        $product = collect($this->getAllProducts(0, 99999))->firstWhere('id', $numericId)
+            ?? $this->getProductByIdLight($numericId);
+        if (!$product) return null;
+
+        $min = $product['price']['min'] ?? null;
+        $cur = $product['price']['currencyCode'] ?? null;
+        if ($min === null || $cur === null) return null;
+
+        return \App\Support\Money::toFcfa($min, $cur);
+    }
+
+    /**
      * Map léger [cardTypeId => productsCount] pour enrichir les listings
      * (ex: afficher "X montants disponibles" sur chaque carte du catalogue).
      * Cache séparé du listing complet — recalcul O(n) à partir du catalogue
