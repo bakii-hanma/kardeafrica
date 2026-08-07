@@ -44,6 +44,30 @@ class ProcessCheckoutJob implements ShouldQueue
     {
         Log::info('ProcessCheckoutJob: Debut du traitement', ['order_id' => $this->order->id]);
 
+        // Idempotence — garde-fou CRITIQUE. Sans worker/cron, ces jobs sont
+        // restés en file des mois ; en réactivant la file ils seraient rejoués.
+        // Une commande déjà complétée NE DOIT PAS être re-livrée : cela
+        // rappellerait afrikard/Bamboo = double débit + doublons de cartes.
+        $this->order->refresh();
+        if ($this->order->status === Order::STATUS_COMPLETED) {
+            Log::info('ProcessCheckoutJob: commande déjà complétée, aucune action (idempotence)', [
+                'order_id' => $this->order->id,
+            ]);
+            return;
+        }
+
+        // Garde PAIEMENT — CRITIQUE. Ne JAMAIS livrer une commande dont le
+        // paiement n'est pas confirmé : d'anciens jobs en file correspondent à
+        // des paiements abandonnés (payment_status != completed). Les livrer
+        // donnerait des cartes gratuites (débit Bamboo réel sans encaissement).
+        if ($this->order->payment_status !== Order::PAYMENT_STATUS_COMPLETED) {
+            Log::warning('ProcessCheckoutJob: paiement non confirmé, livraison refusée', [
+                'order_id'       => $this->order->id,
+                'payment_status' => $this->order->payment_status,
+            ]);
+            return;
+        }
+
         // Charger les order items + user pour l'identité buyer (Carte Gabon)
         $this->order->load(['orderItems', 'user']);
 

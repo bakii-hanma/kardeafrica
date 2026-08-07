@@ -39,3 +39,8 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# secrets — NE JAMAIS committer (clé de signature Android + mot de passe)
+kardafrica.keystore
+*.keystore
+credentials.json

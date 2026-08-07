@@ -25,6 +25,14 @@ class ProductApiService
     private $cacheDuration = 3600; // 1 heure
 
     /**
+     * Mémoïsation par requête du catalogue traité. La page détail lit le
+     * catalogue complet (~7 Mo) pour trouver 1 produit PUIS pour les produits
+     * similaires : sans ceci on désérialise 7 Mo deux fois par affichage. On ne
+     * garde qu'une copie en mémoire le temps de la requête HTTP courante.
+     */
+    private $catalogMemo = null;
+
+    /**
      * Pays autorisés pour l'affichage (France, Global, US uniquement)
      */
     private $allowedCountries = ['FR', 'US', 'GLOBAL', 'GL'];
@@ -810,6 +818,16 @@ class ProductApiService
      * européennes — Fnac, Darty, FNAC Belgium, Fnac Billetterie, etc.).
      */
     private function fetchAndProcessAllProducts()
+    {
+        // Mémoïsation par requête : évite de re-désérialiser ~7 Mo plusieurs fois
+        // pour un même affichage (page détail = produit + produits similaires).
+        if ($this->catalogMemo !== null) {
+            return $this->catalogMemo;
+        }
+        return $this->catalogMemo = $this->computeProcessedCatalog();
+    }
+
+    private function computeProcessedCatalog()
     {
         // ⚠ bump le suffixe quand on change la composition du catalogue.
         $cacheKey = self::CACHE_FRESH;

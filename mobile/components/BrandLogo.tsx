@@ -35,14 +35,17 @@ export function BrandLogo({ brand, size = 52, width, height }: BrandLogoProps) {
         </Svg>
       );
 
-    case 'psn':
-      // PS large + N fin (= proposition)
+    case 'psn': {
+      // "PS" gras + "N" fin — identique au logo web (le SVG path fait main
+      // ressortait comme "FIK", d'où ce rendu texte propre).
+      const h = height ?? 32;
       return (
-        <Svg width={width ?? 80} height={height ?? 32} viewBox="0 0 200 80">
-          <Path d="M0 60 L0 0 L42 0 L42 12 L18 12 L18 24 L40 24 L40 36 L18 36 L18 60 Z M52 60 L52 0 L80 0 L80 60 Z" fill="#ffffff" />
-          <Path d="M90 60 L90 0 L110 0 L110 28 L130 0 L150 0 L130 30 L150 60 L130 60 L110 32 L110 60 Z" fill="#ffffff" />
-        </Svg>
+        <View style={{ flexDirection: 'row', alignItems: 'flex-end' }}>
+          <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: h * 0.92, letterSpacing: -2, lineHeight: h }}>PS</Text>
+          <Text style={{ color: '#ffffff', fontWeight: '300', fontSize: h * 0.5, lineHeight: h * 0.9, marginLeft: 1 }}>N</Text>
+        </View>
       );
+    }
 
     case 'netflix':
       // Logo "N" stylisé Netflix (rouge sur fond sombre)

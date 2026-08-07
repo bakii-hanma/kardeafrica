@@ -8,6 +8,7 @@ import SplashScreen from './splash';
 import { CartProvider } from '../context/CartContext';
 import { AlertProvider } from '../context/AlertContext';
 import { CatalogService } from '../services/catalog';
+import { initAnalytics } from '../services/analytics';
 
 export default function RootLayout() {
   const [appIsReady, setAppIsReady] = useState(false);
@@ -17,6 +18,9 @@ export default function RootLayout() {
   useEffect(() => {
     async function prepare() {
       try {
+        // Meta App Events (équivalent Pixel côté app) — best-effort
+        initAnalytics();
+
         // Vérifier si c'est le premier lancement
         const value = await AsyncStorage.getItem('hasSeenOnboarding');
         if (value === null) {
@@ -30,7 +34,7 @@ export default function RootLayout() {
         CatalogService.refreshCurrencyRates().catch(() => {});
 
         // Simuler un chargement ou vérifier l'état de l'app
-        await new Promise(resolve => setTimeout(resolve, 2500)); // Afficher le splash pendant 2.5s
+        await new Promise(resolve => setTimeout(resolve, 900)); // splash court (perf) — était 2.5s
       } catch (e) {
         console.warn(e);
       } finally {

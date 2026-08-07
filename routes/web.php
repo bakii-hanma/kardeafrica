@@ -125,6 +125,10 @@ Route::get('/telecharger', function () {
     ]);
 })->name('download');
 
+// Pages légales
+Route::view('/confidentialite',     'legal.privacy')->name('privacy');
+Route::view('/suppression-donnees', 'legal.data-deletion')->name('data-deletion');
+
 // Routes API pour les produits (web context)
 Route::prefix('api')->group(function () {
     Route::get('/products', [ProductController::class, 'apiProducts'])->name('api.products');

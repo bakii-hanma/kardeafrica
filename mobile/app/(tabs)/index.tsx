@@ -4,6 +4,7 @@ import { MagnifyingGlassIcon, BellIcon } from 'react-native-heroicons/outline';
 import { CATEGORIES } from '../../data/mock';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState, useRef, useEffect } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CatalogService, PopularCardType } from '../../services/catalog';
 import EmptyState from '../../components/EmptyState';
 import LoadingKeychain from '../../components/LoadingKeychain';
@@ -132,15 +133,28 @@ export default function HomeScreen() {
   }, []);
 
   const loadProducts = async () => {
+    // 1) Affichage INSTANTANÉ depuis le cache local (stale-while-revalidate),
+    //    équivalent du snapshot côté web : l'accueil s'affiche sans attendre le réseau.
     try {
-      setIsLoading(true);
-      // Endpoint dédié : /api/v1/catalog/popular → renvoie cardTypes triés
-      // (popularité Afrique → Europe FR/BE → reste). Mêmes que welcome.blade web.
+      const cached = await AsyncStorage.getItem('cache_popular_v1');
+      if (cached) {
+        const arr = JSON.parse(cached);
+        if (Array.isArray(arr) && arr.length) {
+          setProducts(arr);
+          setIsLoading(false);
+        }
+      }
+    } catch { /* pas de cache, on continue */ }
+
+    // 2) Rafraîchissement en arrière-plan + mise à jour du cache.
+    try {
       const popular = await CatalogService.getPopular(12);
-      setProducts(popular);
+      if (Array.isArray(popular) && popular.length) {
+        setProducts(popular);
+        AsyncStorage.setItem('cache_popular_v1', JSON.stringify(popular)).catch(() => {});
+      }
     } catch (error) {
       console.error('Failed to load popular cards:', error);
-      setProducts([]);
     } finally {
       setIsLoading(false);
     }
@@ -154,12 +168,14 @@ export default function HomeScreen() {
       <View className="bg-[#1F2937] px-4 pt-2 pb-6 shadow-lg z-50">
         <View className="flex-row justify-between items-center mb-4">
           <View className="flex-row items-center">
-            <Image 
-              source={require('../assets/FAVCON-KARDAFRICA-.png')} 
-              className="w-10 h-10 mr-2 rounded-full bg-white/10"
-              resizeMode="contain"
-            />
-            <Text className="text-xl font-bold text-white tracking-tight">KarDAfrica</Text>
+            <View className="w-10 h-10 mr-2 rounded-xl bg-[#44A08D] items-center justify-center" style={{ padding: 5 }}>
+              <Image
+                source={require('../assets/FAVCON-KARDAFRICA-.png')}
+                className="w-full h-full"
+                resizeMode="contain"
+              />
+            </View>
+            <Text className="text-xl font-bold text-white tracking-tight">KardAfrica</Text>
           </View>
           
           <View className="flex-row items-center">
@@ -295,6 +311,7 @@ export default function HomeScreen() {
                       brandLabel={fullName}
                       brandColor={brandColor}
                       countryCode={cardType.countryCode}
+                      logoUrl={logoUrl}
                       gradId={`home-${cardType.id}`}
                     />
 

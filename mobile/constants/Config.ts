@@ -7,8 +7,10 @@ export const Config = {
   BASE_URL: 'https://kardafrica.com',
   STORAGE_URL: 'https://kardafrica.com/storage',
 
-  // External APIs
-  CATALOG_API_URL: 'https://afrikard-api.duckdns.org/api/v1',
+  // External APIs — fallback catalogue direct (utilisé seulement si l'API
+  // kardafrica est injoignable). Pointe vers le VPS afrikard actuel ; l'ancien
+  // hôte afrikard-api.duckdns.org est éteint (aucune réponse).
+  CATALOG_API_URL: 'https://srv1882929.hstgr.cloud/api/v1',
 
   // Payment APIs
   PAYMENT_API_INIT: 'https://emoneygabon.alwaysdata.net/la-map-gabon/api/payment/init.php',

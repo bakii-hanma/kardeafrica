@@ -1,9 +1,9 @@
 {
   "expo": {
-    "name": "mobile",
-    "slug": "mobile",
+    "name": "Kardafrica",
+    "slug": "kardafrica",
     "scheme": "kardafrica",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -14,12 +14,15 @@
       "backgroundColor": "#1A202C"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.kardafrica.app"
     },
     "android": {
+      "package": "com.kardafrica.app",
+      "versionCode": 2,
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "foregroundImage": "./assets/adaptive-foreground.png",
+        "backgroundColor": "#44A08D"
       },
       "edgeToEdgeEnabled": true
     },
@@ -29,6 +32,13 @@
     "plugins": [
       "expo-router",
       "@react-native-community/datetimepicker"
-    ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "151bd33b-e80a-4f54-b6ae-52d3fc0751c0"
+      }
+    },
+    "owner": "kombins"
   }
 }

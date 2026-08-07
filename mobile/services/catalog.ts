@@ -12,7 +12,7 @@ import { Config } from '../constants/Config';
  */
 
 const API_URL          = Config.API_URL;          // https://kardafrica.com/api
-const AFRIKARD_API_URL = Config.CATALOG_API_URL;  // https://afrikard-api.duckdns.org/api/v1
+const AFRIKARD_API_URL = Config.CATALOG_API_URL;  // VPS afrikard (srv1882929.hstgr.cloud)
 
 // ============================================================
 // Types
@@ -80,14 +80,15 @@ export interface PopularCardType {
 // Constantes (mêmes valeurs que le web côté PHP)
 // ============================================================
 
-// Devises bloquées : cartes UAE inutilisables en Afrique
-const BLOCKED_COUNTRIES  = new Set(['AE']);
-const BLOCKED_CURRENCIES = new Set(['AED']);
+// Pays / devises bloqués (mêmes valeurs que le web : ProductApiService).
+// UAE (AED) inutilisable en Afrique ; Suisse (CHF) masquée côté web.
+const BLOCKED_COUNTRIES  = new Set(['AE', 'CH']);
+const BLOCKED_CURRENCIES = new Set(['AED', 'CHF']);
 
 // Mapping pays → région (cohérent avec ProductApiService::regionMap)
 const REGION_MAP: Record<string, string> = {
   FR: 'europe', BE: 'europe', DE: 'europe', IT: 'europe', ES: 'europe', PT: 'europe',
-  NL: 'europe', GB: 'europe', IE: 'europe', LU: 'europe', CH: 'europe', AT: 'europe',
+  NL: 'europe', GB: 'europe', IE: 'europe', LU: 'europe', AT: 'europe',
   DK: 'europe', SE: 'europe', NO: 'europe', FI: 'europe', PL: 'europe', CZ: 'europe',
   GR: 'europe', HU: 'europe', RO: 'europe', BG: 'europe', SK: 'europe', SI: 'europe',
   HR: 'europe', EE: 'europe', LV: 'europe', LT: 'europe', MT: 'europe', CY: 'europe',

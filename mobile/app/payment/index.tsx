@@ -10,6 +10,7 @@ import * as PaymentService from '../../services/payment';
 import { useCart } from '../../context/CartContext';
 import { useAlert } from '../../context/AlertContext';
 import { formatFCFA } from '../../utils/currency';
+import { logPurchase } from '../../services/analytics';
 import LoadingKeychain from '../../components/LoadingKeychain';
 
 export default function PaymentScreen() {
@@ -31,73 +32,6 @@ export default function PaymentScreen() {
   const externalRef = useRef<string>('');
   const pollingAttempts = useRef(0);
   const pollingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Simulate payment (DEV only)
-  const [isSimulating, setIsSimulating] = useState(false);
-
-  const runSimulation = async () => {
-    setIsSimulating(true);
-    try {
-      const items = cartItems.map((it: any) => ({
-        product_id: String(it.id || it.product_id),
-        name:       it.name,
-        price:      Number(it.price) || 0,
-        quantity:   Number(it.quantity) || 1,
-        image_url:  it.image,
-      }));
-
-      const result = await PaymentService.simulatePayment(items);
-
-      if (result.success) {
-        clearCart();
-        const delivered = result.cards_delivered && result.cards_delivered > 0;
-        showAlert({
-          title:   delivered ? 'Cartes livrées !' : 'Paiement simulé',
-          message: result.message || 'Commande créée avec succès.',
-          variant: delivered ? 'success' : 'info',
-          buttons: [
-            { label: 'Voir mes cartes',  variant: 'primary',  onPress: () => router.replace('/(tabs)/wallet') },
-            { label: 'Voir la commande', variant: 'secondary', onPress: () => result.order_id
-              ? router.replace(`/orders/${result.order_id}`)
-              : router.replace('/(tabs)/wallet') },
-          ],
-        });
-      } else {
-        showAlert({ title: 'Échec simulation', message: result.message || 'Erreur inconnue', variant: 'error' });
-      }
-    } catch (e: any) {
-      showAlert({ title: 'Erreur', message: e?.message || 'Erreur réseau', variant: 'error' });
-    } finally {
-      setIsSimulating(false);
-    }
-  };
-
-  const handleSimulate = () => {
-    if (isSimulating || isLoading) return;
-    if (!user) {
-      showAlert({
-        title: 'Connexion requise',
-        message: 'Tu dois être connecté pour simuler un paiement.',
-        variant: 'warning',
-        buttons: [{ label: 'Se connecter', variant: 'primary', onPress: () => router.push('/login') }],
-      });
-      return;
-    }
-    if (cartItems.length === 0) {
-      showAlert({ title: 'Panier vide', message: 'Ajoute des articles avant de simuler.', variant: 'info' });
-      return;
-    }
-
-    showAlert({
-      title: 'Simuler le paiement ?',
-      message: 'Mode développeur uniquement — la commande sera créée et marquée payée sans passer par E-Billing.',
-      variant: 'warning',
-      buttons: [
-        { label: 'Annuler', variant: 'secondary' },
-        { label: 'Simuler', variant: 'primary', onPress: runSimulation },
-      ],
-    });
-  };
 
   // Load real user data on mount
   useEffect(() => {
@@ -228,24 +162,38 @@ export default function PaymentScreen() {
     }
   };
 
+  // Annule la vérification en cours et revient à l'écran de paiement.
+  const cancelVerification = () => {
+    if (pollingTimer.current) clearTimeout(pollingTimer.current);
+    pollingTimer.current = null;
+    pollingAttempts.current = 0;
+    setIsLoading(false);
+    setPaymentStatus('idle');
+    setStatusMessage('');
+  };
+
   const startPolling = () => {
     setIsLoading(true);
     setPaymentStatus('pending');
-    setStatusMessage('Verification du statut du paiement...');
+    setStatusMessage('Vérification du statut du paiement...');
     pollingAttempts.current = 0;
     if (pollingTimer.current) clearTimeout(pollingTimer.current);
     poll();
   };
 
   const poll = async () => {
-    if (pollingAttempts.current >= 60) {
+    // Max 20 tentatives × 3s = 60s. Au-delà : échec, on invite à réessayer.
+    if (pollingAttempts.current >= 20) {
+      if (pollingTimer.current) clearTimeout(pollingTimer.current);
+      pollingTimer.current = null;
       setIsLoading(false);
       setPaymentStatus('failed');
-      setStatusMessage('Delai de verification depasse.');
+      setStatusMessage('');
       showAlert({
-        title: 'Délai dépassé',
-        message: 'La vérification du paiement a pris trop de temps. Si tu as bien payé, tes cartes apparaîtront dans quelques minutes — ou utilise le bouton "Relancer" sur ta commande.',
-        variant: 'warning',
+        title: 'Échec de paiement',
+        message: 'Le paiement n\'a pas pu être confirmé. Veuillez réessayer.',
+        variant: 'error',
+        buttons: [{ label: 'Réessayer', variant: 'primary' }],
       });
       return;
     }
@@ -267,6 +215,10 @@ export default function PaymentScreen() {
           console.log('Finalize result:', finalizeResult);
 
           if (finalizeResult.success) {
+            // Meta App Events — Purchase (avant de vider le panier)
+            const purchaseTotal = cartItems.reduce((s: number, it: any) =>
+              s + (Number(it.price) || 0) * (Number(it.quantity) || 1), 0);
+            logPurchase(purchaseTotal, 'XAF', { fb_num_items: cartItems.length });
             // Clear local cart
             clearCart();
 
@@ -296,13 +248,16 @@ export default function PaymentScreen() {
           }
           return;
         } else if (s === 'failed' || s === 'cancelled' || s === 'expired') {
+          if (pollingTimer.current) clearTimeout(pollingTimer.current);
+          pollingTimer.current = null;
           setIsLoading(false);
           setPaymentStatus('failed');
-          setStatusMessage(`Paiement echoue (Statut: ${s})`);
+          setStatusMessage('');
           showAlert({
-            title: 'Paiement échoué',
-            message: `Le paiement a échoué : ${s}. Tu peux réessayer depuis le panier.`,
+            title: 'Échec de paiement',
+            message: 'Le paiement n\'a pas pu être confirmé. Veuillez réessayer.',
             variant: 'error',
+            buttons: [{ label: 'Réessayer', variant: 'primary' }],
           });
           return;
         }
@@ -316,10 +271,19 @@ export default function PaymentScreen() {
 
   if (isLoading) {
     return (
-      <View className="flex-1 justify-center items-center bg-white">
+      <View className="flex-1 justify-center items-center bg-white px-8">
         <LoadingKeychain />
         {statusMessage ? (
-          <Text className="text-gray-500 text-center mt-4 px-8">{statusMessage}</Text>
+          <Text className="text-gray-500 text-center mt-4">{statusMessage}</Text>
+        ) : null}
+        {/* Pendant la vérification du paiement : possibilité d'annuler */}
+        {paymentStatus === 'pending' ? (
+          <TouchableOpacity
+            onPress={cancelVerification}
+            style={{ marginTop: 28, paddingVertical: 12, paddingHorizontal: 30, borderRadius: 12, borderWidth: 1.5, borderColor: '#E2E8F0', backgroundColor: '#fff' }}
+          >
+            <Text style={{ color: '#475569', fontWeight: '700', fontSize: 14 }}>Annuler</Text>
+          </TouchableOpacity>
         ) : null}
       </View>
     );
@@ -426,38 +390,6 @@ export default function PaymentScreen() {
             <Text className="text-white font-bold text-lg">
               Payer {formatFCFA(cartTotal)}
             </Text>
-          )}
-        </TouchableOpacity>
-
-        {/* Bouton simulation (DEV) */}
-        <TouchableOpacity
-          onPress={handleSimulate}
-          disabled={isSimulating || isLoading}
-          style={{
-            paddingVertical: 14,
-            borderRadius: 12,
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexDirection: 'row',
-            gap: 8,
-            backgroundColor: isSimulating ? '#94A3B8' : '#F8FAFC',
-            borderWidth: 1.5,
-            borderColor: isSimulating ? '#94A3B8' : '#44A08D',
-            borderStyle: 'dashed',
-          }}
-        >
-          {isSimulating ? (
-            <>
-              <ActivityIndicator color="white" />
-              <Text className="text-white font-bold text-sm">Simulation en cours…</Text>
-            </>
-          ) : (
-            <>
-              <Text style={{ fontSize: 16 }}>⚡</Text>
-              <Text style={{ fontSize: 13, fontWeight: '700', color: '#44A08D' }}>
-                Simuler le paiement (dev)
-              </Text>
-            </>
           )}
         </TouchableOpacity>
       </View>

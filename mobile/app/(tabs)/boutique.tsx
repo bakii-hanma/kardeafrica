@@ -85,6 +85,7 @@ function ProductCard({ product, onPress, delay, variant }: ProductCardProps) {
             brandColor={brandColor}
             countryCode={product.cardType.countryCode}
             currency={product.native_currency}
+            logoUrl={product.cardType.logoUrl}
             gradId={`grid-${product.id}`}
           />
 

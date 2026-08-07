@@ -15,3 +15,13 @@ Schedule::command('cash:expire-orders')->everyFiveMinutes()->withoutOverlapping(
 // avant l'expiration du cache de 1h). Évite que le premier visiteur paie le
 // fetch complet de ~70s qui dépasse max_execution_time PHP.
 Schedule::command('catalog:warm')->everyThirtyMinutes()->withoutOverlapping();
+
+// Traite la file d'attente (livraisons afrikard asynchrones : ProcessCheckoutJob).
+// CRITIQUE sur hébergement mutualisé : aucun worker persistant ne tourne, donc
+// sans ceci les commandes en fallback async restaient bloquées et les clients
+// n'obtenaient JAMAIS leurs codes. --stop-when-empty : le worker s'arrête dès la
+// file vidée (pas de démon). La garde d'idempotence de ProcessCheckoutJob évite
+// tout double appel Bamboo si un job est rejoué.
+Schedule::command('queue:work --stop-when-empty --max-time=55 --tries=3 --backoff=30')
+    ->everyMinute()
+    ->withoutOverlapping();

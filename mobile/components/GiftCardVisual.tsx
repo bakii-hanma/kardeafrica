@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Image } from 'react-native';
 import Svg, { Defs, LinearGradient as SvgLinearGradient, Stop, Rect } from 'react-native-svg';
 import { CheckIcon } from 'react-native-heroicons/outline';
 import {
@@ -67,6 +67,8 @@ interface GiftCardVisualProps {
   countryCode?: string | null;
   /** Devise native (affichée si ≠ XAF) */
   currency?: string | null;
+  /** Image officielle afrikard de la carte — affichée en fond (comme le web) */
+  logoUrl?: string | null;
   /** Compact = pour mini-cartes (hero stack notamment) */
   compact?: boolean;
   /** ID unique pour le gradient SVG (évite les collisions si plusieurs cards sur la page) */
@@ -78,6 +80,7 @@ export function GiftCardVisual({
   brandColor,
   countryCode,
   currency,
+  logoUrl,
   compact = false,
   gradId,
 }: GiftCardVisualProps) {
@@ -141,6 +144,22 @@ export function GiftCardVisual({
     }}>
       {/* Gradient principal (via react-native-svg, pas de dépendance externe) */}
       <GradientBg colors={style.gradient as string[]} gradKey={uniqueGradId} />
+
+      {/* Artwork officiel de la carte en WATERMARK à droite (identique au web :
+          background-position 78% center, background-size 55% auto, contain =
+          non déformé). Pas en cover plein cadre (ça recadrait/déformait). */}
+      {logoUrl ? (
+        <Image
+          source={{ uri: logoUrl }}
+          resizeMode="contain"
+          style={{
+            position: 'absolute',
+            right: 0, top: 0, bottom: 0,
+            width: '55%', height: '100%',
+            opacity: brandKey ? 0.30 : 0.5,
+          }}
+        />
+      ) : null}
 
       {/* Glow d'ambiance optionnelle (= proposition) */}
       {style.glow && glowPos && (
