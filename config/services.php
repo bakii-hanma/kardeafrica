@@ -71,7 +71,18 @@ return [
     |--------------------------------------------------------------------------
     */
     'product_api' => [
-        'base_url' => env('PRODUCT_API_URL', 'https://afrikard-api.duckdns.org/api/v1'),
+        'base_url' => env('PRODUCT_API_URL', 'https://srv1882929.hstgr.cloud/api/v1'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Mistral AI — assistante « Kara »
+    |--------------------------------------------------------------------------
+    | La clé reste UNIQUEMENT côté serveur (.env), jamais dans le frontend.
+    */
+    'mistral' => [
+        'key'   => env('MISTRAL_API_KEY'),
+        'model' => env('MISTRAL_MODEL', 'mistral-small-latest'),
     ],
 
 ];

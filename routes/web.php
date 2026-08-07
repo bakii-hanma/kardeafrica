@@ -30,6 +30,12 @@ use App\Http\Controllers\ClaimController;
 // Route d'accueil avec les produits populaires
 Route::get('/', [ProductController::class, 'home'])->name('home');
 
+// Assistante IA « Kara » — proxy Mistral (clé côté serveur). Publique (invités
+// inclus) + rate-limit. Le frontend envoie le token CSRF.
+Route::post('/assistant/chat', [\App\Http\Controllers\KaraController::class, 'chat'])
+    ->middleware('throttle:20,1')
+    ->name('kara.chat');
+
 // Route pour le profil
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'show'])->name('profile.show');

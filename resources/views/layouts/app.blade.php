@@ -2065,18 +2065,50 @@
                 function handleSend() {
                     const text = input.value.trim();
                     if (!text) return;
+                    // Contexte = échanges précédents (avant d'ajouter le message courant)
+                    let history = [];
+                    try {
+                        history = (JSON.parse(sessionStorage.getItem(STORAGE_KEY) || '[]'))
+                            .slice(-6)
+                            .map(m => ({ role: m.isUser ? 'user' : 'assistant', content: m.text }));
+                    } catch (_) {}
+
                     renderMessage(text, true);
                     input.value = '';
                     sendBtn.disabled = true;
-
                     showTyping();
-                    setTimeout(() => {
+                    askKara(text, history);
+                }
+
+                // Appel de l'IA Kara (backend Laravel → Mistral). En cas d'échec,
+                // repli gracieux sur la base de connaissances locale (regex).
+                async function askKara(text, history) {
+                    try {
+                        const res = await fetch('{{ route("kara.chat") }}', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                            },
+                            body: JSON.stringify({ message: text, history }),
+                        });
+                        hideTyping();
+                        if (res.ok) {
+                            const data = await res.json();
+                            renderMessage((data.reply || '').trim() || 'Désolée, je n\'ai pas de réponse. Reformule ?', false);
+                        } else {
+                            const intent = findIntent(text);
+                            renderMessage(intent.reply(), false, intent.links || []);
+                        }
+                    } catch (_) {
                         hideTyping();
                         const intent = findIntent(text);
                         renderMessage(intent.reply(), false, intent.links || []);
-                        renderChips(intent.suggestions || DEFAULT_CHIPS);
+                    } finally {
+                        renderChips(DEFAULT_CHIPS);
                         sendBtn.disabled = false;
-                    }, 600 + Math.random() * 400);
+                    }
                 }
 
                 const label    = document.getElementById('kaBotLabel');
