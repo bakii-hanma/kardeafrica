@@ -169,6 +169,26 @@ class MerchantCardCode
      *
      * @return MerchantCardPurchase la purchase créée ou retrouvée
      */
+
+    /**
+     * Prix/montant FAISANT AUTORITÉ pour un product_id marchand (anti-fraude C2).
+     * Une carte marchand est une valeur stockée 1:1 : son prix EST son montant.
+     * Retourne le montant si le product_id est marchand ET le montant est
+     * ACHETABLE pour la carte (denomination listée, ou montant libre dans la
+     * plage, carte active) ; null sinon (non-marchand ou montant invalide).
+     */
+    public static function authoritativeAmount(string $productId): ?int
+    {
+        if (!preg_match('/^merchant_(\d+)_(\d+)$/', $productId, $m)) {
+            return null;
+        }
+        $card = MerchantCard::find((int) $m[1]);
+        if (!$card) return null;
+
+        $amount = (int) $m[2];
+        return $card->isValidAmount($amount, true) ? $amount : null;
+    }
+
     public static function createPurchaseForOrderItem(Order $order, OrderItem $item): MerchantCardPurchase
     {
         // Idempotence : si la purchase existe déjà, on s'assure qu'elle a un
@@ -195,6 +215,14 @@ class MerchantCardCode
         $card = MerchantCard::find($cardId);
         if (!$card) {
             throw new RuntimeException("MerchantCard #{$cardId} introuvable (peut-être supprimée)");
+        }
+
+        // SÉCURITÉ (C2) — le montant (= solde encaissable de la carte) ne doit
+        // JAMAIS être hors des règles de la carte. On tolère is_active=false ici
+        // (la commande a déjà été payée quand la carte était en vente), mais on
+        // refuse tout montant hors denominations / hors plage libre.
+        if (!$card->isValidAmount($amount, false)) {
+            throw new RuntimeException("Montant marchand invalide pour la carte #{$cardId} : {$amount}");
         }
 
         $order->loadMissing('user');

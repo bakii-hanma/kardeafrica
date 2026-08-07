@@ -1445,6 +1445,14 @@ class ProductApiService
      */
     public function authoritativeUnitPrice(int|string $productId, $fallback): int
     {
+        $pid = (string) $productId;
+
+        // Cartes marchand (C2) : prix = montant validé (valeur stockée 1:1).
+        if (str_starts_with($pid, 'merchant_')) {
+            $amount = \App\Support\MerchantCardCode::authoritativeAmount($pid);
+            return $amount ?? (int) round((float) $fallback);
+        }
+
         $auth = $this->authoritativePriceFcfa($productId);
         return $auth ?? (int) round((float) $fallback);
     }

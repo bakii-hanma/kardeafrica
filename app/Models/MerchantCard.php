@@ -58,6 +58,35 @@ class MerchantCard extends Model
     ];
 
     // ============================================================
+    // Validation des montants (anti-fraude C2)
+    // ============================================================
+
+    /**
+     * Un montant est-il ACHETABLE pour cette carte ? Un montant listé dans
+     * `denominations` est toujours accepté ; sinon, seulement si la carte
+     * autorise le montant libre et que le montant est dans [min_amount, max_amount].
+     *
+     * @param bool $requireActive true à la vente (vitrine), false à la livraison
+     *        d'une commande déjà payée (la carte a pu être désactivée depuis).
+     */
+    public function isValidAmount($amount, bool $requireActive = true): bool
+    {
+        $amount = (float) $amount;
+        if ($amount <= 0) return false;
+        if ($requireActive && !$this->is_active) return false;
+
+        $denoms = collect($this->denominations ?? [])->map(fn ($d) => (float) $d);
+        if ($denoms->contains($amount)) return true;
+
+        if ($this->allow_custom_amount) {
+            $min = $this->min_amount !== null ? (float) $this->min_amount : 0.0;
+            $max = $this->max_amount !== null ? (float) $this->max_amount : PHP_FLOAT_MAX;
+            return $amount >= $min && $amount <= $max;
+        }
+        return false;
+    }
+
+    // ============================================================
     // Relations
     // ============================================================
 

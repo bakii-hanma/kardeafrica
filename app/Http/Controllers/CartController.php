@@ -63,6 +63,29 @@ class CartController extends Controller
             // ne jamais casser l'ajout au panier sur une erreur de résolution
         }
 
+        // C2 — cartes marchand : le prix = le montant encodé (valeur stockée 1:1),
+        // et le montant doit être ACHETABLE pour la carte (denomination ou plage
+        // libre, carte active). On rejette un montant invalide et on force le prix
+        // au montant validé (empêche "merchant_5_500000 à 1 FCFA").
+        if (str_starts_with((string) $request->product_id, 'merchant_')) {
+            $amount = \App\Support\MerchantCardCode::authoritativeAmount((string) $request->product_id);
+            if ($amount === null) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Montant de carte invalide pour ce marchand.',
+                ], 422);
+            }
+            if ((int) round((float) $request->price) !== $amount) {
+                \Illuminate\Support\Facades\Log::warning('C2 merchant price corrected (cart:add)', [
+                    'product_id'   => $request->product_id,
+                    'client_price' => $request->price,
+                    'amount'       => $amount,
+                    'user_id'      => Auth::id(),
+                ]);
+            }
+            $request->merge(['price' => $amount]);
+        }
+
         $userId = Auth::id();
         $sessionId = Session::getId();
         
