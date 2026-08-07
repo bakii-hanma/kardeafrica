@@ -310,6 +310,26 @@ class PaymentController extends Controller
             }
             $subtotal = $cartItems->sum(fn($item) => $item->auth_unit_price * $item->quantity);
 
+            // C3 (Palier 4) — le montant LIVRÉ ne doit pas dépasser le montant
+            // PAYÉ. La facture E-Billing a été créée à l'init avec un montant
+            // verrouillé ; on le retrouve par la référence. Si le total recalculé
+            // du panier le dépasse (panier gonflé APRÈS paiement), on refuse la
+            // livraison plutôt que de livrer plus que ce qui a été encaissé.
+            $invoiced = Payment::where('transaction_id', $externalRef)->value('amount')
+                ?? Order::where('external_reference', $externalRef)->value('total_amount');
+            if ($invoiced !== null && (int) round($subtotal) > (int) round((float) $invoiced)) {
+                Log::warning('C3 total supérieur au montant payé — livraison refusée', [
+                    'ref'        => $externalRef,
+                    'recomputed' => $subtotal,
+                    'invoiced'   => $invoiced,
+                    'user_id'    => $userId,
+                ]);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Le panier a changé depuis le paiement. Contacte le support avec ta référence de commande.',
+                ], 422);
+            }
+
             // 3. DB Transaction for atomicity
             $result = DB::transaction(function () use ($cartItems, $subtotal, $externalRef, $userId) {
                 // Create Order
