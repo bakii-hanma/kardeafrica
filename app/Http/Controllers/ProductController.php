@@ -122,21 +122,39 @@ class ProductController extends Controller
     public function show($productId)
     {
         $product = $this->productService->getProductById($productId);
-        
+
         if (!$product) {
             abort(404, 'Produit non trouvé');
         }
 
-        // Récupérer des produits similaires (même catégorie)
-        $similarProducts = [];
-        if (!empty($product['categories'])) {
-            $categoryId = $product['categories'][0]['id'];
-            $similarProducts = $this->productService->getProductsByCategory($categoryId, 0, 4);
-            // Exclure le produit actuel
-            $similarProducts = collect($similarProducts)->filter(function ($item) use ($productId) {
-                return $item['internalId'] !== $productId;
-            })->values()->all();
+        // getProductById renvoie toutes les dénominations de la même carte (même
+        // type) dans $product['products']. On les capture AVANT de filtrer.
+        $siblings  = $product['products'] ?? [];
+        $currentId = $product['id'] ?? $productId;
+        $brandLogo = $product['cardType']['logoUrl'] ?? ($product['logoUrl'] ?? null);
+
+        // La fiche n'affiche QUE la carte sélectionnée (plus la grille de toutes
+        // les dénominations).
+        if (!empty($siblings)) {
+            $selected = collect($siblings)->firstWhere('id', $currentId);
+            $product['products'] = $selected ? [$selected] : [collect($siblings)->first()];
         }
+
+        // Cartes similaires = les AUTRES dénominations de la même carte (même
+        // type), telles qu'elles étaient sélectionnables avant, désormais placées
+        // en section « Produits similaires ». Le template attend internalId/name/
+        // logoUrl : on mappe l'id du sibling + le logo de la marque (partagé).
+        $similarProducts = collect($siblings)
+            ->reject(fn ($s) => ($s['id'] ?? null) == $currentId)
+            ->map(fn ($s) => [
+                'internalId' => $s['id'] ?? null,
+                'name'       => $s['name'] ?? '',
+                'logoUrl'    => $brandLogo,
+                'price'      => $s['price'] ?? null,
+            ])
+            ->filter(fn ($s) => !empty($s['internalId']))
+            ->values()
+            ->all();
 
         return view('products.show', compact('product', 'similarProducts'));
     }

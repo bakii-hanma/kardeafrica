@@ -130,8 +130,9 @@
 
             <!-- Right Column: Details & Selection -->
             <div>
-                <!-- Selection Grid -->
-                <div class="mb-8">
+                <!-- Selection Grid : n'affiche le sélecteur de montant que s'il
+                     existe plusieurs dénominations ; sinon on montre juste la carte. -->
+                <div class="mb-8" x-show="products.length > 1">
                     <h3 class="text-lg font-bold text-gray-900 mb-4" x-text="selectedTitle"></h3>
                     <div class="flex flex-wrap gap-3">
                 <template x-for="prod in products" :key="prod.id">
@@ -274,7 +275,11 @@
                             
                             <h3 class="font-bold text-gray-900 mb-1 truncate text-sm">{{ $similar['name'] }}</h3>
                             <p class="text-[#44A08D] font-medium text-xs">
-                                Voir les offres
+                                @if(!empty($similar['price']['min']))
+                                    {{ \App\Support\Money::formatFcfa($similar['price']['min'], $similar['price']['currencyCode'] ?? 'XAF') }}
+                                @else
+                                    Voir les offres
+                                @endif
                             </p>
                         </div>
                     </a>
@@ -307,35 +312,6 @@
         </div>
     </div>
 
-    <!-- Similar Products -->
-    @if(isset($similarProducts) && count($similarProducts) > 0)
-    <div class="mt-16 border-t border-gray-100 pt-10">
-        <h2 class="text-2xl font-bold text-gray-900 mb-6">Produits similaires</h2>
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-            @foreach($similarProducts as $simProduct)
-                <a href="{{ route('products.show', $simProduct['id']) }}" class="group block bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden border border-gray-100">
-                    <div class="aspect-square bg-gray-50 p-4 relative overflow-hidden">
-                        @if(isset($simProduct['logoUrl']))
-                            <img src="{{ $simProduct['logoUrl'] }}" alt="{{ $simProduct['name'] }}" class="w-full h-full object-contain transform group-hover:scale-110 transition-transform duration-500">
-                        @else
-                            <div class="w-full h-full flex items-center justify-center text-gray-300 font-bold text-xl">
-                                {{ substr($simProduct['name'], 0, 1) }}
-                            </div>
-                        @endif
-                    </div>
-                    <div class="p-4">
-                        <h3 class="font-bold text-gray-900 text-sm truncate mb-1 group-hover:text-[#44A08D] transition-colors">{{ $simProduct['name'] }}</h3>
-                        @if(isset($simProduct['price']['min']))
-                            <p class="text-[#44A08D] font-bold text-xs">
-                                {{ \App\Support\Money::formatFcfa($simProduct['price']['min'], $simProduct['price']['currencyCode'] ?? 'XAF') }}
-                            </p>
-                        @endif
-                    </div>
-                </a>
-            @endforeach
-        </div>
-    </div>
-    @endif
 </div>
 
 <style>
