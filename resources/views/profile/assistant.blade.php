@@ -291,19 +291,49 @@
         const text = (input.value || '').trim();
         if (!text) return;
 
+        let history = [];
+        try {
+            history = (JSON.parse(sessionStorage.getItem(STORAGE_KEY) || '[]'))
+                .slice(-6)
+                .map(m => ({ role: m.isUser ? 'user' : 'assistant', content: m.text }));
+        } catch (_) {}
+
         renderMessage(text, true);
         input.value = '';
         sendBtn.disabled = true;
         renderTyping();
+        askKara(text, history);
+    }
 
-        setTimeout(() => {
+    // Appel de l'IA Kara (backend Laravel → Mistral) ; repli local si échec.
+    async function askKara(text, history) {
+        try {
+            const res = await fetch('{{ route("kara.chat") }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                },
+                body: JSON.stringify({ message: text, history }),
+            });
+            removeTyping();
+            if (res.ok) {
+                const data = await res.json();
+                renderMessage((data.reply || '').trim() || 'Désolée, je n\'ai pas de réponse. Reformule ?', false);
+            } else {
+                const intent = detect(text);
+                renderMessage(intent.reply(), false, intent.links || []);
+            }
+        } catch (_) {
             removeTyping();
             const intent = detect(text);
             renderMessage(intent.reply(), false, intent.links || []);
+        } finally {
             renderChips(DEFAULT_CHIPS);
             sendBtn.disabled = false;
             input.focus();
-        }, 600 + Math.random() * 400);
+        }
     }
 
     // Restaure l'historique de session ou greeting
