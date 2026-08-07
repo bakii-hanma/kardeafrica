@@ -39,22 +39,28 @@ class CartController extends Controller
             'quantity' => 'nullable|integer|min:1'
         ]);
 
-        // C1 — DÉTECTION (Palier 1, sans blocage) : compare le prix envoyé par le
-        // client au prix serveur faisant autorité (Money::toFcfa). On ne rejette
-        // rien encore ; on journalise les écarts pour valider avant enforcement.
+        // C1 — ENFORCEMENT (Palier 2) : le prix payé ne doit JAMAIS venir du
+        // client. On le remplace par le prix serveur faisant autorité
+        // (Money::toFcfa depuis le catalogue). Pour un produit résolvable, tout
+        // prix client est écrasé (une commande légitime a déjà le bon prix : no-op).
+        // Les produits non résolvables (merchant_*/daywatch_*/id suffixé) gardent
+        // leur prix — traités à leur propre palier.
         try {
             $authPrice = app(\App\Services\ProductApiService::class)
                 ->authoritativePriceFcfa($request->product_id);
-            if ($authPrice !== null && (int) round((float) $request->price) !== $authPrice) {
-                \Illuminate\Support\Facades\Log::warning('C1 price mismatch (cart:add)', [
-                    'product_id'    => $request->product_id,
-                    'client_price'  => $request->price,
-                    'authoritative' => $authPrice,
-                    'user_id'       => Auth::id(),
-                ]);
+            if ($authPrice !== null) {
+                if ((int) round((float) $request->price) !== $authPrice) {
+                    \Illuminate\Support\Facades\Log::warning('C1 price corrected (cart:add)', [
+                        'product_id'    => $request->product_id,
+                        'client_price'  => $request->price,
+                        'authoritative' => $authPrice,
+                        'user_id'       => Auth::id(),
+                    ]);
+                }
+                $request->merge(['price' => $authPrice]);
             }
         } catch (\Throwable $e) {
-            // détection strictement non bloquante — ne jamais interrompre l'ajout
+            // ne jamais casser l'ajout au panier sur une erreur de résolution
         }
 
         $userId = Auth::id();

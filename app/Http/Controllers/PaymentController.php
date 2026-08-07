@@ -300,7 +300,15 @@ class PaymentController extends Controller
                 ]);
             }
 
-            $subtotal = $cartItems->sum(fn($item) => $item->price * $item->quantity);
+            // C1 (Palier 3) — le montant à facturer est recalculé côté serveur
+            // depuis le catalogue, jamais le prix stocké seul. Défense en profondeur
+            // en plus du palier panier (couvre aussi les items ajoutés avant ou
+            // toute tentative de manipulation directe).
+            $priceSvc = app(\App\Services\ProductApiService::class);
+            foreach ($cartItems as $item) {
+                $item->auth_unit_price = $priceSvc->authoritativeUnitPrice($item->product_id, $item->price);
+            }
+            $subtotal = $cartItems->sum(fn($item) => $item->auth_unit_price * $item->quantity);
 
             // 3. DB Transaction for atomicity
             $result = DB::transaction(function () use ($cartItems, $subtotal, $externalRef, $userId) {
@@ -348,8 +356,8 @@ class PaymentController extends Controller
                         'product_id'      => $item->product_id,
                         'card_id'         => null,
                         'name'            => $item->name,
-                        'unit_price'      => $item->price,
-                        'total_price'     => $item->price * $item->quantity,
+                        'unit_price'      => $item->auth_unit_price,
+                        'total_price'     => $item->auth_unit_price * $item->quantity,
                         'quantity'        => $item->quantity,
                         'image_url'       => $item->image_url,
                         'native_value'    => $native['value']    ?? null,

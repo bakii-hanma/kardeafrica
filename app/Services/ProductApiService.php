@@ -1438,6 +1438,18 @@ class ProductApiService
     }
 
     /**
+     * Prix unitaire à FACTURER pour un produit (C1, Palier 3). Retourne le prix
+     * serveur faisant autorité s'il est résolvable, sinon le prix de repli fourni
+     * (cartes marchand/Daywatch dont le montant est dérivé ailleurs). À utiliser
+     * partout où l'on calcule un total à payer, JAMAIS le prix envoyé/stocké seul.
+     */
+    public function authoritativeUnitPrice(int|string $productId, $fallback): int
+    {
+        $auth = $this->authoritativePriceFcfa($productId);
+        return $auth ?? (int) round((float) $fallback);
+    }
+
+    /**
      * Map léger [cardTypeId => productsCount] pour enrichir les listings
      * (ex: afficher "X montants disponibles" sur chaque carte du catalogue).
      * Cache séparé du listing complet — recalcul O(n) à partir du catalogue

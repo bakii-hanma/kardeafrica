@@ -49,6 +49,14 @@ class CheckoutController extends Controller
             return response()->json(['success' => false, 'message' => 'Panier vide.'], 422);
         }
 
+        // C1 (Palier 3) — le montant à facturer (invoice E-Billing) est recalculé
+        // côté serveur depuis le catalogue ; le prix stocké/client n'est jamais cru
+        // seul. On écrase le prix de chaque item en mémoire → subtotal ET order
+        // items utilisent le prix faisant autorité.
+        $priceSvc = app(\App\Services\ProductApiService::class);
+        foreach ($cartItems as $item) {
+            $item->price = $priceSvc->authoritativeUnitPrice($item->product_id, $item->price);
+        }
         $subtotal    = $cartItems->sum(fn($i) => $i->price * $i->quantity);
         $externalRef = 'KARD_' . time() . '_' . rand(1000, 9999);
 

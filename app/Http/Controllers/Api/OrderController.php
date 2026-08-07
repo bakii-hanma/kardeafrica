@@ -218,12 +218,20 @@ class OrderController extends Controller
             ], 422);
         }
 
-        $subtotal = $items->sum(fn($i) => $i['price'] * $i['quantity']);
-        $externalRef = 'KARD_' . time() . '_' . rand(1000, 9999);
-
         // Résout la valeur native (10 EUR, etc.) à la création — afrikard
         // /orders/checkout attend la valeur NATIVE, pas le prix XAF affiché.
         $productService = app(ProductApiService::class);
+
+        // C1 (Palier 3) — ENFORCEMENT. Ce endpoint accepte items[].price du client
+        // (bypass possible du panier). Le prix facturé est donc recalculé côté
+        // serveur depuis le catalogue ; le prix client n'est jamais cru.
+        $items = $items->map(function ($i) use ($productService) {
+            $i['price'] = $productService->authoritativeUnitPrice($i['product_id'], $i['price'] ?? 0);
+            return $i;
+        });
+
+        $subtotal = $items->sum(fn($i) => $i['price'] * $i['quantity']);
+        $externalRef = 'KARD_' . time() . '_' . rand(1000, 9999);
 
         $order = DB::transaction(function () use ($items, $subtotal, $externalRef, $user, $productService) {
             $order = Order::create([
