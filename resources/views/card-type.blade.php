@@ -151,29 +151,11 @@
                     @endif
                 </div>
 
-                {{-- Selection : pills modernes --}}
+                {{-- Montant sélectionné : juste le prix (pas de titre ni de compteur) --}}
                 <div class="mb-6">
-                    <div class="flex items-center justify-between mb-3">
-                        <h3 class="text-sm font-bold text-slate-900" x-text="selectedTitle"></h3>
-                        <span class="text-xs text-slate-500" x-show="products.length > 1">
-                            +<span x-text="products.length - 1"></span> autre<span x-show="products.length > 2">s</span> ci-dessous
-                        </span>
-                    </div>
-                    <div class="flex flex-wrap gap-2">
-                        {{-- N'affiche QUE la carte sélectionnée ; les autres montants
-                             sont proposés plus bas dans « Cartes similaires ». --}}
-                        <template x-for="product in (selectedProduct ? [selectedProduct] : products.slice(0,1))" :key="product.id">
-                            <button @click="selectProduct(product)" type="button"
-                                    class="relative px-5 py-3 rounded-xl border-2 transition-all duration-200 font-bold text-sm min-w-[90px] active:scale-95"
-                                    :class="selectedProduct && selectedProduct.id === product.id
-                                        ? 'border-[#44A08D] bg-teal-50 text-[#44A08D] shadow-md shadow-[#44A08D]/15'
-                                        : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'">
-                                <span x-text="formatPrice(product.price.min, product.price.currencyCode)"></span>
-                                <span x-show="selectedProduct && selectedProduct.id === product.id" class="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-[#44A08D] flex items-center justify-center shadow-lg">
-                                    <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-                                </span>
-                            </button>
-                        </template>
+                    <div class="inline-flex items-center px-6 py-3 rounded-xl border-2 border-[#44A08D] bg-teal-50">
+                        <span class="font-black text-xl text-[#44A08D] tabular-nums"
+                              x-text="selectedProduct ? formatPrice(selectedProduct.price.min, selectedProduct.price.currencyCode) : '—'"></span>
                     </div>
                 </div>
 
@@ -260,25 +242,25 @@
         <div class="border-t border-slate-100 pt-8">
             <h2 class="text-lg font-bold text-slate-900 mb-1">Cartes similaires</h2>
             <p class="text-sm text-slate-500 mb-5">Autres montants disponibles pour cette carte.</p>
-            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                <template x-for="product in products.filter(p => !selectedProduct || p.id !== selectedProduct.id)" :key="'sim-' + product.id">
-                    <button type="button"
-                            @click="selectProduct(product); window.scrollTo({ top: 0, behavior: 'smooth' })"
-                            class="group text-left bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md hover:border-[#44A08D]/50 transition-all overflow-hidden">
-                        <div class="h-20 flex items-center justify-center p-3" :style="'background-color:' + cardInfo.brandColor + '14'">
-                            <template x-if="cardInfo.logoUrl">
-                                <img :src="cardInfo.logoUrl" :alt="cardInfo.name" class="max-h-12 max-w-[70%] object-contain">
-                            </template>
-                            <template x-if="!cardInfo.logoUrl">
-                                <span class="text-2xl font-black" :style="'color:' + cardInfo.brandColor" x-text="cardInfo.name.charAt(0)"></span>
-                            </template>
-                        </div>
-                        <div class="p-3">
-                            <div class="text-xs text-slate-500 truncate" x-text="cardInfo.name"></div>
-                            <div class="text-sm font-bold text-[#44A08D] mt-0.5" x-text="formatPrice(product.price.min, product.price.currencyCode)"></div>
-                        </div>
-                    </button>
-                </template>
+            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                {{-- Même design que la boutique (composant x-product-card). Cliquer
+                     sélectionne le montant + remonte en haut ; le montant courant
+                     est masqué (x-show) puisqu'il est déjà affiché en haut. --}}
+                @foreach($cardType['products'] as $denom)
+                    <x-product-card
+                        :name="$denom['name']"
+                        :brand-label="$cardType['name']"
+                        :brand-color="$brandColor"
+                        :logo-url="$cardType['logoUrl'] ?? null"
+                        :price="$denom['price']['min'] ?? 0"
+                        :currency="$denom['price']['currencyCode'] ?? 'XAF'"
+                        :country-code="$cardType['countryCode'] ?? null"
+                        :discount="2"
+                        href="#"
+                        x-show="!selectedProduct || selectedProduct.id !== {{ (int) $denom['id'] }}"
+                        x-on:click.prevent="selectProduct({{ \Illuminate\Support\Js::from(['id' => $denom['id'], 'name' => $denom['name'], 'price' => $denom['price']]) }}); window.scrollTo({ top: 0, behavior: 'smooth' })"
+                    />
+                @endforeach
             </div>
         </div>
     </div>
