@@ -242,8 +242,22 @@ class PaymentController extends Controller
             return response()->json(['success' => false, 'message' => 'Reference manquante.'], 400);
         }
 
-        // Prevent duplicate orders
-        $existingOrder = Order::where('notes', 'LIKE', "%Ref: $externalRef%")->first();
+        // SÉCURITÉ (C0) : la référence est réutilisée dans des requêtes SQL et
+        // identifie une commande. On impose un format strict — aucun métacaractère
+        // LIKE (% _) possible. Format réel des refs : KARD_<timestamp>_<rand>.
+        if (!preg_match('/^[A-Za-z0-9_\-]{1,64}$/', (string) $externalRef)) {
+            return response()->json(['success' => false, 'message' => 'Référence invalide.'], 422);
+        }
+
+        $userId = Auth::id();
+
+        // Prevent duplicate orders — CORRESPONDANCE EXACTE + SCOPE PROPRIÉTAIRE.
+        // Avant : `LIKE "%Ref: $ref%"` sans contrôle de propriété permettait, avec
+        // ref="%", de récupérer les cartes et PIN d'AUTRES clients. On ne retourne
+        // désormais que les commandes de l'utilisateur authentifié.
+        $existingOrder = Order::where('user_id', $userId)
+            ->where('notes', 'Ref: ' . $externalRef)
+            ->first();
         if ($existingOrder) {
             $existingOrder->load('orderItems');
             $userCards = UserCard::where('order_id', $existingOrder->id)->get();
@@ -464,7 +478,16 @@ class PaymentController extends Controller
      */
     public function handleCallback(Request $request)
     {
-        Log::info('Payment Webhook', $request->all());
+        // SÉCURITÉ (C4) : endpoint public NON AUTHENTIFIÉ. Il est volontairement
+        // INERTE — il ne modifie AUCUN état (statut de paiement, commande, carte).
+        // ⚠️ NE JAMAIS lui faire confiance sans vérifier la signature HMAC du
+        // fournisseur au préalable (avec idempotence sur external_reference).
+        // La source de vérité du paiement reste la vérification serveur active
+        // (check_status) dans finalize(). On ne journalise pas le corps brut.
+        Log::info('Payment Webhook reçu (inerte)', [
+            'ip'  => $request->ip(),
+            'ref' => $request->input('external_reference') ?? $request->input('ref'),
+        ]);
         return response()->json(['success' => true]);
     }
 }

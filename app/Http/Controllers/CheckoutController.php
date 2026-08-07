@@ -187,10 +187,10 @@ class CheckoutController extends Controller
     {
         $user = $request->user();
 
-        // Simulation autorisée : en mode debug OU pour un admin connecté (test prod
-        // sans paiement réel). Bloquée pour les clients normaux en prod (sinon
-        // n'importe qui obtiendrait des cartes gratuites).
-        if (!config('app.debug') && !($user && method_exists($user, 'isAdmin') && $user->isAdmin())) {
+        // SÉCURITÉ (H3) : simulation autorisée UNIQUEMENT si le flag dédié est
+        // actif (défaut false, jamais en prod). Le bypass admin a été retiré :
+        // même un admin ne doit pas pouvoir émettre de vraies cartes gratuites.
+        if (!config('app.payments_simulation_enabled')) {
             abort(404);
         }
 

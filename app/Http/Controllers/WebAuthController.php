@@ -24,6 +24,18 @@ class WebAuthController extends Controller
         ]);
 
         if (Auth::attempt($credentials)) {
+            // SÉCURITÉ (H12) : un compte désactivé depuis le back-office ne doit
+            // plus pouvoir se connecter ni acheter.
+            if (!Auth::user()->is_active) {
+                Auth::logout();
+                $request->session()->invalidate();
+                $message = 'Ce compte est désactivé. Contactez le support.';
+                if ($request->wantsJson() || $request->ajax()) {
+                    return response()->json(['errors' => ['email' => [$message]]], 403);
+                }
+                return back()->withErrors(['email' => $message])->onlyInput('email');
+            }
+
             $request->session()->regenerate();
 
             $redirect = Auth::user()->isAdmin() ? route('admin.dashboard') : route('home');

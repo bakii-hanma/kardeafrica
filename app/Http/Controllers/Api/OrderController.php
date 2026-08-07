@@ -33,7 +33,8 @@ class OrderController extends Controller
      */
     public function simulate(Request $request)
     {
-        if (!config('app.debug')) {
+        // SÉCURITÉ (H3) : flag dédié, jamais actif en prod (défaut false).
+        if (!config('app.payments_simulation_enabled')) {
             return response()->json(['success' => false, 'message' => 'Simulation désactivée en production.'], 403);
         }
 

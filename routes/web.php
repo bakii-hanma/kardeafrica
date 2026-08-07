@@ -89,7 +89,7 @@ Route::prefix('gabon')->group(function () {
 Route::prefix('proprietaire')->group(function () {
     // Auth (publique)
     Route::get('/login',  [\App\Http\Controllers\Owner\AuthController::class, 'showLoginForm'])->name('owner.login');
-    Route::post('/login', [\App\Http\Controllers\Owner\AuthController::class, 'login'])->name('owner.login.submit');
+    Route::post('/login', [\App\Http\Controllers\Owner\AuthController::class, 'login'])->middleware('throttle:6,1')->name('owner.login.submit');
     Route::post('/logout',[\App\Http\Controllers\Owner\AuthController::class, 'logout'])->name('owner.logout');
 
     // Dashboard + tout le reste (protégé)
@@ -149,9 +149,16 @@ Route::get('/support', function () { return view('support'); })->name('support')
 // Routes pour l'authentification web
 Route::middleware('guest')->group(function () {
     Route::get('/login', [WebAuthController::class, 'showLoginForm'])->name('login');
-    Route::post('/login', [WebAuthController::class, 'login']);
+    Route::post('/login', [WebAuthController::class, 'login'])->middleware('throttle:6,1');
     Route::get('/register', [WebAuthController::class, 'showRegisterForm'])->name('register');
     Route::post('/register', [WebAuthController::class, 'register']);
+
+    // Réinitialisation de mot de passe (M15) — le contrôleur et les vues
+    // existaient mais n'étaient routés nulle part → récupération impossible.
+    Route::get('/forgot-password',        [\App\Http\Controllers\Auth\PasswordResetController::class, 'showLinkRequestForm'])->name('password.request');
+    Route::post('/forgot-password',       [\App\Http\Controllers\Auth\PasswordResetController::class, 'sendResetLinkEmail'])->middleware('throttle:6,1')->name('password.email');
+    Route::get('/reset-password/{token}', [\App\Http\Controllers\Auth\PasswordResetController::class, 'showResetForm'])->name('password.reset');
+    Route::post('/reset-password',        [\App\Http\Controllers\Auth\PasswordResetController::class, 'reset'])->middleware('throttle:6,1')->name('password.update');
 });
 
 Route::post('/logout', [WebAuthController::class, 'logout'])->middleware('auth')->name('logout');

@@ -151,10 +151,12 @@ class ProcessCheckoutJob implements ShouldQueue
         $response = Http::timeout(30)
             ->post(config('services.product_api.base_url') . '/orders/checkout', $checkoutPayload);
 
+        // SÉCURITÉ (C7) : ne JAMAIS logger le corps de la réponse fournisseur —
+        // il contient les codes et PIN des cartes en clair. On ne trace que le
+        // statut HTTP. Le succès détaillé est loggé plus bas sans données sensibles.
         Log::info('ProcessCheckoutJob: Reponse API afrikard', [
             'order_id' => $this->order->id,
             'status'   => $response->status(),
-            'body'     => $response->json(),
         ]);
 
         if ($response->status() === 202 || $response->successful()) {

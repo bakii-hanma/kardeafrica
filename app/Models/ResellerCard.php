@@ -28,6 +28,12 @@ class ResellerCard extends Model
         'metadata',
     ];
 
+    // SÉCURITÉ (H13) : la valeur d'une carte, c'est son code. Masqué à la
+    // sérialisation JSON, comme UserCard. Les vues Blade vendeur accèdent aux
+    // propriétés directement (non affectées par $hidden) ; utiliser makeVisible()
+    // sur tout endpoint JSON qui doit légitimement les exposer au propriétaire.
+    protected $hidden = ['card_code', 'pin', 'serial_number'];
+
     protected $casts = [
         'expiration_date' => 'date',
         'face_value'      => 'decimal:2',

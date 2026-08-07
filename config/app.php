@@ -43,6 +43,16 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Simulation de paiement (SÉCURITÉ H3)
+    |--------------------------------------------------------------------------
+    | Active les routes /checkout/simulate et /api/orders/simulate qui émettent
+    | de VRAIES cartes sans paiement. DOIT rester false en production. Découplé
+    | de APP_DEBUG pour ne jamais dépendre du niveau de debug.
+    */
+    'payments_simulation_enabled' => (bool) env('PAYMENTS_SIMULATION_ENABLED', false),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application URL
     |--------------------------------------------------------------------------
     |

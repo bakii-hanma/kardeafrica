@@ -44,3 +44,4 @@ yarn-error.*
 kardafrica.keystore
 *.keystore
 credentials.json
+google-services.json

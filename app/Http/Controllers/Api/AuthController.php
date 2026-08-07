@@ -104,6 +104,14 @@ class AuthController extends Controller
             ], 401);
         }
 
+        // SÉCURITÉ (H12) : refuser un compte désactivé depuis le back-office.
+        if (!$user->is_active) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Ce compte est désactivé.'
+            ], 403);
+        }
+
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([

@@ -62,7 +62,11 @@ class MerchantCardPurchase extends Model
      * Le QR payload n'est JAMAIS exposé en API publique (cf spec §SÉCURITÉ #1)
      * — il sert uniquement lors du scan, dans une route authentifiée vendor.
      */
-    protected $hidden = ['qr_payload'];
+    // SÉCURITÉ (H14) : le couple unique_code + pin_code EST le secret
+    // d'authentification au comptoir — masquer le QR seul ne suffisait pas.
+    // Masqué en JSON ; l'acheteur voit sa carte via le miroir UserCard, et le
+    // scan marchand (Owner/ScanController) lit pin_code par accès propriété.
+    protected $hidden = ['qr_payload', 'unique_code', 'pin_code'];
 
     // ============================================================
     // Relations
