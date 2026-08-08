@@ -6,6 +6,7 @@ import { useState, useEffect, useRef } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CatalogService } from '../../services/catalog';
 import AddToCartModal from '../../components/AddToCartModal';
+import { GiftCardVisual } from '../../components/GiftCardVisual';
 import { convertToFCFA } from '../../utils/currency';
 import LoadingKeychain from '../../components/LoadingKeychain';
 import { useCart } from '../../context/CartContext';
@@ -295,70 +296,17 @@ export default function ProductDetailScreen() {
         <View className="px-4 pt-6 pb-2">
           <Animated.View style={[animatedStyle]}>
             <TouchableOpacity activeOpacity={0.92} onPress={handleCardPress} style={{ width: '100%' }}>
-              <View style={{
-                width: '100%',
-                aspectRatio: 1.6,
-                borderRadius: 24,
-                backgroundColor: brandColor,
-                overflow: 'hidden',
-                shadowColor: brandColor,
-                shadowOffset: { width: 0, height: 24 },
-                shadowOpacity: 0.45,
-                shadowRadius: 30,
-                elevation: 12,
-              }}>
-                {/* Halos */}
-                <View style={{ position: 'absolute', top: -50, right: -50, width: 200, height: 200, borderRadius: 100, backgroundColor: 'rgba(255,255,255,0.18)' }} />
-                <View style={{ position: 'absolute', bottom: -40, left: -40, width: 120, height: 120, borderRadius: 60, backgroundColor: 'rgba(255,255,255,0.10)' }} />
-
-                {/* Content */}
-                <View style={{ position: 'relative', flex: 1, padding: 22, justifyContent: 'space-between' }}>
-                  {/* Top : label + logo */}
-                  <View className="flex-row items-start justify-between">
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ color: 'rgba(255,255,255,0.78)', fontSize: 10, fontWeight: '700', letterSpacing: 1.8, textTransform: 'uppercase' }}>
-                        Gift Card
-                      </Text>
-                      <Text style={{ color: '#FFFFFF', fontSize: 28, fontWeight: '900', letterSpacing: -0.5, marginTop: 6 }} numberOfLines={1}>
-                        {product.brandName || product.name}
-                      </Text>
-                    </View>
-                    <View style={{
-                      width: 56, height: 56, borderRadius: 16,
-                      backgroundColor: '#FFFFFF',
-                      alignItems: 'center', justifyContent: 'center',
-                      shadowColor: '#0F172A', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.18, shadowRadius: 8,
-                      overflow: 'hidden',
-                    }}>
-                      {product.logoUrl ? (
-                        <Image source={{ uri: product.logoUrl }} style={{ width: '85%', height: '85%' }} resizeMode="contain" />
-                      ) : (
-                        <Text style={{ fontSize: 24, fontWeight: '900', color: brandColor }}>{initial}</Text>
-                      )}
-                    </View>
-                  </View>
-
-                  {/* Bottom : price + chip gold */}
-                  <View className="flex-row items-end justify-between">
-                    <View>
-                      <Text style={{ color: 'rgba(255,255,255,0.65)', fontSize: 9, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase' }}>
-                        {selectedTier ? 'Sélectionné' : 'Dès'}
-                      </Text>
-                      <Text style={{ color: '#FFFFFF', fontSize: 26, fontWeight: '900', fontVariant: ['tabular-nums'], marginTop: 2 }}>
-                        {selectedTier
-                          ? new Intl.NumberFormat('fr-FR').format(Math.round(selectedTier.fcfa)) + ' FCFA'
-                          : new Intl.NumberFormat('fr-FR').format(Math.round(product.tiers?.[0]?.fcfa ?? 0)) + ' FCFA'}
-                      </Text>
-                    </View>
-                    <View style={{ width: 42, height: 30, borderRadius: 6, backgroundColor: '#FCD34D', borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)' }} />
-                  </View>
-                </View>
-
-                {/* Numéro carte décoratif */}
-                <Text style={{ position: 'absolute', bottom: 8, left: 22, fontSize: 9, color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace', letterSpacing: 2 }}>
-                  •••• •••• •••• 4829
-                </Text>
-              </View>
+              {/* Même visuel de carte que la boutique/web (GiftCardVisual :
+                  frame KardAfrica + ✓ Vérifié + gradient marque + chip + région).
+                  Le prix est affiché sous la carte (PRICE SELECTOR). */}
+              <GiftCardVisual
+                brandLabel={product.brandName || product.name}
+                brandColor={brandColor}
+                countryCode={product.countryCode}
+                currency={product.currencyCode}
+                logoUrl={product.logoUrl}
+                gradId={`detail-${product.id}`}
+              />
             </TouchableOpacity>
           </Animated.View>
 
