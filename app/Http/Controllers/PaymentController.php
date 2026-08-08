@@ -184,12 +184,16 @@ class PaymentController extends Controller
             $body = $response->json();
             $data = $body['data'] ?? $body;
 
+            // SÉCURITÉ (C6) : endpoint PUBLIC (polling WebView). On ne renvoie QUE
+            // le statut — jamais le payload brut du fournisseur qui contient des
+            // données personnelles du payeur (msisdn, email, montant). Sinon,
+            // couplé à des références devinables, c'était un outil d'énumération
+            // des paiements d'autrui.
             return response()->json([
                 'success'      => true,
                 'status'       => $data['status'] ?? 'unknown',
                 'is_completed' => (bool) ($data['is_completed'] ?? false),
                 'is_failed'    => (bool) ($data['is_failed'] ?? false),
-                'data'         => $data,
             ]);
 
         } catch (\Illuminate\Validation\ValidationException $e) {

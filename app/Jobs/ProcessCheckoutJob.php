@@ -56,6 +56,21 @@ class ProcessCheckoutJob implements ShouldQueue
             return;
         }
 
+        // Garde REMBOURSEMENT/ANNULATION (H2) — une commande remboursée ou annulée
+        // ne doit JAMAIS être livrée, même si le paiement fut un jour "completed"
+        // (le remboursement peut passer order.status à refunded sans toucher
+        // payment_status). Couvre la course remboursement ↔ livraison quand le
+        // job est encore en file au moment du remboursement.
+        if (in_array($this->order->status, [Order::STATUS_REFUNDED, Order::STATUS_CANCELLED], true)
+            || in_array($this->order->payment_status, [Order::PAYMENT_STATUS_REFUNDED, Order::PAYMENT_STATUS_CANCELLED], true)) {
+            Log::warning('ProcessCheckoutJob: commande remboursée/annulée, livraison refusée (H2)', [
+                'order_id'       => $this->order->id,
+                'status'         => $this->order->status,
+                'payment_status' => $this->order->payment_status,
+            ]);
+            return;
+        }
+
         // Garde PAIEMENT — CRITIQUE. Ne JAMAIS livrer une commande dont le
         // paiement n'est pas confirmé : d'anciens jobs en file correspondent à
         // des paiements abandonnés (payment_status != completed). Les livrer
