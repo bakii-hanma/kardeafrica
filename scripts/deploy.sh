@@ -78,7 +78,14 @@ if command -v npm >/dev/null 2>&1; then
   log "npm ci && npm run build (Vite)"
   npm ci --no-audit --no-fund || npm install --no-audit --no-fund
   npm run build
-  ok "Assets Vite construits ($(ls -1 public/build/assets 2>/dev/null | wc -l) fichiers)"
+  # ⚠️ SiteGround : le doc root sert depuis ./build (racine), pas ./public/build
+  # où Vite écrit. Sans cette synchro, le manifest pointe vers un CSS/JS absent
+  # du doc root → 404 → site totalement dé-stylé.
+  if [ -d public/build ]; then
+    mkdir -p build
+    cp -rf public/build/. build/
+  fi
+  ok "Assets Vite construits + synchronisés ($(ls -1 build/assets 2>/dev/null | wc -l) fichiers)"
 else
   warn "npm introuvable — build Vite SAUTÉ ; /public/build doit être déployé autrement"
 fi

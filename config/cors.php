@@ -12,16 +12,19 @@ return [
 
     'allowed_methods' => ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
 
-    'allowed_origins' => [
-        'http://kardafrica.com',
+    // M17/M2 — avec supports_credentials, on n'autorise QUE le HTTPS de prod.
+    // Les origines localhost (dev) ne sont ajoutées qu'en environnement local.
+    'allowed_origins' => array_values(array_filter([
         'https://kardafrica.com',
-        'http://localhost:3000',
-        'http://localhost:8000',
-        'http://localhost:8081',
-    ],
+        'https://www.kardafrica.com',
+        env('APP_ENV') === 'local' ? 'http://localhost:3000' : null,
+        env('APP_ENV') === 'local' ? 'http://localhost:8000' : null,
+        env('APP_ENV') === 'local' ? 'http://localhost:8081' : null,
+    ])),
 
+    // HTTPS uniquement + sous-domaine simple (plus de `https?` ni `.*`).
     'allowed_origins_patterns' => [
-        '#^https?://.*\.kardafrica\.com$#',
+        '#^https://([a-z0-9-]+\.)?kardafrica\.com$#',
     ],
 
     'allowed_headers' => ['Content-Type', 'Authorization', 'Accept', 'X-Requested-With', 'X-CSRF-TOKEN'],

@@ -254,6 +254,12 @@ class AuthController extends Controller
             'password' => Hash::make($request->new_password)
         ]);
 
+        // M20 — révoque tous les AUTRES jetons après changement de mot de passe
+        // (un éventuel jeton volé cesse d'être valide). On conserve la session
+        // courante pour ne pas déconnecter l'utilisateur qui vient d'agir.
+        $current = $user->currentAccessToken();
+        $user->tokens()->when($current, fn ($q) => $q->where('id', '!=', $current->id))->delete();
+
         return response()->json([
             'status' => 'success',
             'message' => 'Mot de passe modifié avec succès.'
