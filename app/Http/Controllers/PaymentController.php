@@ -350,19 +350,39 @@ class PaymentController extends Controller
                     'notes' => 'Ref: ' . $externalRef,
                 ]);
 
-                // Create Payment record
-                Payment::create([
-                    'transaction_id' => $externalRef,
-                    'order_id' => $order->id,
-                    'user_id' => $userId,
-                    'payment_method' => 'ebilling',
-                    'provider' => 'E-Billing',
-                    'amount' => $subtotal,
-                    'currency' => 'XAF',
-                    'status' => Payment::STATUS_COMPLETED,
-                    'external_transaction_id' => $externalRef,
-                    'processed_at' => now(),
-                ]);
+                // H0 — Le paiement web passe d'abord par CheckoutController::start
+                // qui a DÉJÀ créé un Payment `firstOrCreate(transaction_id=ref)`.
+                // Un `Payment::create` ici entrait en collision avec la contrainte
+                // UNIQUE sur transaction_id → rollback → HTTP 500 → client débité,
+                // jamais livré. On RÉUTILISE donc le paiement existant (ou on le crée
+                // pour le flux mobile qui n'appelle pas start).
+                Payment::updateOrCreate(
+                    ['transaction_id' => $externalRef],
+                    [
+                        'order_id' => $order->id,
+                        'user_id' => $userId,
+                        'payment_method' => 'ebilling',
+                        'provider' => 'E-Billing',
+                        'amount' => $subtotal,
+                        'currency' => 'XAF',
+                        'status' => Payment::STATUS_COMPLETED,
+                        'external_transaction_id' => $externalRef,
+                        'processed_at' => now(),
+                    ]
+                );
+
+                // H0 — annule la commande "pending" créée par start() pour la même
+                // référence : son paiement vient d'être rattaché à la commande
+                // finalisée ci-dessus. Évite une commande orpheline visible par le
+                // client. (Le flux mobile n'a pas de commande start → no-op.)
+                Order::where('external_reference', $externalRef)
+                    ->where('user_id', $userId)
+                    ->where('id', '!=', $order->id)
+                    ->whereIn('status', [Order::STATUS_PENDING, Order::STATUS_PROCESSING])
+                    ->update([
+                        'status'  => Order::STATUS_CANCELLED,
+                        'notes'   => 'Remplacée par la commande finalisée #' . $order->id . ' (H0)',
+                    ]);
 
                 // Create Order Items — on résout la valeur NATIVE (10 EUR pour
                 // une Roblox FR 10€) maintenant pour que ProcessCheckoutJob/retry
