@@ -1,5 +1,6 @@
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getToken } from './tokenStore';
 import { Config } from '../constants/Config';
 
 // --- Constants ---
@@ -183,7 +184,7 @@ export async function checkPaymentStatus(externalReference: string): Promise<Pay
  */
 export async function finalizePayment(externalReference: string): Promise<FinalizeResponse> {
   try {
-    const token = await AsyncStorage.getItem('token');
+    const token = await getToken();
     if (!token) {
       return { success: false, message: 'Non authentifie' };
     }
@@ -241,7 +242,7 @@ export async function simulatePayment(items: Array<{
   image_url?: string;
 }>): Promise<SimulatePaymentResponse> {
   try {
-    const token = await AsyncStorage.getItem('token');
+    const token = await getToken();
     if (!token) return { success: false, message: 'Non authentifié' };
 
     const response = await fetch(`${Config.API_URL}/orders/simulate`, {

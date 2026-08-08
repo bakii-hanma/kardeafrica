@@ -4,6 +4,7 @@ import { TrashIcon, MinusIcon, PlusIcon, ShoppingBagIcon, ArrowRightIcon, Square
 import { useState } from 'react';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getToken } from '../../services/tokenStore';
 import EmptyState from '../../components/EmptyState';
 import LoginRequiredModal from '../../components/LoginRequiredModal';
 import { useCart } from '../../context/CartContext';
@@ -49,7 +50,7 @@ export default function CartScreen() {
 
   const handleCheckout = async () => {
     try {
-      const token = await AsyncStorage.getItem('token');
+      const token = await getToken();
       if (!token) {
         setIsLoginModalVisible(true);
         return;

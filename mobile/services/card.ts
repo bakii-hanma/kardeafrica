@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { Config } from '../constants/Config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getToken } from './tokenStore';
 
 const API_URL = Config.API_URL;
 
@@ -24,7 +25,7 @@ export interface Card {
 export const CardService = {
   async getCards(): Promise<Card[]> {
     try {
-      const token = await AsyncStorage.getItem('token');
+      const token = await getToken();
       if (!token) throw new Error('No token found');
 
       const response = await axios.get(`${API_URL}/cards`, {
@@ -42,7 +43,7 @@ export const CardService = {
 
   async getCard(id: number): Promise<Card> {
     try {
-      const token = await AsyncStorage.getItem('token');
+      const token = await getToken();
       if (!token) throw new Error('No token found');
 
       const response = await axios.get(`${API_URL}/cards/${id}`, {

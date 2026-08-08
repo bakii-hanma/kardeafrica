@@ -3,6 +3,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { useRouter, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getToken } from '../../services/tokenStore';
 import {
   ArrowLeftIcon, ShoppingBagIcon, ClipboardDocumentListIcon,
   CheckCircleIcon, ChevronRightIcon, CreditCardIcon, PlusIcon,
@@ -186,7 +187,7 @@ export default function OrdersScreen() {
 
   const loadOrders = async () => {
     try {
-      const token = await AsyncStorage.getItem('token');
+      const token = await getToken();
       if (!token) { setLoading(false); return; }
       const data = await OrderService.getOrders();
       setOrders(data);

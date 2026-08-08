@@ -4,6 +4,7 @@ import AuthRequired from '../../components/AuthRequired';
 import LogoutModal from '../../components/LogoutModal';
 import { useState, useEffect, useRef, useMemo } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getToken, deleteToken } from '../../services/tokenStore';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { UserIcon, ArrowRightOnRectangleIcon, ChevronRightIcon, MapPinIcon, EnvelopeIcon, PhoneIcon, SparklesIcon, PencilIcon, ShieldCheckIcon, QuestionMarkCircleIcon, ExclamationTriangleIcon, ShoppingBagIcon } from 'react-native-heroicons/outline';
 import { Gyroscope } from 'expo-sensors';
@@ -114,7 +115,7 @@ export default function ProfileScreen() {
 
   const checkAuth = async () => {
     try {
-      const token = await AsyncStorage.getItem('token');
+      const token = await getToken();
       const userData = await AsyncStorage.getItem('user');
       
       if (token) {
@@ -150,7 +151,13 @@ export default function ProfileScreen() {
   const performLogout = async () => {
     try {
       setIsLogoutModalVisible(false);
-      await AsyncStorage.removeItem('token');
+      // H1 — révoque le token côté serveur avant de l'effacer localement (sinon
+      // un token éventuellement exfiltré resterait valide).
+      try {
+        const token = await getToken();
+        if (token) await AuthService.logout(token);
+      } catch {}
+      await deleteToken();
       await AsyncStorage.removeItem('user');
       setIsAuthenticated(false);
       setUser(null);

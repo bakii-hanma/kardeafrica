@@ -1,5 +1,6 @@
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getToken } from './tokenStore';
 import { Config } from '../constants/Config';
 
 // Use Config.API_URL for API requests
@@ -31,7 +32,7 @@ export const AuthService = {
   // Verifie le mot de passe de l'utilisateur connecte (gate pour reveal de cartes)
   verifyPassword: async (password: string): Promise<{ ok: boolean; message?: string }> => {
     try {
-      const token = await AsyncStorage.getItem('token');
+      const token = await getToken();
       if (!token) return { ok: false, message: 'Non connecté' };
 
       const response = await fetch(`${BASE_URL}/verify-password`, {
@@ -197,7 +198,7 @@ export const AuthService = {
     avatar?: { uri: string; type: string; name: string } | null
   ): Promise<AuthResponse> => {
     try {
-      const token = await AsyncStorage.getItem('token');
+      const token = await getToken();
       if (!token) throw new Error('No token found');
 
       const controller = new AbortController();
@@ -257,7 +258,7 @@ export const AuthService = {
   // Change Password
   changePassword: async (currentPassword: string, newPassword: string): Promise<AuthResponse> => {
     try {
-      const token = await AsyncStorage.getItem('token');
+      const token = await getToken();
       if (!token) throw new Error('No token found');
 
       const controller = new AbortController();

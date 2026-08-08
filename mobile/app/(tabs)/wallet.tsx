@@ -5,6 +5,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import AuthRequired from '../../components/AuthRequired';
 import EmptyState from '../../components/EmptyState';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getToken } from '../../services/tokenStore';
 import NavbarProfile from '../../components/NavbarProfile';
 import * as Clipboard from 'expo-clipboard';
 import { CardService, Card } from '../../services/card';
@@ -208,7 +209,7 @@ export default function WalletScreen() {
 
   const checkAuthAndLoadCards = async () => {
     try {
-      const token = await AsyncStorage.getItem('token');
+      const token = await getToken();
       if (token) { setIsAuthenticated(true); loadCards(); loadPendingOrders(); }
       else { setIsAuthenticated(false); setLoading(false); setCards([]); }
     } catch {

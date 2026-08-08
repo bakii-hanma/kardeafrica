@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getToken } from './tokenStore';
 import { Config } from '../constants/Config';
 
 const API_URL = Config.API_URL;
@@ -34,7 +35,7 @@ export interface Order {
 export const OrderService = {
   async getOrders(): Promise<Order[]> {
     try {
-      const token = await AsyncStorage.getItem('token');
+      const token = await getToken();
       if (!token) throw new Error('No token found');
 
       const response = await fetch(`${API_URL}/orders`, {
@@ -75,7 +76,7 @@ export const OrderService = {
     cards?: any[];
   }> {
     try {
-      const token = await AsyncStorage.getItem('token');
+      const token = await getToken();
       if (!token) throw new Error('No token found');
 
       const response = await fetch(`${API_URL}/orders/${orderId}/retry-delivery`, {
@@ -95,7 +96,7 @@ export const OrderService = {
 
   async getOrder(id: number): Promise<{ order: Order; cards: any[] }> {
     try {
-      const token = await AsyncStorage.getItem('token');
+      const token = await getToken();
       if (!token) throw new Error('No token found');
 
       const response = await fetch(`${API_URL}/orders/${id}`, {

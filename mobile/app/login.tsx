@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Image, Dimensions, StatusBar, Animated, Easing } from 'react-native';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { setToken } from '../services/tokenStore';
 import { AuthService } from '../services/auth';
 import ErrorModal from '../components/ErrorModal';
 import SuccessModal from '../components/SuccessModal';
@@ -173,7 +174,7 @@ const LoginScreen = () => {
       const response = await AuthService.login(loginEmail, loginPassword);
 
       if (response.status === 'success' && response.data) {
-        await AsyncStorage.setItem('token', response.data.token);
+        await setToken(response.data.token);
         await AsyncStorage.setItem('user', JSON.stringify(response.data.user));
 
         setSuccessTitle('Connexion réussie');
