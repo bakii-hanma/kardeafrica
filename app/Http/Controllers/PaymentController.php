@@ -159,6 +159,78 @@ class PaymentController extends Controller
     }
 
     /**
+     * C6 — Crée un e-bill (billing-easy) CÔTÉ SERVEUR pour le flux mobile.
+     * La clé marchand reste dans le .env (plus jamais dans l'APK), et le montant
+     * est recalculé depuis le catalogue (jamais le montant envoyé par le client).
+     */
+    public function createEbill(Request $request)
+    {
+        $validated = $request->validate([
+            'items'              => 'required|array|min:1',
+            'items.*.product_id' => 'required',
+            'items.*.quantity'   => 'required|integer|min:1',
+            'external_reference' => 'required|string|max:100',
+            'phone'              => 'required|string|max:30',
+            'email'              => 'nullable|email|max:255',
+            'name'               => 'nullable|string|max:255',
+            'description'        => 'nullable|string|max:120',
+        ]);
+
+        $auth = config('services.ebilling.auth');
+        if (empty($auth)) {
+            return response()->json(['success' => false, 'message' => 'Paiement momentanément indisponible.'], 503);
+        }
+
+        $user = $request->user();
+
+        // Montant FAISANT AUTORITÉ recalculé serveur (C1/C6) — jamais le client.
+        $svc = app(\App\Services\ProductApiService::class);
+        $amount = 0;
+        foreach ($validated['items'] as $it) {
+            $amount += $svc->authoritativeUnitPrice($it['product_id'], 0) * (int) $it['quantity'];
+        }
+        if ($amount <= 0) {
+            return response()->json(['success' => false, 'message' => 'Montant invalide.'], 422);
+        }
+
+        $payload = [
+            'payer_email'        => $validated['email'] ?? $user?->email ?? 'noreply@kardafrica.com',
+            'payer_msisdn'       => $this->formatPhoneNumber($validated['phone']),
+            'amount'             => (int) round($amount),
+            'short_description'  => substr($validated['description'] ?? 'Commande KardAfrica', 0, 100),
+            'external_reference' => $validated['external_reference'],
+            'payer_name'         => $validated['name'] ?? $user?->name ?? 'Client KardAfrica',
+            'expiry_period'      => 60,
+            'currency'           => 'XAF',
+        ];
+
+        try {
+            $response = Http::timeout(20)
+                ->withHeaders(['Authorization' => $auth, 'Accept' => 'application/json'])
+                ->post(config('services.ebilling.url'), $payload);
+        } catch (\Throwable $e) {
+            Log::warning('createEbill: exception réseau', ['error' => $e->getMessage()]);
+            return response()->json(['success' => false, 'message' => 'Erreur réseau paiement.'], 502);
+        }
+
+        if (!$response->successful()) {
+            Log::warning('createEbill: billing-easy non OK', ['status' => $response->status()]);
+            return response()->json(['success' => false, 'message' => 'Erreur lors de la création de la facture.'], 502);
+        }
+
+        $data   = $response->json();
+        $billId = $data['e_bill']['bill_id'] ?? $data['bill_id'] ?? null;
+
+        return response()->json([
+            'success'    => true,
+            'bill_id'    => $billId,
+            'portal_url' => $billId ? (config('services.ebilling.portal_base') . $billId) : null,
+            'amount'     => (int) round($amount),
+            'e_bill'     => $data['e_bill'] ?? $data,
+        ]);
+    }
+
+    /**
      * Verifier le statut d'un paiement via futursowax/check_status.php
      * Format de reponse aligne sur la doc : { is_completed, is_failed, status }
      */

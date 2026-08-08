@@ -85,4 +85,19 @@ return [
         'model' => env('MISTRAL_MODEL', 'mistral-small-latest'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | E-Billing (billing-easy) — création d'e-bill pour le flux MOBILE (C6)
+    |--------------------------------------------------------------------------
+    | La clé marchand (EBILLING_AUTH) était embarquée dans l'APK et donc
+    | extractible. Elle vit désormais UNIQUEMENT ici (côté serveur) ; le mobile
+    | appelle un endpoint Laravel qui crée l'e-bill à sa place, avec un montant
+    | calculé serveur.
+    */
+    'ebilling' => [
+        'url'         => env('EBILLING_URL', 'https://stg.billing-easy.com/api/v1/merchant/e_bills'),
+        'auth'        => env('EBILLING_AUTH'), // ex: 'Basic <base64(user:key)>'
+        'portal_base' => env('EBILLING_PORTAL_BASE', 'https://staging.billing-easy.net/?invoice='),
+    ],
+
 ];

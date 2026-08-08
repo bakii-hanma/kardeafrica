@@ -118,6 +118,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/payment/init', [App\Http\Controllers\PaymentController::class, 'init'])
         ->middleware('throttle:10,1')
         ->name('api.payment.init');
+    // C6 — création d'e-bill billing-easy côté serveur (clé hors APK, montant serveur)
+    Route::post('/payment/create-ebill', [App\Http\Controllers\PaymentController::class, 'createEbill'])
+        ->middleware('throttle:10,1')
+        ->name('api.payment.create-ebill');
     Route::post('/payment/finalize', [App\Http\Controllers\PaymentController::class, 'finalize'])
         ->name('api.payment.finalize'); // legacy
 });

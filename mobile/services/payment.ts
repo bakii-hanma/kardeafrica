@@ -6,11 +6,10 @@ import { Config } from '../constants/Config';
 // --- Constants ---
 const API_URL_INIT = Config.PAYMENT_API_INIT;
 const API_URL_CHECK = Config.PAYMENT_API_CHECK;
-const API_URL_EBILLING = Config.PAYMENT_API_EBILLING;
 const PORTAL_URL_BASE = Config.PAYMENT_PORTAL_BASE;
 
-// Credentials
-const EBILLING_AUTH = 'Basic U293YXg6Y2E0OTJkNzgtY2JlYi00NTEzLTk1MjUtYzIzYjhmMGNlMGMx';
+// C6 — la clé marchand billing-easy N'EST PLUS dans l'app : la création d'e-bill
+// passe par le serveur (POST /api/payment/create-ebill), clé dans le .env serveur.
 
 // --- Types ---
 
@@ -23,6 +22,10 @@ export interface PaymentInitResponse {
 }
 
 export interface EBillResponse {
+  success?: boolean;
+  bill_id?: string | null;
+  portal_url?: string | null;
+  amount?: number;
   e_bill?: {
     bill_id: string;
   };
@@ -124,10 +127,15 @@ export async function initBackendTransaction(
 }
 
 /**
- * Step 2: Create E-Bill
+ * Step 2: Create E-Bill — VIA LE SERVEUR (C6).
+ *
+ * La clé marchand billing-easy ne vit plus dans l'app (elle était extractible de
+ * l'APK). On appelle un endpoint Laravel authentifié (Sanctum) qui crée l'e-bill
+ * avec la clé côté serveur ET un montant recalculé serveur depuis le catalogue
+ * (on envoie les product_id + quantités, jamais un montant).
  */
 export async function createEBill(
-  amount: number,
+  items: Array<{ product_id: string; quantity: number }>,
   description: string,
   externalReference: string,
   email: string,
@@ -135,30 +143,29 @@ export async function createEBill(
   name: string
 ): Promise<EBillResponse> {
   try {
-    const response = await fetch(API_URL_EBILLING, {
+    const token = await getToken();
+    const response = await fetch(`${Config.API_URL}/payment/create-ebill`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
-        'Authorization': EBILLING_AUTH,
+        'Authorization': `Bearer ${token}`,
       },
       body: JSON.stringify({
-        payer_email: email,
-        payer_msisdn: formatPhoneNumber(phoneNumber),
-        amount: Math.round(amount),
-        short_description: description.substring(0, 100),
+        items,
         external_reference: externalReference,
-        payer_name: name,
-        expiry_period: 60,
-        currency: 'XAF',
+        phone: phoneNumber,
+        email,
+        name,
+        description: description.substring(0, 100),
       }),
     });
 
     const data = await response.json();
-    return data;
+    return data; // { success, bill_id, portal_url, e_bill }
   } catch (error) {
     console.error('Error creating e-bill:', error);
-    return { message: 'Network error connecting to E-Billing' };
+    return { message: 'Network error connecting to payment server' };
   }
 }
 

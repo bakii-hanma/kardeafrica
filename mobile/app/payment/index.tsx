@@ -105,9 +105,13 @@ export default function PaymentScreen() {
         console.warn('Backend init failed, continuing with E-Billing...');
       }
 
-      // 3. Create E-Bill with real user data and real amount
+      // 3. Create E-Bill VIA LE SERVEUR (C6) — on envoie les articles, le serveur
+      //    recalcule le montant et crée la facture avec sa clé (jamais dans l'app).
       const eBill = await PaymentService.createEBill(
-        amountToPay,
+        cartItems.map((it: any) => ({
+          product_id: String(it.id || it.product_id),
+          quantity: Number(it.quantity) || 1,
+        })),
         `Paiement Panier (${cartCount} articles)`,
         ref,
         userEmail,
@@ -115,15 +119,12 @@ export default function PaymentScreen() {
         userName
       );
 
-      console.log('E-Bill Created:', eBill);
-
-      if (!eBill || !eBill.e_bill || !eBill.e_bill.bill_id) {
-        throw new Error('Erreur lors de la creation de la facture E-Billing');
+      if (!eBill || !eBill.success || !eBill.portal_url) {
+        throw new Error('Erreur lors de la création de la facture');
       }
 
-      // 4. Open Portal
-      const url = PaymentService.getPortalUrl(eBill.e_bill.bill_id);
-      setPortalUrl(url);
+      // 4. Open Portal (URL fournie par le serveur)
+      setPortalUrl(eBill.portal_url);
       setShowWebView(true);
       setIsLoading(false);
 
