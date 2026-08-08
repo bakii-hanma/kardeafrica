@@ -71,6 +71,18 @@ log "composer install --no-dev --optimize-autoloader"
 composer install --no-interaction --prefer-dist --no-dev --optimize-autoloader
 ok "Dependencies installées"
 
+# ----- 3b. Build des assets frontend (Vite) -----
+# CRITIQUE : le layout principal utilise @vite(). Sans /public/build à jour,
+# le rendu casse ("Vite manifest not found"). Cette étape manquait au pipeline.
+if command -v npm >/dev/null 2>&1; then
+  log "npm ci && npm run build (Vite)"
+  npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+  npm run build
+  ok "Assets Vite construits ($(ls -1 public/build/assets 2>/dev/null | wc -l) fichiers)"
+else
+  warn "npm introuvable — build Vite SAUTÉ ; /public/build doit être déployé autrement"
+fi
+
 # ----- 4. Migrations DB -----
 log "php artisan migrate --force"
 php artisan migrate --force
