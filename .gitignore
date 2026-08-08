@@ -25,3 +25,7 @@ Thumbs.db
 
 # Doc contenant des identifiants réels — ne jamais committer
 CONFIG_DATABASE.md
+
+# Réglages locaux / docs à secrets — ne jamais committer
+.claude/
+GUIDE_PAIEMENT.md
