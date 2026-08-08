@@ -22,8 +22,11 @@ return new class extends Migration
 {
     public function up(): void
     {
-        // Change le default DB pour les nouveaux INSERT
-        DB::statement('ALTER TABLE resellers MODIFY wallet_balance DECIMAL(10,2) NOT NULL DEFAULT 20000');
+        // Change le default DB pour les nouveaux INSERT (MySQL). SQLite (tests)
+        // ne supporte pas `ALTER ... MODIFY` et ne teste pas ce default → on saute.
+        if (DB::connection()->getDriverName() !== 'sqlite') {
+            DB::statement('ALTER TABLE resellers MODIFY wallet_balance DECIMAL(10,2) NOT NULL DEFAULT 20000');
+        }
 
         // Backfill : comptes vierges → cagnotte initiale
         DB::table('resellers')
@@ -34,7 +37,9 @@ return new class extends Migration
 
     public function down(): void
     {
-        DB::statement('ALTER TABLE resellers MODIFY wallet_balance DECIMAL(10,2) NOT NULL DEFAULT 0');
+        if (DB::connection()->getDriverName() !== 'sqlite') {
+            DB::statement('ALTER TABLE resellers MODIFY wallet_balance DECIMAL(10,2) NOT NULL DEFAULT 0');
+        }
         // Pas de rollback du crédit : on ne sait pas distinguer les comptes
         // bootstrap des comptes ayant gagné 20k naturellement.
     }

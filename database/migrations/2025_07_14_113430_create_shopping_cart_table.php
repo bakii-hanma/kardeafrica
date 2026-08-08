@@ -15,7 +15,14 @@ return new class extends Migration
             $table->id();
             $table->foreignId('user_id')->nullable()->constrained()->onDelete('cascade');
             $table->string('session_id')->nullable(); // Pour les utilisateurs non connectés
-            $table->foreignId('card_id')->constrained()->onDelete('cascade');
+            // FK conditionnelle (M14) : sur SQLite (tests), on NE pose PAS la
+            // contrainte — sinon la migration suivante qui supprime cette colonne
+            // casse (SQLite recrée la table en gardant une FK vers une colonne
+            // disparue). En MySQL/prod, comportement strictement inchangé.
+            $table->unsignedBigInteger('card_id');
+            if (Schema::getConnection()->getDriverName() !== 'sqlite') {
+                $table->foreign('card_id')->references('id')->on('cards')->onDelete('cascade');
+            }
             $table->integer('quantity');
             $table->timestamps();
             
