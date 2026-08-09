@@ -165,5 +165,34 @@
             @endif
         </div>
     </div>
+
+    {{-- ========== Réinitialiser le mot de passe du propriétaire ========== --}}
+    <div style="margin-top:24px;background:white;border:1px solid #E2E8F0;border-radius:16px;padding:22px;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+            <svg style="width:18px;height:18px;color:#44A08D;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
+            <h3 style="margin:0;font-size:15px;font-weight:800;color:#0F172A;">Réinitialiser le mot de passe</h3>
+        </div>
+        <p style="margin:0 0 14px;font-size:12px;color:#64748B;">Définis un nouveau mot de passe pour <strong>{{ $owner->name }}</strong> ({{ $owner->email }}). L'ancien sera immédiatement invalidé.</p>
+        <form method="POST" action="{{ route('admin.card-owners.reset-password', $owner) }}"
+              onsubmit="return confirm('Réinitialiser le mot de passe de ce propriétaire ?');"
+              style="display:flex;flex-wrap:wrap;gap:10px;align-items:end;">
+            @csrf
+            <div style="flex:1;min-width:180px;">
+                <label style="display:block;font-size:11px;font-weight:700;color:#475569;margin-bottom:4px;">Nouveau mot de passe</label>
+                <input type="password" name="password" required minlength="8" autocomplete="new-password"
+                       style="width:100%;padding:9px 12px;border:1px solid #CBD5E1;border-radius:9px;font-size:13px;box-sizing:border-box;">
+            </div>
+            <div style="flex:1;min-width:180px;">
+                <label style="display:block;font-size:11px;font-weight:700;color:#475569;margin-bottom:4px;">Confirmer</label>
+                <input type="password" name="password_confirmation" required minlength="8" autocomplete="new-password"
+                       style="width:100%;padding:9px 12px;border:1px solid #CBD5E1;border-radius:9px;font-size:13px;box-sizing:border-box;">
+            </div>
+            <button type="submit"
+                    style="padding:10px 18px;background:linear-gradient(135deg,#44A08D,#4ECDC4);color:white;border:none;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer;">
+                Réinitialiser
+            </button>
+        </form>
+        @error('password')<p style="margin:8px 0 0;font-size:11px;color:#DC2626;">{{ $message }}</p>@enderror
+    </div>
 </div>
 @endsection

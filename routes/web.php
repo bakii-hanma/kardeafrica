@@ -342,6 +342,7 @@ Route::prefix('admin')->middleware(['auth', 'is_admin'])->group(function () {
     Route::get('/card-owners/{cardOwner}/edit',        [\App\Http\Controllers\Admin\CardOwnerController::class, 'edit'])->name('admin.card-owners.edit');
     Route::put('/card-owners/{cardOwner}',             [\App\Http\Controllers\Admin\CardOwnerController::class, 'update'])->name('admin.card-owners.update');
     Route::delete('/card-owners/{cardOwner}',          [\App\Http\Controllers\Admin\CardOwnerController::class, 'destroy'])->name('admin.card-owners.destroy');
+    Route::post('/card-owners/{cardOwner}/reset-password', [\App\Http\Controllers\Admin\CardOwnerController::class, 'resetPassword'])->name('admin.card-owners.reset-password');
 
     // Cartes-cadeau Carte Gabon — créées par l'admin, vendues par les boutiques
     Route::get('/merchant-cards',                            [AdminMerchantCardController::class, 'index'])->name('admin.merchant-cards.index');
