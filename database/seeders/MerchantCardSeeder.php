@@ -38,7 +38,7 @@ class MerchantCardSeeder extends Seeder
             'address'         => $reseller->address         ?? 'Boulevard du Bord de Mer',
             'city'            => $reseller->city            ?? 'Libreville',
             'province'        => $reseller->province        ?? 'Estuaire',
-            'whatsapp_number' => $reseller->whatsapp_number ?? '+24106871309',
+            'whatsapp_number' => $reseller->whatsapp_number ?? '+24100000000',
             'kyc_status'      => 'approved',
             'kyc_approved_at' => $reseller->kyc_approved_at ?? now(),
         ]);

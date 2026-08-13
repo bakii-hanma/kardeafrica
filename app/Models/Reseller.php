@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class Reseller extends Authenticatable
@@ -116,13 +117,17 @@ class Reseller extends Authenticatable
         }
 
         return DB::transaction(function () use ($amount, $adminId, $description, $reference) {
-            $this->refresh();
-            $newBalance = (float) $this->wallet_balance + $amount;
-            if ($newBalance > (float) $this->max_wallet) {
-                throw new \RuntimeException("Plafond de {$this->max_wallet} FCFA dépassé.");
+            // Verrou pessimiste (race-safe) : le contrôle de plafond et le calcul
+            // se font sur la ligne fraîchement verrouillée, pas sur l'instance mémoire.
+            $fresh = static::where('id', $this->id)->lockForUpdate()->first();
+
+            $balanceBefore = (float) $fresh->wallet_balance;
+            $newBalance    = $balanceBefore + $amount;
+            if ($newBalance > (float) $fresh->max_wallet) {
+                throw new \RuntimeException("Plafond de {$fresh->max_wallet} FCFA dépassé.");
             }
-            $balanceBefore = (float) $this->wallet_balance;
-            $this->update(['wallet_balance' => $newBalance]);
+            $fresh->wallet_balance = $newBalance;
+            $fresh->save();
 
             ResellerWalletTransaction::create([
                 'reseller_id'    => $this->id,
@@ -136,6 +141,132 @@ class Reseller extends Authenticatable
                 'reference'      => $reference,
             ]);
 
+            // Synchronise l'instance courante avec l'état persisté
+            $this->refresh();
+            return $newBalance;
+        });
+    }
+
+    /**
+     * Transfère des commissions gagnées vers le portefeuille de VENTE.
+     *
+     * Jusqu'ici `commission_balance` n'avait aucune sortie : aucune route,
+     * aucun contrôleur, aucun job ne permettait d'en disposer. Le vendeur
+     * accumulait un solde qu'il ne pouvait jamais toucher. Ce transfert lui
+     * rend l'argent utile immédiatement — il le convertit en pouvoir de vente.
+     *
+     * Atomique et plafonné : impossible de transférer plus que le solde de
+     * commissions, ni de dépasser le plafond de la cagnotte.
+     *
+     * @return array{commission_balance: float, wallet_balance: float}
+     */
+    public function transferCommissionToWallet(float $amount): array
+    {
+        if ($amount <= 0) {
+            throw new \InvalidArgumentException('Le montant doit être positif.');
+        }
+
+        return DB::transaction(function () use ($amount) {
+            $fresh = static::where('id', $this->id)->lockForUpdate()->first();
+
+            $commissionBefore = (float) $fresh->commission_balance;
+            $walletBefore     = (float) $fresh->wallet_balance;
+
+            if ($commissionBefore < $amount) {
+                throw new \RuntimeException('Commissions insuffisantes.');
+            }
+            if ($walletBefore + $amount > (float) $fresh->max_wallet) {
+                $place = max(0, (float) $fresh->max_wallet - $walletBefore);
+                throw new \RuntimeException(
+                    'Ta cagnotte ne peut accueillir que ' . number_format($place, 0, ',', ' ') . ' FCFA de plus.'
+                );
+            }
+
+            $fresh->commission_balance = $commissionBefore - $amount;
+            $fresh->wallet_balance     = $walletBefore + $amount;
+            $fresh->save();
+
+            // Deux écritures : la sortie du portefeuille commissions et l'entrée
+            // dans celui de vente. L'historique reste lisible des deux côtés.
+            ResellerWalletTransaction::create([
+                'reseller_id'    => $this->id,
+                'wallet'         => 'commission',
+                'type'           => 'transfer_out',
+                'amount'         => $amount,
+                'balance_before' => $commissionBefore,
+                'balance_after'  => $commissionBefore - $amount,
+                'description'    => 'Transfert vers le solde de vente',
+            ]);
+            ResellerWalletTransaction::create([
+                'reseller_id'    => $this->id,
+                'wallet'         => 'sales',
+                'type'           => 'transfer_in',
+                'amount'         => $amount,
+                'balance_before' => $walletBefore,
+                'balance_after'  => $walletBefore + $amount,
+                'description'    => 'Transfert depuis mes commissions',
+            ]);
+
+            $this->refresh();
+
+            return [
+                'commission_balance' => (float) $fresh->commission_balance,
+                'wallet_balance'     => (float) $fresh->wallet_balance,
+            ];
+        });
+    }
+
+    /**
+     * RESTITUE au portefeuille de vente un montant précédemment débité
+     * (remboursement d'une commande non livrée).
+     *
+     * Contrairement à `credit()`, cette opération IGNORE le plafond : elle ne
+     * fait qu'annuler un débit antérieur, elle n'ajoute pas de float neuf. Le
+     * plafond encadre ce qu'un vendeur peut *charger*, pas ce qu'on lui *rend*.
+     *
+     * Sans cela, un remboursement pouvait échouer APRÈS le virement au client
+     * (le contrôle de plafond levait une exception dans la transaction de
+     * clôture) : le client était remboursé, le vendeur ne récupérait jamais son
+     * argent, et chaque nouvel essai butait sur le même plafond.
+     */
+    public function refundCredit(float $amount, ?string $description = null, ?string $reference = null): float
+    {
+        if ($amount <= 0) {
+            throw new \InvalidArgumentException('Le montant doit être positif.');
+        }
+
+        return DB::transaction(function () use ($amount, $description, $reference) {
+            $fresh = static::where('id', $this->id)->lockForUpdate()->first();
+
+            $balanceBefore = (float) $fresh->wallet_balance;
+            $newBalance    = $balanceBefore + $amount;
+
+            $fresh->wallet_balance = $newBalance;
+            // Le remboursement peut faire repasser au-dessus du plafond courant
+            // (ex. le vendeur a rechargé depuis la vente). On le trace pour que
+            // l'admin le voie, sans jamais bloquer la restitution.
+            if ($newBalance > (float) $fresh->max_wallet) {
+                Log::notice('Restitution au-dessus du plafond wallet', [
+                    'reseller_id' => $this->id,
+                    'new_balance' => $newBalance,
+                    'max_wallet'  => (float) $fresh->max_wallet,
+                    'reference'   => $reference,
+                ]);
+            }
+            $fresh->save();
+
+            ResellerWalletTransaction::create([
+                'reseller_id'    => $this->id,
+                'wallet'         => 'sales',
+                'type'           => 'refund',
+                'amount'         => $amount,
+                'balance_before' => $balanceBefore,
+                'balance_after'  => $newBalance,
+                'description'    => $description ?? 'Restitution remboursement',
+                'reference'      => $reference,
+            ]);
+
+            $this->refresh();
             return $newBalance;
         });
     }
@@ -146,13 +277,17 @@ class Reseller extends Authenticatable
     public function debit(float $amount, ?string $description = null, ?string $reference = null): float
     {
         return DB::transaction(function () use ($amount, $description, $reference) {
-            $this->refresh();
-            if ((float) $this->wallet_balance < $amount) {
+            // Verrou pessimiste (race-safe) : le contrôle de solde se fait sur la
+            // ligne fraîchement verrouillée — deux débits concurrents se sérialisent.
+            $fresh = static::where('id', $this->id)->lockForUpdate()->first();
+
+            if ((float) $fresh->wallet_balance < $amount) {
                 throw new \RuntimeException('Solde insuffisant.');
             }
-            $balanceBefore = (float) $this->wallet_balance;
+            $balanceBefore = (float) $fresh->wallet_balance;
             $newBalance = $balanceBefore - $amount;
-            $this->update(['wallet_balance' => $newBalance]);
+            $fresh->wallet_balance = $newBalance;
+            $fresh->save();
 
             ResellerWalletTransaction::create([
                 'reseller_id'    => $this->id,
@@ -165,6 +300,8 @@ class Reseller extends Authenticatable
                 'reference'      => $reference,
             ]);
 
+            // Synchronise l'instance courante avec l'état persisté
+            $this->refresh();
             return $newBalance;
         });
     }
@@ -176,13 +313,15 @@ class Reseller extends Authenticatable
     public function commission(float $amount, ?string $description = null, ?string $reference = null): float
     {
         return DB::transaction(function () use ($amount, $description, $reference) {
-            $this->refresh();
-            $balanceBefore = (float) $this->commission_balance;
+            // Verrou pessimiste (race-safe) : calcul sur la ligne fraîchement
+            // verrouillée pour éviter la perte d'une commission concurrente.
+            $fresh = static::where('id', $this->id)->lockForUpdate()->first();
+
+            $balanceBefore = (float) $fresh->commission_balance;
             $newBalance = $balanceBefore + $amount;
-            $this->update([
-                'commission_balance'      => $newBalance,
-                'total_commission_earned' => $this->total_commission_earned + $amount,
-            ]);
+            $fresh->commission_balance      = $newBalance;
+            $fresh->total_commission_earned = (float) $fresh->total_commission_earned + $amount;
+            $fresh->save();
 
             ResellerWalletTransaction::create([
                 'reseller_id'    => $this->id,
@@ -195,6 +334,8 @@ class Reseller extends Authenticatable
                 'reference'      => $reference,
             ]);
 
+            // Synchronise l'instance courante avec l'état persisté
+            $this->refresh();
             return $newBalance;
         });
     }
@@ -204,6 +345,21 @@ class Reseller extends Authenticatable
         return (float) $this->max_wallet > 0
             ? round(((float) $this->wallet_balance / (float) $this->max_wallet) * 100, 1)
             : 0;
+    }
+
+    /**
+     * Niveau d'alerte de la jauge de solde, pour la coloration du dashboard.
+     * Sous 30 % du plafond le vendeur doit songer à recharger, sous 10 % il ne
+     * peut quasiment plus vendre. Ici pour être testable sans passer par le HTML.
+     *
+     * @return 'ok'|'warn'|'danger'
+     */
+    public function walletTone(): string
+    {
+        $pct = $this->wallet_percentage;
+        if ($pct < 10) return 'danger';
+        if ($pct < 30) return 'warn';
+        return 'ok';
     }
 
     /**
@@ -336,6 +492,22 @@ class Reseller extends Authenticatable
             }
             $fresh->wallet_locked = (float) $fresh->wallet_locked + $amount;
             $fresh->save();
+
+            // Trace le blocage : sans elle, le vendeur voyait son solde
+            // disponible baisser sans aucune ligne correspondante dans son
+            // historique. Le solde du portefeuille ne bouge pas — seule la
+            // part réservée change — d'où before == after.
+            ResellerWalletTransaction::create([
+                'reseller_id'    => $this->id,
+                'wallet'         => 'sales',
+                'type'           => 'lock',
+                'amount'         => $amount,
+                'balance_before' => (float) $fresh->wallet_balance,
+                'balance_after'  => (float) $fresh->wallet_balance,
+                'description'    => 'Fonds réservés (vente en espèces en attente)',
+                'reference'      => $reference,
+            ]);
+
             $this->refresh();
             return (float) $this->wallet_locked;
         });
@@ -348,11 +520,24 @@ class Reseller extends Authenticatable
     {
         if ($amount <= 0) return (float) $this->wallet_locked;
 
-        return DB::transaction(function () use ($amount) {
+        return DB::transaction(function () use ($amount, $reference) {
             $fresh = static::where('id', $this->id)->lockForUpdate()->first();
             $newLocked = max(0, (float) $fresh->wallet_locked - $amount);
             $fresh->wallet_locked = $newLocked;
             $fresh->save();
+
+            // Pendant du blocage : la libération doit être visible elle aussi.
+            ResellerWalletTransaction::create([
+                'reseller_id'    => $this->id,
+                'wallet'         => 'sales',
+                'type'           => 'unlock',
+                'amount'         => $amount,
+                'balance_before' => (float) $fresh->wallet_balance,
+                'balance_after'  => (float) $fresh->wallet_balance,
+                'description'    => 'Fonds réservés libérés (vente annulée ou expirée)',
+                'reference'      => $reference,
+            ]);
+
             $this->refresh();
             return $newLocked;
         });

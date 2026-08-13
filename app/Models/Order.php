@@ -27,6 +27,9 @@ class Order extends Model
         'billing_details',
         'notes',
         'completed_at',
+        // H4 — marqueur posé sous verrou AVANT l'appel afrikard /orders/checkout
+        // (voir ProcessCheckoutJob) : un rejeu ne doit jamais re-facturer la carte.
+        'delivery_requested_at',
     ];
 
     protected $casts = [
@@ -36,6 +39,7 @@ class Order extends Model
         'billing_details' => 'array',
         'completed_at' => 'datetime',
         'cash_lock_expires_at' => 'datetime',
+        'delivery_requested_at' => 'datetime',
     ];
 
     const PAYMENT_METHOD_CASH_RESELLER = 'cash_at_reseller';
@@ -49,6 +53,10 @@ class Order extends Model
     const STATUS_DELIVERED = 'delivered';
     const STATUS_COMPLETED = 'completed';
     const STATUS_CANCELLED = 'cancelled';
+    // État transitoire : virement de remboursement en cours auprès du PSP.
+    // Marqué DANS un verrou avant l'appel transfer.php pour empêcher tout
+    // double remboursement (voir OrderController::refund).
+    const STATUS_REFUNDING = 'refunding';
     const STATUS_REFUNDED = 'refunded';
 
     /**
@@ -206,6 +214,7 @@ class Order extends Model
             self::STATUS_DELIVERED => 'Livrée',
             self::STATUS_COMPLETED => 'Terminée',
             self::STATUS_CANCELLED => 'Annulée',
+            self::STATUS_REFUNDING => 'Remboursement en cours',
             self::STATUS_REFUNDED => 'Remboursée'
         ];
         

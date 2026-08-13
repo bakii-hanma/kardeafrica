@@ -10,10 +10,32 @@ use Illuminate\Support\Facades\Log;
 class ProductApiService
 {
     /** Cache catalogue FRAIS (TTL court = $cacheDuration). Source primaire. */
-    private const CACHE_FRESH = 'processed_all_products_v7_slim';
+    private const CACHE_FRESH = 'processed_all_products_v8_slim';
+
+    /** Cache du catalogue classé par CatalogClassifier (drapeau catalog.use_classifier). */
+    private const CACHE_FRESH_CLASSIFIER = 'processed_all_products_v9_clf';
+
+    /**
+     * Clés de cache du catalogue, TOUJOURS résolues par ces deux méthodes.
+     *
+     * La première version du branchement lisait la clé v9 avec le drapeau actif
+     * mais écrivait en dur sur la clé v8 : le cache n'était jamais atteint, et
+     * chaque requête reconstruisait le catalogue entier. Lecture et écriture
+     * doivent passer par le même résolveur — y compris le snapshot, dont le
+     * contenu dépend du mode de classification.
+     */
+    private function freshKey(): string
+    {
+        return $this->useClassifier() ? self::CACHE_FRESH_CLASSIFIER : self::CACHE_FRESH;
+    }
+
+    private function snapshotKey(): string
+    {
+        return $this->useClassifier() ? self::CACHE_SNAPSHOT . '_clf' : self::CACHE_SNAPSHOT;
+    }
 
     /** Snapshot "dernier bon catalogue connu" (TTL long). Sert le web en stale-while-revalidate. */
-    private const CACHE_SNAPSHOT = 'processed_all_products_snapshot_v1';
+    private const CACHE_SNAPSHOT = 'processed_all_products_snapshot_v2';
 
     /** Durée de vie du snapshot (24h) — assez long pour survivre à un outage afrikard. */
     private const SNAPSHOT_TTL = 86400;
@@ -47,6 +69,9 @@ class ProductApiService
     private $blockedCountries = ['AE', 'CH'];
     private $blockedCurrencies = ['AED', 'CHF'];
 
+    // Catégorie Crypto (id 8) : classification + disponibilité Gabon/France
+    // → App\Support\CryptoCards (isolé pour être testable sans réseau).
+
     /**
      * Mapping pays → région pour l'affichage et le filtre.
      */
@@ -75,7 +100,7 @@ class ProductApiService
      * Mises en avant sur la page d'accueil + filtre dédié dans la boutique.
      *
      * Liste validée produit (juillet 2026) : Apple, Netflix, Steam, PSN,
-     * Nintendo, Xbox, Spotify, Google Play, Roblox (+ Prime Video, Deezer
+     * Nintendo, Xbox, Deezer, Google Play, Roblox (+ Prime Video, Spotify
      * conservés). Les synonymes (itunes/app store pour Apple, playstation pour
      * PSN, amazon prime pour Prime Video, playstore/play store pour Google Play)
      * sont inclus pour couvrir la nomenclature variable d'afrikard.
@@ -87,6 +112,7 @@ class ProductApiService
         'prime video', 'amazon prime',
         'steam',
         'psn', 'playstation',
+        'chatgpt',   // carte IA mise en avant (Rewarble ChatGPT Global)
         'nintendo',
         'spotify',
         'deezer',
@@ -143,7 +169,7 @@ class ProductApiService
         'PlayStation' => ['psn', 'playstation'],
         'Nintendo'    => ['nintendo'],
         'Xbox'        => ['xbox'],
-        'Spotify'     => ['spotify'],
+        'Deezer'      => ['deezer'],
         'Google Play' => ['google play', 'play store', 'playstore'],
         'Roblox'      => ['roblox'],
     ];
@@ -470,10 +496,33 @@ class ProductApiService
      *
      * Retourne le produit traité (slim, avec cardType normalisé) ou null.
      */
+    /**
+     * Produit à plage RÉEL (non déplié) d'un montant virtuel : cherché dans le
+     * catalogue BRUT (avant dépliage — le catalogue exposé ne contient plus la
+     * plage), sinon via l'API ciblée. Sert de base de re-matérialisation quand
+     * un id virtuel n'est plus dans le catalogue (échelle modifiée, cache froid).
+     */
+    private function getRawBaseProduct(int $realId): ?array
+    {
+        $raw = collect($this->computeProcessedCatalog())->firstWhere('id', $realId);
+        return $raw ?: $this->getProductByIdLight($realId);
+    }
+
     public function getProductByIdLight(string|int $productId): ?array
     {
         $productId = (string) $productId;
         if ($productId === '') return null;
+
+        // Montant virtuel : l'API afrikard ne connaît que l'id réel — on
+        // matérialise le montant depuis le produit à plage (écrans admin,
+        // résolution sur cache froid).
+        if (($v = \App\Support\VirtualDenominations::parse($productId)) !== null) {
+            $base = $this->getRawBaseProduct($v['real']);
+            if (!$base || !\App\Support\VirtualDenominations::isPurchasable($base, $v['face'])) {
+                return null;
+            }
+            return \App\Support\VirtualDenominations::materialize($base, $v['face']);
+        }
 
         $cacheKey = "product_light_v1_{$productId}";
 
@@ -523,7 +572,34 @@ class ProductApiService
         $brandName = strtolower($product['brand']['name'] ?? '');
         if (str_contains($brandName, 'uae') || str_contains($brandName, 'emirates')) return true;
 
+        // Crypto verrouillée sur un marché tiers → inactivable depuis le Gabon
+        // ou la France, donc jamais mise en vente. La devise est reprise de la
+        // marque quand le prix ne la porte pas (payloads afrikard hétérogènes).
+        if ($this->isCryptoBrand($brandName, strtolower($product['name'] ?? ''))) {
+            $cryptoCur = $cur ?: strtoupper($product['brand']['currencyCode'] ?? $product['cardType']['currencyCode'] ?? '');
+            if (!\App\Support\CryptoCards::usableHere($cc, $cryptoCur)) return true;
+        }
+
         return false;
+    }
+
+    /** Le nouveau classifieur est-il actif ? (drapeau, bascule sans déploiement) */
+    public function useClassifier(): bool
+    {
+        return (bool) config('catalog.use_classifier', false);
+    }
+
+    private ?\App\Services\CatalogClassifier $classifier = null;
+
+    private function classifier(): \App\Services\CatalogClassifier
+    {
+        return $this->classifier ??= new \App\Services\CatalogClassifier(config('catalog'));
+    }
+
+    /** Vrai si la marque (ou le produit) relève de la catégorie Crypto. */
+    private function isCryptoBrand(string $brandName, string $productName = ''): bool
+    {
+        return \App\Support\CryptoCards::isCrypto($brandName, $productName);
     }
 
     /**
@@ -570,6 +646,47 @@ class ProductApiService
         $cardType['popular_in_africa'] = $popular;
 
         $product['cardType'] = $cardType;
+
+        // ==== NOUVEAU CLASSIFIEUR (drapeau catalog.use_classifier) ====
+        // Un seul rayon par carte (premier match gagnant), un modèle de rachat,
+        // et une visibilité qui croise rachat + devise de marché. Les deux
+        // désambiguïsations héritées (Voyage/jeux, Crypto/voucher) deviennent
+        // structurellement inutiles : l'ordre des règles les rend impossibles.
+        if ($this->useClassifier()) {
+            $verdict = $this->classifier()->classify(
+                trim(($brand['name'] ?? '') . ' ' . ($product['name'] ?? '')),
+                $brand['countryCode'] ?? null,
+                $brand['id'] ?? null,
+                $product['price']['currencyCode'] ?? $brand['currencyCode'] ?? null,
+            );
+
+            $rayon = config('catalog.categories')[$verdict['category_id']] ?? null;
+
+            $product['cardType']['categories'] = $rayon ? [[
+                'id'    => $verdict['category_id'],
+                'name'  => $rayon['name'],
+                'icon'  => $rayon['icon'],
+                'emoji' => $rayon['emoji'],
+            ]] : [];
+
+            $product['redeem_model']   = $verdict['redeem_model'];
+            $product['visible']        = $verdict['visible'];
+            $product['hidden_reason']  = $verdict['hidden_reason'];
+            $product['matched_by']     = $verdict['matched_by'];
+            $product['priority_score'] = $verdict['priority_score'];
+
+            // LOT 4 — `popular_in_africa` pilote le filtre « 🔥 Top Afrique » et
+            // les blocs « populaires ». Il reposait sur une liste de marques en
+            // dur ; il dérive désormais du barème (géographie + rachat + rayon
+            // + devise), donc une nouvelle marque France ou Global est mise en
+            // avant sans qu'on touche au code.
+            $product['cardType']['popular_in_africa'] = $verdict['is_popular'];
+
+            unset($product['brand'], $product['country']);
+
+            return $product;
+        }
+
         $categories = [];
 
         foreach ($this->getCategories() as $cat) {
@@ -586,6 +703,11 @@ class ProductApiService
                     ->contains(fn($k) => str_contains($brandName, $k) || str_contains($productName, $k)),
                 6 => collect(['uber', 'airbnb', 'booking', 'expedia', 'travel', 'flight', 'hotel', 'train', 'bus', 'trip', 'bolt', 'yango', 'taxi', 'ride', 'fly', 'lyft', 'grab'])
                     ->contains(fn($k) => str_contains($brandName, $k) || str_contains($productName, $k)),
+                // Intelligence Artificielle (ex. Rewarble ChatGPT Global)
+                7 => collect(['chatgpt', 'chat gpt', 'openai', 'midjourney', 'copilot'])
+                    ->contains(fn($k) => str_contains($brandName, $k) || str_contains($productName, $k)),
+                // Crypto (Binance, Crypto Voucher, GatePay, Bitnovo…)
+                8 => $this->isCryptoBrand($brandName, $productName),
                 default => false,
             };
 
@@ -598,6 +720,13 @@ class ProductApiService
         // on retire la catégorie Voyage faussement attribuée.
         if ($this->isGamingPlatformBrand($brandName)) {
             $categories = array_values(array_filter($categories, fn ($c) => (int) $c['id'] !== 6));
+        }
+
+        // Désambiguïsation Crypto : « Crypto Voucher » contient "voucher" et
+        // « Gift Me Crypto » contient "gift" → tous deux classés Shopping à
+        // tort. Une carte crypto n'appartient qu'à la catégorie Crypto.
+        if ($this->isCryptoBrand($brandName, $productName)) {
+            $categories = array_values(array_filter($categories, fn ($c) => (int) $c['id'] === 8));
         }
 
         $product['cardType']['categories'] = $categories;
@@ -650,7 +779,13 @@ class ProductApiService
                 return collect($allProducts)->filter(function ($product) use ($categoryId) {
                     $brandName = strtolower($product['cardType']['name'] ?? '');
                     $productName = strtolower($product['name'] ?? '');
-                    
+
+                    // Une carte crypto n'appartient qu'à la catégorie 8 (sinon
+                    // "Crypto Voucher"/"Gift Me Crypto" ressortent en Shopping).
+                    if ($this->isCryptoBrand($brandName, $productName)) {
+                        return (int) $categoryId === 8;
+                    }
+
                     // Map category IDs to keywords/brands (Same logic as mobile app)
                     if ($categoryId == 1) { // Divertissement
                         return collect(['netflix', 'disney', 'hulu', 'tv', 'movie', 'film', 'cinema', 'stream', 'subscription', 'plus', 'premium', 'twitch', 'crunchyroll', 'canal', 'dstv', 'showmax', 'startimes', 'youtube', 'prime'])
@@ -669,8 +804,11 @@ class ProductApiService
                             ->contains(fn($k) => str_contains($brandName, $k) || str_contains($productName, $k));
                     } elseif ($categoryId == 6) { // Voyage
                         if ($this->isGamingPlatformBrand($brandName)) return false;
+                        if ($this->isCryptoBrand($brandName, $productName)) return false;
                         return collect(['uber', 'airbnb', 'booking', 'expedia', 'travel', 'flight', 'hotel', 'train', 'bus', 'trip', 'bolt', 'yango', 'taxi', 'ride', 'fly'])
                             ->contains(fn($k) => str_contains($brandName, $k) || str_contains($productName, $k));
+                    } elseif ($categoryId == 8) { // Crypto
+                        return $this->isCryptoBrand($brandName, $productName);
                     }
                     
                     return false;
@@ -704,6 +842,20 @@ class ProductApiService
      */
     public function getCategories()
     {
+        if ($this->useClassifier()) {
+            // La navigation, les lignes thématiques et les facettes lisent la
+            // même taxonomie que le classifieur — une seule source.
+            $ordre = array_flip((array) config('catalog.display_order', []));
+
+            return collect(config('catalog.categories'))
+                ->map(fn ($c, $id) => ['id' => $id, 'name' => $c['name'], 'icon' => $c['icon'], 'emoji' => $c['emoji'], 'featured' => $c['featured']])
+                // Ordre d'affichage voulu par le client ; un rayon non listé se
+                // range après, sans disparaître.
+                ->sortBy(fn ($c) => $ordre[$c['id']] ?? PHP_INT_MAX)
+                ->values()
+                ->all();
+        }
+
         return [
             ['id' => 1, 'name' => 'Divertissement', 'icon' => 'film', 'emoji' => '🎬'],
             ['id' => 2, 'name' => 'Jeux Vidéo', 'icon' => 'gamepad-2', 'emoji' => '🎮'],
@@ -711,6 +863,8 @@ class ProductApiService
             ['id' => 4, 'name' => 'Shopping', 'icon' => 'shopping-cart', 'emoji' => '🛍️'],
             ['id' => 5, 'name' => 'Daywatch', 'icon' => 'tv', 'emoji' => '📺'],
             ['id' => 6, 'name' => 'Voyage', 'icon' => 'map', 'emoji' => '✈️'],
+            ['id' => 7, 'name' => 'Intelligence Artificielle', 'icon' => 'sparkles', 'emoji' => '🤖'],
+            ['id' => 8, 'name' => 'Crypto', 'icon' => 'bitcoin', 'emoji' => '₿'],
         ];
     }
 
@@ -725,8 +879,8 @@ class ProductApiService
             $dw = DaywatchProduct::find($localId);
             if (!$dw) return null;
             $item = $dw->toCatalogItem();
-            $item['siblings'] = [$item];
-            $item['categories'] = [['id' => 5, 'name' => 'Daywatch']];
+            $item['siblings']   = [$item];
+            $item['categories'] = [DaywatchProduct::catalogCategory()];
             return $item;
         }
 
@@ -824,13 +978,21 @@ class ProductApiService
         if ($this->catalogMemo !== null) {
             return $this->catalogMemo;
         }
-        return $this->catalogMemo = $this->computeProcessedCatalog();
+        // Montants virtuels (Apple EU à plage libre → échelle 5/10/25 €…).
+        // Appliqué À LA LECTURE (idempotent) : couvre cache frais, snapshot et
+        // build, y compris les snapshots antérieurs au déploiement.
+        return $this->catalogMemo = \App\Support\VirtualDenominations::expandList(
+            $this->computeProcessedCatalog()
+        );
     }
 
     private function computeProcessedCatalog()
     {
         // ⚠ bump le suffixe quand on change la composition du catalogue.
-        $cacheKey = self::CACHE_FRESH;
+        // Deux caches distincts : basculer le drapeau ne doit jamais servir un
+        // catalogue classé par l'autre système (TTL 24 h — on verrait « rien
+        // ne change » pendant une journée et on conclurait à un échec).
+        $cacheKey = $this->freshKey();
 
         // 1. Cache FRAIS valide (< 1h) → réponse instantanée. Lecture manuelle
         //    pour filtrer un cache "vide" pollué par un outage afrikard.
@@ -849,7 +1011,7 @@ class ProductApiService
         if (!app()->runningInConsole()) {
             $this->dispatchWarmIfNeeded();
 
-            $snap = Cache::get(self::CACHE_SNAPSHOT);
+            $snap = Cache::get($this->snapshotKey());
             if (is_array($snap) && count($snap) >= 500) {
                 return $snap; // dernière version connue — instantané
             }
@@ -919,8 +1081,8 @@ class ProductApiService
             //    Remplace la pagination 50 pages + ~40 requêtes d'enrichissement.
             $blob = $this->fetchCatalogBlob();
             if (count($blob) >= 500) {
-                Cache::put(self::CACHE_FRESH, $blob, $this->cacheDuration);
-                Cache::put(self::CACHE_SNAPSHOT, $blob, self::SNAPSHOT_TTL);
+                Cache::put($this->freshKey(), $blob, $this->cacheDuration);
+                Cache::put($this->snapshotKey(), $blob, self::SNAPSHOT_TTL);
                 return $blob;
             }
 
@@ -933,7 +1095,7 @@ class ProductApiService
                 // afrikard injoignable : on retombe sur le snapshot s'il existe
                 // plutôt que de renvoyer un catalogue vide (livraisons cartes,
                 // pages boutique…).
-                $snap = Cache::get(self::CACHE_SNAPSHOT);
+                $snap = Cache::get($this->snapshotKey());
                 return (is_array($snap) && count($snap) >= 500) ? $snap : [];
             }
 
@@ -965,17 +1127,17 @@ class ProductApiService
 
             // Ne cache QUE si le dataset est réaliste (garde-fou anti-outage).
             if (count($processed) >= 500) {
-                Cache::put(self::CACHE_FRESH, $processed, $this->cacheDuration);
+                Cache::put($this->freshKey(), $processed, $this->cacheDuration);
                 // Snapshot longue durée (24h) = "dernier bon catalogue connu".
                 // Sert de source stale-while-revalidate en contexte web.
-                Cache::put(self::CACHE_SNAPSHOT, $processed, self::SNAPSHOT_TTL);
+                Cache::put($this->snapshotKey(), $processed, self::SNAPSHOT_TTL);
             } else {
                 Log::warning('processed_all_products: only ' . count($processed) . ' items, NOT caching');
             }
             return $processed;
         } catch (\Exception $e) {
             Log::error('Erreur traitement produits: ' . $e->getMessage());
-            $snap = Cache::get(self::CACHE_SNAPSHOT);
+            $snap = Cache::get($this->snapshotKey());
             return (is_array($snap) && count($snap) >= 500) ? $snap : [];
         }
     }
@@ -1025,10 +1187,162 @@ class ProductApiService
      */
     public function getFilteredProducts($filters = [], $page = 1, $perPage = 12)
     {
-        $key = 'filtered_v1_' . md5(json_encode($filters) . "_p{$page}_pp{$perPage}");
+        // GARDE-FOU MÉMOIRE (12 août) — ne mettre en cache que les VRAIES pages.
+        //
+        // Les appels internes (mode lignes : perPage 5000, facettes : 100000,
+        // rapports : 20000) recevaient chacun leur copie sérialisée du
+        // catalogue filtré. À 10 000 produits ça passait ; le dépliage
+        // généralisé porte le catalogue à ~19 000, et la sérialisation d'un
+        // paquet de 5 000 items (~20 Mo) faisait exploser les 128 Mo du process
+        // dans FileStore::put. Ces appels lisent déjà le catalogue processé,
+        // lui-même en cache : re-cacher leur résultat ne faisait gagner que
+        // quelques dizaines de ms de filtrage en mémoire.
+        if ($perPage > 200) {
+            return $this->computeFilteredProducts($filters, $page, $perPage);
+        }
+
+        $mode = $this->useClassifier() ? 'clf' : 'leg';
+        $key = 'filtered_v2_' . $mode . '_' . md5(json_encode($filters) . "_p{$page}_pp{$perPage}");
         return Cache::remember($key, 900, function () use ($filters, $page, $perPage) {
             return $this->computeFilteredProducts($filters, $page, $perPage);
         });
+    }
+
+    /**
+     * P1 §5 — bornes réelles du catalogue en FCFA de vente (min/max), pour
+     * borner le slider prix. Cache 1 h.
+     *
+     * @return array{min:int,max:int}
+     */
+    public function getPriceBounds(): array
+    {
+        return Cache::remember('price_bounds_v1', 3600, function () {
+            $min = PHP_FLOAT_MAX;
+            $max = 0.0;
+            foreach ($this->fetchAndProcessAllProducts() as $p) {
+                $price = (float) ($p['price']['min'] ?? 0);
+                if ($price <= 0) continue;
+                $fcfa = \App\Support\Money::toFcfa($price, $p['price']['currencyCode'] ?? 'XAF');
+                if ($fcfa < $min) $min = $fcfa;
+                if ($fcfa > $max) $max = $fcfa;
+            }
+            return $min === PHP_FLOAT_MAX
+                ? ['min' => 0, 'max' => 100000]
+                : ['min' => (int) floor($min / 100) * 100, 'max' => (int) ceil($max / 100) * 100];
+        });
+    }
+
+    /**
+     * P1 §4 — compteurs FACETÉS : pour chaque option (catégorie / région /
+     * marque), le nombre de CARTES (groupées) qu'elle donnerait compte tenu des
+     * AUTRES filtres actifs — la dimension comptée est retirée de ses propres
+     * filtres (facette standard). Cache 15 min par combinaison.
+     *
+     * @return array{categories:array<int|string,int>,regions:array<string,int>,brands:array<string,int>}
+     */
+    public function getFacetCounts(array $filters): array
+    {
+        $key = 'facets_v1_' . md5(json_encode($filters));
+        return Cache::remember($key, 900, function () use ($filters) {
+            $itemsFor = function (array $without) use ($filters) {
+                $f = array_diff_key($filters, array_flip($without));
+                $f['group'] = true;
+                return $this->computeFilteredProducts($f, 1, 100000)['items'];
+            };
+
+            // Catégories (dimension category exclue)
+            $categories = [];
+            foreach ($itemsFor(['category']) as $p) {
+                foreach ($p['cardType']['categories'] ?? [] as $cat) {
+                    $id = $cat['id'] ?? null;
+                    if ($id !== null) $categories[$id] = ($categories[$id] ?? 0) + 1;
+                }
+            }
+
+            // Régions (dimensions region + country_code exclues)
+            $regions = ['fr' => 0, 'europe' => 0, 'usa' => 0, 'africa' => 0, 'global' => 0];
+            foreach ($itemsFor(['region', 'country_code']) as $p) {
+                $cc = strtoupper($p['cardType']['countryCode'] ?? '');
+                $r  = $p['cardType']['region'] ?? 'other';
+                if ($cc === 'FR') $regions['fr']++;
+                if (isset($regions[$r])) $regions[$r]++;
+            }
+
+            // Marques (dimension brand exclue) — clés brandKey en minuscule
+            $brands = [];
+            foreach ($itemsFor(['brand']) as $p) {
+                $b = mb_strtolower(\App\Support\CatalogRows::brandKey($p['cardType']['name'] ?? ($p['name'] ?? '')));
+                if ($b !== '') $brands[$b] = ($brands[$b] ?? 0) + 1;
+            }
+
+            return ['categories' => $categories, 'regions' => $regions, 'brands' => $brands];
+        });
+    }
+
+    /**
+     * P1 §7 — suggestions d'autocomplétion : cherche dans les CARTES groupées
+     * (marque+région) avec synonymes + tolérance typo. Top $limit, triées par
+     * pertinence (préfixe > contient) puis prix.
+     */
+    public function suggestCards(string $query, int $limit = 8): array
+    {
+        $q = \App\Support\SearchSynonyms::normalize($query);
+        if (mb_strlen($q) < 2) {
+            return [];
+        }
+
+        $cards = Cache::remember('suggest_pool_v1', 900, function () {
+            return \App\Support\CatalogGrouping::dedupeByCardType($this->fetchAndProcessAllProducts());
+        });
+
+        $match = collect($cards)->filter(function ($c) use ($q) {
+            return str_contains(mb_strtolower($c['cardType']['name'] ?? ''), $q);
+        });
+
+        // Rien trouvé → correction typo contre les marques du catalogue
+        if ($match->isEmpty()) {
+            $brandNames = collect($cards)
+                ->map(fn ($c) => \App\Support\CatalogRows::brandKey($c['cardType']['name'] ?? ''))
+                ->filter()->unique()->values()->all();
+            $corrected = \App\Support\SearchSynonyms::closest($q, $brandNames);
+            if ($corrected !== null) {
+                $cq = mb_strtolower($corrected);
+                $match = collect($cards)->filter(
+                    fn ($c) => str_contains(mb_strtolower($c['cardType']['name'] ?? ''), $cq)
+                );
+            }
+        }
+
+        return $match
+            ->sortBy(function ($c) use ($q) {
+                // Marché cible d'abord (FR → BE/EU → GB/DE/IT/ES → US → global)
+                $cc = strtoupper($c['cardType']['countryCode'] ?? '');
+                $ccPrio = match ($cc) {
+                    'FR' => 0, 'BE' => 1, 'EU' => 1,
+                    'GB', 'IE', 'DE', 'IT', 'ES', 'PT', 'NL' => 2,
+                    'US', 'CA' => 3,
+                    'GLC', 'WW', 'GLOBAL', 'GL' => 4,
+                    default => 9,
+                };
+                return [
+                    str_starts_with(mb_strtolower($c['cardType']['name'] ?? ''), $q) ? 0 : 1,
+                    $ccPrio,
+                    \App\Support\Money::toFcfa((float) ($c['price']['min'] ?? 0), $c['price']['currencyCode'] ?? 'XAF'),
+                ];
+            })
+            ->take($limit)
+            ->map(function ($c) {
+                $ctId = $c['cardType']['internalId'] ?? $c['cardType']['id'] ?? null;
+                return [
+                    'name'   => $c['cardType']['name'] ?? ($c['name'] ?? ''),
+                    'region' => strtoupper($c['cardType']['countryCode'] ?? ''),
+                    'price'  => \App\Support\Money::formatFcfa((float) ($c['price']['min'] ?? 0), $c['price']['currencyCode'] ?? 'XAF'),
+                    'logo'   => $c['cardType']['logoUrl'] ?? null,
+                    'url'    => $ctId ? route('card-type.show', $ctId) : route('boutique'),
+                ];
+            })
+            ->values()
+            ->all();
     }
 
     private function computeFilteredProducts($filters = [], $page = 1, $perPage = 12)
@@ -1036,24 +1350,29 @@ class ProductApiService
         $searchTerm = trim((string) ($filters['search'] ?? ''));
 
         if ($searchTerm !== '') {
-            // Recherche server-side + fallback cache local, déjà dédoublonné
+            // Recherche server-side + fallback cache local, déjà dédoublonné.
+            // La recherche voit TOUT le catalogue, invisibles compris (lot 5) :
+            // qui cherche « Zalando » par son nom sait ce qu'il cherche.
             $allProducts = $this->searchIndividualProducts($searchTerm, 0, 500);
         } else {
             $allProducts = $this->fetchAndProcessAllProducts();
+
+            // Rayons et listings : uniquement ce qui se rachète depuis le Gabon
+            // dans une devise de marché. `?? true` = tolérance aux caches d'avant
+            // le classifieur, qui n'ont pas le champ.
+            if ($this->useClassifier()) {
+                $allProducts = array_values(array_filter(
+                    $allProducts,
+                    fn ($p) => ($p['visible'] ?? true) !== false,
+                ));
+            }
         }
 
         // Inject Daywatch products (catégorie 5) — toujours présents indépendamment de l'API afrikard
         $daywatchItems = DaywatchProduct::where('is_active', true)
             ->orderBy('sort_order')
             ->get()
-            ->map(function ($p) {
-                $item = $p->toCatalogItem();
-                // Attache la catégorie Daywatch sur cardType pour que le filtre `category` fonctionne
-                $item['cardType']['categories']         = [['id' => 5, 'name' => 'Daywatch']];
-                $item['cardType']['region']             = 'africa';
-                $item['cardType']['popular_in_africa'] = true; // produit local Kardafrica → mis en avant
-                return $item;
-            })
+            ->map(fn ($p) => $p->toCatalogItem())
             ->all();
 
         // Si on est en mode recherche, on ne réinjecte Daywatch QUE s'il matche le terme
@@ -1090,6 +1409,18 @@ class ProductApiService
                 }
             }
 
+            // P1 §C — filtre MARQUE dédié (param marque[]) : match sur la marque
+            // agrégée (brandKey retire les tokens géo : « PSN France » → PSN).
+            if ($match && !empty($filters['brand'])) {
+                $brandKey = mb_strtolower(\App\Support\CatalogRows::brandKey(
+                    $product['cardType']['name'] ?? ($product['name'] ?? '')
+                ));
+                $wanted = array_map(fn ($b) => mb_strtolower(trim((string) $b)), (array) $filters['brand']);
+                if (!in_array($brandKey, $wanted, true)) {
+                    $match = false;
+                }
+            }
+
             // Region (europe / usa / africa / global)
             if ($match && !empty($filters['region'])) {
                 $regions = is_array($filters['region']) ? $filters['region'] : [$filters['region']];
@@ -1105,6 +1436,7 @@ class ProductApiService
                     $match = false;
                 }
             }
+
 
             // Country
             if ($match && !empty($filters['country'])) {
@@ -1134,17 +1466,39 @@ class ProductApiService
                 }
             }
 
-            // Price Range
-            if ($match && !empty($filters['price_range'])) {
-                $price = $product['price']['min'] ?? 0;
-                $priceMatch = false;
-                foreach ($filters['price_range'] as $range) {
-                    if ($range == 'under_1000' && $price < 1000) $priceMatch = true;
-                    if ($range == '1000_5000' && $price >= 1000 && $price <= 5000) $priceMatch = true;
-                    if ($range == '5000_20000' && $price > 5000 && $price <= 20000) $priceMatch = true;
-                    if ($range == 'over_20000' && $price > 20000) $priceMatch = true;
+            // Country code PRODUIT (région-lock, ex. France = FR). Distinct du
+            // filtre `country` (zones de devise). Match sur cardType.region_code.
+            if ($match && !empty($filters['country_code'])) {
+                $code = strtoupper($product['cardType']['region_code'] ?? '');
+                if (!in_array($code, $filters['country_code'], true)) {
+                    $match = false;
                 }
-                if (!$priceMatch) {
+            }
+
+            // P1 §5 — slider prix min/max (FCFA de vente). Un produit individuel
+            // = une variante : le produit groupé matche si ≥ 1 variante passe.
+            if ($match && (isset($filters['price_min']) || isset($filters['price_max']))) {
+                $fcfa = \App\Support\Money::toFcfa(
+                    (float) ($product['price']['min'] ?? 0),
+                    $product['price']['currencyCode'] ?? 'XAF',
+                );
+                if (!\App\Support\PriceRange::withinBounds($fcfa, $filters['price_min'] ?? null, $filters['price_max'] ?? null)) {
+                    $match = false;
+                }
+            }
+
+            // Price Range — comparé au PRIX DE VENTE en XAF (Money::toFcfa =
+            // le prix affiché ET facturé : taux admin + arrondi palier, pipeline
+            // C1 — pas une conversion indicative ; la valeur faciale EUR/USD ne
+            // change pas). Bug historique : comparer le prix natif (9.42 EUR) à
+            // « 1000_5000 » donnait 0 résultat dès qu'une région EUR était
+            // filtrée, et « under_1000 » matchait tout le catalogue étranger.
+            if ($match && !empty($filters['price_range'])) {
+                $fcfa = \App\Support\Money::toFcfa(
+                    (float) ($product['price']['min'] ?? 0),
+                    $product['price']['currencyCode'] ?? 'XAF',
+                );
+                if (!\App\Support\PriceRange::matches($fcfa, (array) $filters['price_range'])) {
                     $match = false;
                 }
             }
@@ -1152,15 +1506,49 @@ class ProductApiService
             return $match;
         });
 
+        // P1 §1 — mode groupé : une seule entrée par cardType (marque+région),
+        // représentant = variante la moins chère + résumé des montants. Appliqué
+        // APRÈS filtre (un produit matche si ≥ 1 variante passe les filtres) et
+        // AVANT tri/pagination (le tri s'applique aux représentants).
+        if (!empty($filters['group'])) {
+            $filtered = collect(\App\Support\CatalogGrouping::dedupeByCardType($filtered->values()->all()));
+        }
+
         // Tri
         $sort = $filters['sort'] ?? 'popular';
+        // Tri prix sur le PRIX DE VENTE en XAF (ce que le client paye — même
+        // calcul que l'affichage/checkout ; comparer des prix natifs mélangerait
+        // EUR/USD/XAF et fausserait l'ordre).
+        $toFcfa = fn ($p) => \App\Support\Money::toFcfa(
+            (float) ($p['price']['min'] ?? 0),
+            $p['price']['currencyCode'] ?? 'XAF',
+        );
         $filtered = match ($sort) {
-            'price_asc'  => $filtered->sortBy(fn($p) => (float) ($p['price']['min'] ?? 0))->values(),
-            'price_desc' => $filtered->sortByDesc(fn($p) => (float) ($p['price']['min'] ?? 0))->values(),
+            'price_asc'  => $filtered->sortBy($toFcfa)->values(),
+            'price_desc' => $filtered->sortByDesc($toFcfa)->values(),
             'newest'     => $filtered->sortByDesc(fn($p) => $p['modifiedDate'] ?? '')->values(),
-            // Tri "Populaire" : marques Top Afrique d'abord, puis Europe
-            // (FR > BE > EU > autres), puis USA, puis le reste.
-            default      => $filtered->sortBy(function ($p) {
+            // Économie la plus forte d'abord (valeur faciale vs prix payé).
+            // Les cartes sans avantage retombent derrière, triées par prix.
+            'promo'      => $filtered->sortBy(fn ($p) => [
+                -1 * \App\Support\ProductPricing::bestSavingPercent(
+                    $p['variants'] ?? [$p]
+                ),
+                $toFcfa($p),
+            ])->values(),
+            // Tri "Populaire". Avec le classifieur, le barème du lot 4 fait
+            // déjà la synthèse géographie + rachat + rayon + devise : trier
+            // dessus évite d'entretenir DEUX hiérarchies de pays divergentes.
+            default      => $this->useClassifier()
+                ? $filtered->sortByDesc(fn ($p) => [
+                    (int) ($p['priority_score'] ?? 0),
+                    // À score égal, la carte la moins chère d'abord : c'est
+                    // celle qui déclenche l'achat sur ce marché.
+                    -1 * \App\Support\Money::toFcfa(
+                        (float) ($p['price']['min'] ?? 0),
+                        $p['price']['currencyCode'] ?? 'XAF',
+                    ),
+                ])->values()
+                : $filtered->sortBy(function ($p) {
                 $popular = !empty($p['cardType']['popular_in_africa']) ? 0 : 1;
                 $region  = ($p['cardType']['region'] ?? 'other') === 'europe' ? 0
                         : (($p['cardType']['region'] ?? 'other') === 'usa' ? 1
@@ -1176,6 +1564,38 @@ class ProductApiService
                 return [$popular, $region, $cPrio];
             })->values(),
         };
+
+        // LOT 4 — plafond par marque dans les blocs POPULAIRES uniquement.
+        // Appliqué APRÈS le tri : on garde les mieux classées de chaque marque,
+        // pas les premières rencontrées.
+        $plafond = (int) config('catalog.priority.max_per_brand_in_popular', 0);
+
+        if ($plafond > 0 && !empty($filters['popular_only'])) {
+            $familles = (array) config('catalog.priority.brand_families', []);
+            $vues = [];
+
+            $filtered = $filtered->filter(function ($p) use (&$vues, $plafond, $familles) {
+                $nom = ($p['cardType']['name'] ?? '') . ' ' . ($p['name'] ?? '');
+
+                // Famille d'abord (« Halo Infinite XBOX » et « NBA 2K25 XBOX »
+                // comptent pour la même), clé de marque en repli.
+                $cle = null;
+                foreach ($familles as $famille => $motif) {
+                    if (preg_match($motif, $nom) === 1) {
+                        $cle = $famille;
+                        break;
+                    }
+                }
+
+                $cle ??= mb_strtolower(\App\Support\CatalogRows::brandKey(
+                    $p['cardType']['name'] ?? ($p['name'] ?? '')
+                ));
+
+                $vues[$cle] = ($vues[$cle] ?? 0) + 1;
+
+                return $vues[$cle] <= $plafond;
+            })->values();
+        }
 
         $total = $filtered->count();
         $items = $filtered->slice(($page - 1) * $perPage, $perPage)->values()->all();
@@ -1287,7 +1707,7 @@ class ProductApiService
     /**
      * Liste CURÉE de marques mises en avant sur la page d'accueil (demande
      * produit — "les cartes de Mr Franck") : Apple, Netflix, Steam, PSN,
-     * Nintendo, Xbox, Spotify, Google Play, Roblox.
+     * Nintendo, Xbox, Deezer, Google Play, Roblox.
      *
      * Pour chaque marque, on privilégie la variante EU/FR (region=europe,
      * puis pays FR > BE > EU > autres UE). Si aucune variante EU/FR n'existe
@@ -1378,6 +1798,16 @@ class ProductApiService
      */
     public function resolveNativeValue(int|string $productId, bool $deepScan = false): ?array
     {
+        // Montant virtuel : la valeur native EST le montant encodé dans l'id
+        // ("1571149v25" → 25). La devise vient du produit virtuel du catalogue,
+        // sinon du produit à plage réel (cache froid).
+        if (($v = \App\Support\VirtualDenominations::parse($productId)) !== null) {
+            $product = collect($this->getAllProducts(0, 99999))->firstWhere('id', (string) $productId)
+                ?? $this->getRawBaseProduct($v['real']);
+            $currency = $product['price']['currencyCode'] ?? null;
+            return $currency ? ['value' => $v['face'], 'currency' => $currency] : null;
+        }
+
         $allProducts = collect($this->getAllProducts(0, 99999))->keyBy('id');
         $product = $allProducts->get((int) $productId)
             ?? $allProducts->get((string) $productId)
@@ -1415,10 +1845,33 @@ class ProductApiService
     {
         $pid = (string) $productId;
 
-        // Prix géré séparément → ne pas contrôler ici.
-        if (str_starts_with($pid, 'merchant_') || str_starts_with($pid, 'daywatch_')) {
+        // Daywatch : le prix faisant autorité vit en BDD locale (price_xaf).
+        // L'ancien `return null` faisait retomber tout le flux sur le prix
+        // client — trou C1 signalé au re-audit.
+        if (str_starts_with($pid, 'daywatch_')) {
+            $dw = DaywatchProduct::find((int) substr($pid, 9));
+            return ($dw && $dw->is_active) ? (int) $dw->price_xaf : null;
+        }
+
+        // Cartes marchand : montant validé par MerchantCardCode (C2) → pas ici.
+        if (str_starts_with($pid, 'merchant_')) {
             return null;
         }
+
+        // Montant virtuel ("1571149v25") : prix = celui du produit virtuel du
+        // catalogue déplié. Fallback : re-matérialisation depuis le produit à
+        // plage réel, avec validation stricte du montant DANS la plage — un id
+        // forgé hors plage ou hors échelle ne résout pas (fail-closed C1).
+        if (\App\Support\VirtualDenominations::parse($pid) !== null) {
+            // getProductByIdLight matérialise le montant depuis le produit à
+            // plage réel en validant que le montant tombe DANS la plage.
+            $product = collect($this->getAllProducts(0, 99999))->firstWhere('id', $pid)
+                ?? $this->getProductByIdLight($pid);
+            $min = $product['price']['min'] ?? null;
+            $cur = $product['price']['currencyCode'] ?? null;
+            return ($min !== null && $cur !== null) ? \App\Support\Money::toFcfa((float) $min, $cur) : null;
+        }
+
         // Id afrikard "propre" attendu (entier). Les ids suffixés "-<valeur>"
         // encodent une dénomination spécifique : on les laisse à un palier ultérieur.
         if (!ctype_digit($pid)) {
@@ -1439,9 +1892,16 @@ class ProductApiService
 
     /**
      * Prix unitaire à FACTURER pour un produit (C1, Palier 3). Retourne le prix
-     * serveur faisant autorité s'il est résolvable, sinon le prix de repli fourni
-     * (cartes marchand/Daywatch dont le montant est dérivé ailleurs). À utiliser
-     * partout où l'on calcule un total à payer, JAMAIS le prix envoyé/stocké seul.
+     * serveur faisant autorité. À utiliser partout où l'on calcule un total à
+     * payer, JAMAIS le prix envoyé/stocké seul.
+     *
+     * FAIL-CLOSED : si le prix ne peut pas être résolu côté serveur (produit
+     * inconnu, montant marchand invalide, catalogue indisponible), on REFUSE la
+     * commande via une exception au lieu de retomber sur le prix client —
+     * l'ancien fallback transformait toute panne du catalogue en fenêtre de
+     * manipulation de prix ("payer 1 FCFA une carte 50 EUR").
+     *
+     * @throws \RuntimeException quand aucun prix serveur n'est résolvable.
      */
     public function authoritativeUnitPrice(int|string $productId, $fallback): int
     {
@@ -1450,11 +1910,23 @@ class ProductApiService
         // Cartes marchand (C2) : prix = montant validé (valeur stockée 1:1).
         if (str_starts_with($pid, 'merchant_')) {
             $amount = \App\Support\MerchantCardCode::authoritativeAmount($pid);
-            return $amount ?? (int) round((float) $fallback);
+            if ($amount === null) {
+                throw new \RuntimeException('Montant de carte invalide pour ce marchand.');
+            }
+            return $amount;
         }
 
         $auth = $this->authoritativePriceFcfa($productId);
-        return $auth ?? (int) round((float) $fallback);
+        if ($auth === null) {
+            Log::warning('C1 prix serveur non résolvable — commande refusée (fail-closed)', [
+                'product_id'   => $pid,
+                'client_price' => $fallback,
+            ]);
+            throw new \RuntimeException(
+                'Prix indisponible pour ce produit. Réessaie dans quelques instants ou contacte le support.'
+            );
+        }
+        return $auth;
     }
 
     /**
@@ -1565,8 +2037,11 @@ class ProductApiService
                 }
             }
 
-            // Liste de produits (slim, suffisant pour l'affichage des montants)
-            $cardType['products'] = array_map(fn($p) => $this->processCatalogItem($p), $items);
+            // Liste de produits (slim, suffisant pour l'affichage des montants).
+            // Dépliage des plages libres (Apple EU) en échelle de montants.
+            $cardType['products'] = \App\Support\VirtualDenominations::expandList(
+                array_map(fn($p) => $this->processCatalogItem($p), $items)
+            );
 
             Cache::put($cacheKey, $cardType, $this->cacheDuration);
             return $cardType;

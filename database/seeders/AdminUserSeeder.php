@@ -16,29 +16,37 @@ class AdminUserSeeder extends Seeder
      *   ADMIN_EMAIL=admin@kardafrica.com
      *   ADMIN_PASSWORD=motdepasse-fort
      *   ADMIN_NAME="Admin KardAfrica"
-     *   ADMIN_PHONE=+24106871309
+     *   ADMIN_PHONE=+24100000000
      *
      * Lancement :  php artisan db:seed --class=AdminUserSeeder --force
      */
     public function run(): void
     {
         $email    = env('ADMIN_EMAIL',    'admin@kardafrica.com');
-        $password = env('ADMIN_PASSWORD', 'KardAfrica@2026');
+        $password = env('ADMIN_PASSWORD');
         $name     = env('ADMIN_NAME',     'Admin KardAfrica');
-        $phone    = env('ADMIN_PHONE',    '+24106871309');
+        $phone    = env('ADMIN_PHONE',    '+24100000000');
 
-        // Note : le cast 'password' => 'hashed' (User::casts) hashe automatiquement
-        $user = User::updateOrCreate(
-            ['email' => $email],
-            [
-                'name'              => $name,
-                'password'          => $password,
-                'phone'             => $phone,
-                'role'              => 'admin',
-                'is_active'         => true,
-                'email_verified_at' => now(),
-            ]
-        );
+        // Sécurité : aucun mot de passe par défaut en dur (le précédent
+        // 'KardAfrica@2026' était dans le dépôt). On refuse de créer un admin
+        // sans ADMIN_PASSWORD explicite plutôt que de semer un secret connu.
+        if (empty($password)) {
+            $this->command->error('ADMIN_PASSWORD absent du .env — création admin annulée.');
+            return;
+        }
+
+        // Note : le cast 'password' => 'hashed' (User::casts) hashe automatiquement.
+        // M21 : role/is_active hors mass assignment → affectation directe.
+        $user = User::firstOrNew(['email' => $email]);
+        $user->fill([
+            'name'              => $name,
+            'password'          => $password,
+            'phone'             => $phone,
+        ]);
+        $user->role              = 'admin';
+        $user->is_active         = true;
+        $user->email_verified_at = now();
+        $user->save();
 
         $this->command->info('');
         $this->command->info('==============================================');
@@ -46,10 +54,9 @@ class AdminUserSeeder extends Seeder
         $this->command->info('==============================================');
         $this->command->info("  Nom        : {$user->name}");
         $this->command->info("  Email      : {$user->email}");
-        $this->command->info("  Mot de passe : {$password}");
+        // Le mot de passe n'est JAMAIS imprimé (fuite via logs CI/déploiement).
         $this->command->info("  Rôle       : {$user->role}");
         $this->command->info("  URL        : " . url('/admin/login'));
-        $this->command->warn('  ⚠ Change le mot de passe en production via les variables ADMIN_* du .env');
         $this->command->info('==============================================');
     }
 }

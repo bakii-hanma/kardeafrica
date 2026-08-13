@@ -1,6 +1,40 @@
 @extends('layouts.app')
 
-@section('title', $card->name . ' — KardAfrica')
+@section('title', $card->name . ' — Carte Gabon | KardAfrica')
+
+@php
+    $ogMinDenom = collect($card->denominations ?? [])->min();
+    $ogPriceLabel = $ogMinDenom ? number_format((float) $ogMinDenom, 0, ',', ' ') . ' FCFA' : null;
+@endphp
+@section('meta_description', 'Carte cadeau ' . $card->name . ($ogPriceLabel ? ' dès ' . $ogPriceLabel : '') . ' — carte locale Gabon à offrir, payée par Airtel Money ou Moov Money sur KardAfrica.')
+@section('og_type', 'product')
+@section('og_title', $card->name . ($ogPriceLabel ? ' — dès ' . $ogPriceLabel : '') . ' | Carte Gabon')
+@section('og_description', 'Carte cadeau locale à offrir et utiliser sur place. Paiement Airtel Money, Moov Money ou carte bancaire.')
+@section('og_image', route('og.gabon', $card))
+@section('twitter_card', 'summary_large_image')
+
+@push('head')
+{{-- Schema.org Product + Offer (audit SEO/GEO) — carte locale Gabon --}}
+<script type="application/ld+json">
+{!! json_encode([
+    '@context'    => 'https://schema.org',
+    '@type'       => 'Product',
+    'name'        => 'Carte cadeau ' . $card->name,
+    'description' => trim((string) $card->description) ?: ('Carte cadeau locale « ' . $card->name . ' » à offrir et utiliser sur place au Gabon. Paiement Airtel Money, Moov Money ou carte bancaire.'),
+    'image'       => route('og.gabon', $card),
+    'brand'       => ['@type' => 'Brand', 'name' => $card->name],
+    'offers'      => [
+        '@type'         => 'AggregateOffer',
+        'priceCurrency' => 'XAF',
+        'lowPrice'      => (float) (collect($card->denominations ?? [])->min() ?? 0),
+        'highPrice'     => (float) (collect($card->denominations ?? [])->max() ?? 0),
+        'offerCount'    => count($card->denominations ?? []),
+        'availability'  => 'https://schema.org/InStock',
+        'url'           => url()->current(),
+    ],
+], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) !!}
+</script>
+@endpush
 
 @section('content')
 @php
@@ -271,7 +305,7 @@
                                     <p class="text-[10px] text-slate-400 mt-0.5">{{ $otherCount }} montants</p>
                                 @endif
                                 <div class="mt-2 pt-2 border-t border-slate-100 flex items-end justify-between">
-                                    <span class="text-[10px] text-slate-400">Dès</span>
+                                    <span class="text-[10px] text-slate-400">À partir de</span>
                                     <span class="text-sm font-black tabular-nums text-slate-900">{{ number_format($otherMin, 0, ',', ' ') }} <span class="text-[10px] font-bold text-slate-500">FCFA</span></span>
                                 </div>
                             </div>

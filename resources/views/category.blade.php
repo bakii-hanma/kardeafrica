@@ -169,9 +169,16 @@
                                 // Price handling
                                 $minPrice = 0;
                                 $currencyCode = 'XAF';
+                                $faceValue = 0;
                                 if (isset($product['products']) && count($product['products']) > 0) {
-                                    $minPrice = $product['products'][0]['price']['min'] ?? 0;
-                                    $currencyCode = $product['products'][0]['price']['currencyCode'] ?? 'XAF';
+                                    // 1.3 — produit le moins cher (prix + valeur faciale nominale)
+                                    $cheapest = collect($product['products'])
+                                        ->filter(fn ($p) => ($p['price']['min'] ?? 0) > 0)
+                                        ->sortBy(fn ($p) => $p['price']['min'])
+                                        ->first() ?? $product['products'][0];
+                                    $minPrice     = $cheapest['price']['min'] ?? 0;
+                                    $currencyCode = $cheapest['price']['currencyCode'] ?? 'XAF';
+                                    $faceValue    = $cheapest['minFaceValue'] ?? $minPrice;
                                 }
                             @endphp
 
@@ -220,7 +227,11 @@
                                     <!-- Price and Action -->
                                     <div class="flex items-end justify-between mt-1">
                                         <div>
+                                            @php $originalCat = \App\Support\Money::formatOriginal($faceValue, $currencyCode); @endphp
                                             <p class="text-[10px] text-gray-500 mb-0.5">À partir de</p>
+                                            @if($originalCat)
+                                                <span class="inline-block mb-0.5 rounded-md bg-gray-100 px-1.5 py-0.5 text-[10px] font-bold text-gray-600 tabular-nums">{{ $originalCat }}</span>
+                                            @endif
                                             <p class="text-base font-bold text-gray-900 leading-none price-display"
                                                data-price="{{ $minPrice }}"
                                                data-currency="{{ $currencyCode }}"

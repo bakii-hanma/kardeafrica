@@ -97,41 +97,56 @@ class CashOrderController extends Controller
         }
 
         try {
-            DB::transaction(function () use ($order, $reseller) {
-                $subtotal   = (float) $order->subtotal;
+            // Verrou de la commande + re-test du statut À L'INTÉRIEUR de la
+            // transaction : le route-model binding a chargé l'Order sans verrou,
+            // un double submit concurrent doit se sérialiser ici.
+            $already = DB::transaction(function () use ($order, $reseller) {
+                $locked = Order::where('id', $order->id)->lockForUpdate()->first();
+
+                if ($locked->payment_status !== Order::PAYMENT_STATUS_PENDING) {
+                    return true; // déjà encaissée (ou annulée) par une requête concurrente
+                }
+
+                $subtotal   = (float) $locked->subtotal;
                 $rate       = (float) $reseller->commission_rate;
                 $commission = round($subtotal * ($rate / 100), 2);
 
                 // Débite le wallet (et libère la portion bloquée correspondante)
-                $reseller->debitLocked($subtotal, "Encaissement cash #{$order->order_number}", $order->order_number);
+                $reseller->debitLocked($subtotal, "Encaissement cash #{$locked->order_number}", $locked->order_number);
                 // Verse la commission sur le portefeuille dédié
-                $reseller->commission($commission, "Commission cash #{$order->order_number}", $order->order_number);
+                $reseller->commission($commission, "Commission cash #{$locked->order_number}", $locked->order_number);
                 // Cash physique reçu du client : à reverser à KardAfrica via E-Billing
-                $reseller->recordCashCollection($subtotal, $order->order_number);
+                $reseller->recordCashCollection($subtotal, $locked->order_number);
                 $reseller->increment('total_volume', $subtotal);
 
-                $order->update([
+                $locked->update([
                     'payment_status' => Order::PAYMENT_STATUS_COMPLETED,
                     'status'         => Order::STATUS_PROCESSING,
                 ]);
 
                 Payment::firstOrCreate(
-                    ['transaction_id' => $order->external_reference],
+                    ['transaction_id' => $locked->external_reference],
                     [
-                        'order_id'                => $order->id,
-                        'user_id'                 => $order->user_id,
+                        'order_id'                => $locked->id,
+                        'user_id'                 => $locked->user_id,
                         'payment_method'          => 'cash_at_reseller',
                         'provider'                => 'reseller',
-                        'amount'                  => $order->total_amount,
-                        'currency'                => $order->currency,
+                        'amount'                  => $locked->total_amount,
+                        'currency'                => $locked->currency,
                         'status'                  => Payment::STATUS_COMPLETED,
                         'external_transaction_id' => $reseller->vendor_code,
                         'processed_at'            => now(),
                     ]
                 );
+                return false;
             });
 
+            if ($already) {
+                return back()->with('error', 'Cette commande n\'est plus en attente.');
+            }
+
             // Livraison cartes en async (mêmes appels afrikard que la voie E-Billing)
+            // — HORS transaction, uniquement quand CETTE requête a fait l'encaissement.
             ProcessCheckoutJob::dispatch($order->fresh());
 
             return redirect()
@@ -161,14 +176,29 @@ class CashOrderController extends Controller
         }
 
         try {
-            DB::transaction(function () use ($order, $reseller) {
-                $reseller->releaseFunds((float) $order->subtotal, $order->order_number);
-                $order->update([
+            // Verrou de la commande + re-test du statut À L'INTÉRIEUR de la
+            // transaction (route-model binding non verrouillé) : évite une double
+            // libération des fonds si refus + confirmation partent en même temps.
+            $already = DB::transaction(function () use ($order, $reseller) {
+                $locked = Order::where('id', $order->id)->lockForUpdate()->first();
+
+                if ($locked->payment_status !== Order::PAYMENT_STATUS_PENDING) {
+                    return true; // déjà traitée par une requête concurrente
+                }
+
+                $reseller->releaseFunds((float) $locked->subtotal, $locked->order_number);
+                $locked->update([
                     'payment_status' => Order::PAYMENT_STATUS_CANCELLED,
                     'status'         => Order::STATUS_CANCELLED,
                     'notes'          => 'Refusée par le vendeur',
                 ]);
+                return false;
             });
+
+            if ($already) {
+                return back()->with('error', 'Cette commande n\'est plus en attente.');
+            }
+
             return redirect()->route('vendor.cash.index')->with('success', 'Commande refusée — fonds libérés.');
         } catch (\Throwable $e) {
             return back()->with('error', 'Erreur : ' . $e->getMessage());

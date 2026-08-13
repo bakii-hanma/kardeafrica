@@ -15,14 +15,18 @@
         foreach ($brandPalette as $k => $c) if (stripos($name, $k) !== false) return $c;
         $palette = ['#0F172A', '#44A08D', '#0EA5E9', '#7C3AED', '#DC2626', '#EA580C', '#059669'];
         $hash = 0;
-        for ($i = 0; $i < strlen($name); $i++) $hash = ord($name[$i]) + (($hash << 5) - $hash);
+        for ($i = 0; $i < strlen($name); $i++) $hash = (ord($name[$i]) + (($hash << 5) - $hash)) & 0x7FFFFFFF;
         return $palette[(($hash % count($palette)) + count($palette)) % count($palette)];
     };
 
     $activeFiltersCount = (int)!empty($search)
         + (int)!empty($categoryId)
         + count($priceRange ?? [])
-        + count($selectedCountries ?? []);
+        + count($selectedLoc ?? [])
+        + count($selectedRegions ?? [])
+        + count($selectedBrands ?? [])
+        + (int)!empty($popularOnly)
+        + (int)($priceMin !== null || $priceMax !== null);
 
     $currentCategory = $categoryId ? collect($categories)->firstWhere('id', (int) $categoryId) : null;
 
@@ -33,28 +37,31 @@
         'over_20000' => '> 20k',
     ];
 
-    $countryList = [
-        ['SN', 'Sénégal'],
-        ['CI', "Côte d'Ivoire"],
-        ['ML', 'Mali'],
-        ['GA', 'Gabon'],
-        ['CM', 'Cameroun'],
-    ];
-
     $sortOptions = [
         'popular'    => 'Populaire',
         'newest'     => 'Nouveautés',
         'price_asc'  => 'Prix croissant',
         'price_desc' => 'Prix décroissant',
+        'promo'      => 'Meilleures économies',
     ];
     $sortLabel = $sortOptions[$sort] ?? 'Populaire';
 
-    $urlWith = function (array $overrides) use ($search, $categoryId, $priceRange, $selectedCountries, $sort) {
+    // Préserve l'état COMPLET des filtres : trier ou changer de page ne doit
+    // jamais faire disparaître silencieusement une région ou une marque cochée.
+    $urlWith = function (array $overrides) use (
+        $search, $categoryId, $priceRange, $selectedLoc, $selectedRegions,
+        $selectedBrands, $popularOnly, $priceMin, $priceMax, $sort
+    ) {
         $base = [
             'search'      => $search,
             'category'    => $categoryId,
             'price_range' => $priceRange,
-            'country'     => $selectedCountries,
+            'loc'         => $selectedLoc,
+            'region'      => $selectedRegions,
+            'marque'      => $selectedBrands,
+            'popular'     => $popularOnly ? 1 : null,
+            'prix_min'    => $priceMin,
+            'prix_max'    => $priceMax,
             'sort'        => $sort,
         ];
         return route('vendor.sell', array_merge($base, $overrides));
@@ -63,6 +70,8 @@
 
 @section('content')
 <div x-data="vendorSale()" class="vsell-wrap">
+
+    @include('vendor.partials._sell-mode-switch', ['mode' => 'digital'])
 
     {{-- ============= TOP STRIP ============= --}}
     <div class="vsell-top">
@@ -159,13 +168,30 @@
                     <span>×</span>
                 </a>
             @endforeach
-            @foreach ($selectedCountries ?? [] as $country)
-                <a href="{{ route('vendor.sell', ['search' => $search, 'category' => $categoryId, 'price_range' => $priceRange, 'country' => array_values(array_diff($selectedCountries, [$country])), 'sort' => $sort]) }}"
-                   class="vsell-chip">
-                    <span class="vsell-chip-flag">{{ $country }}</span>
-                    <span>×</span>
+            @php
+                $regionLabels = ['europe' => '🇪🇺 Europe', 'usa' => '🇺🇸 États-Unis',
+                                 'africa' => '🌍 Gabon & Afrique', 'global' => '🌐 International'];
+            @endphp
+            @foreach ($selectedLoc ?? [] as $l)
+                <a href="{{ $urlWith(['loc' => array_values(array_diff($selectedLoc, [$l])), 'page' => null]) }}" class="vsell-chip">
+                    <span class="vsell-chip-flag">🇫🇷</span><span>{{ $l }}</span><span>×</span>
                 </a>
             @endforeach
+            @foreach ($selectedRegions ?? [] as $rg)
+                <a href="{{ $urlWith(['region' => array_values(array_diff($selectedRegions, [$rg])), 'page' => null]) }}" class="vsell-chip">
+                    <span>{{ $regionLabels[$rg] ?? $rg }}</span><span>×</span>
+                </a>
+            @endforeach
+            @foreach ($selectedBrands ?? [] as $b)
+                <a href="{{ $urlWith(['marque' => array_values(array_diff($selectedBrands, [$b])), 'page' => null]) }}" class="vsell-chip">
+                    <span>{{ $b }}</span><span>×</span>
+                </a>
+            @endforeach
+            @if($popularOnly)
+                <a href="{{ $urlWith(['popular' => null, 'page' => null]) }}" class="vsell-chip">
+                    <span>🔥 Top Afrique</span><span>×</span>
+                </a>
+            @endif
             <a href="{{ route('vendor.sell') }}" class="vsell-chip-clear">Tout effacer</a>
         </div>
     @endif
@@ -173,105 +199,12 @@
     {{-- ============= MAIN GRID : sidebar + products + cart ============= --}}
     <div class="vsell-grid">
 
-        {{-- ============ FILTER SIDEBAR ============ --}}
-        <aside class="vsell-sidebar" :class="filtersOpen ? 'vsell-sidebar--open' : ''">
-            <div class="vsell-sidebar-overlay" x-show="filtersOpen" x-cloak @click="filtersOpen = false"></div>
-
-            <form id="filterForm" action="{{ route('vendor.sell') }}" method="GET" class="vsell-sidebar-card">
-                <input type="hidden" name="search" value="{{ $search }}">
-                <input type="hidden" name="sort" value="{{ $sort }}">
-
-                <div class="vsell-sidebar-head">
-                    <div class="vsell-sidebar-head-l">
-                        <span class="vsell-sidebar-head-icon">
-                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.207A1 1 0 013 6.5V4z"/></svg>
-                        </span>
-                        <div>
-                            <h3>Filtres</h3>
-                            <p>{{ $activeFiltersCount > 0 ? "$activeFiltersCount actif".($activeFiltersCount > 1 ? 's' : '') : 'Affine ta recherche' }}</p>
-                        </div>
-                    </div>
-                    @if($activeFiltersCount > 0)
-                        <a href="{{ route('vendor.sell') }}" class="vsell-sidebar-clear">Effacer</a>
-                    @endif
-                    <button type="button" @click="filtersOpen = false" class="vsell-sidebar-close">×</button>
-                </div>
-
-                {{-- Catégories --}}
-                <div x-data="{ open: true }" class="vsell-section">
-                    <button @click="open = !open" type="button" class="vsell-section-toggle">
-                        <span>Catégories
-                            @if($categoryId)<span class="vsell-section-count">1</span>@endif
-                        </span>
-                        <svg :class="open && 'vsell-rot'" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
-                    </button>
-                    <div x-show="open" x-collapse class="vsell-section-body">
-                        <a href="{{ route('vendor.sell', array_merge(request()->except(['category', 'page']), ['page' => 1])) }}"
-                           class="vsell-cat {{ !$categoryId ? 'vsell-cat--active' : '' }}">
-                            <span>Toutes</span>
-                            @if(!$categoryId)<svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>@endif
-                        </a>
-                        @foreach($categories as $category)
-                            <a href="{{ route('vendor.sell', array_merge(request()->except(['category', 'page']), ['category' => $category['id'], 'page' => 1])) }}"
-                               class="vsell-cat {{ $categoryId == $category['id'] ? 'vsell-cat--active' : '' }}">
-                                <span>{{ $category['name'] }}</span>
-                                @if($categoryId == $category['id'])<svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>@endif
-                            </a>
-                        @endforeach
-                    </div>
-                </div>
-
-                {{-- Gamme de prix --}}
-                <div x-data="{ open: true }" class="vsell-section">
-                    <button @click="open = !open" type="button" class="vsell-section-toggle">
-                        <span>Gamme de prix
-                            @if(count($priceRange ?? []))<span class="vsell-section-count">{{ count($priceRange) }}</span>@endif
-                        </span>
-                        <svg :class="open && 'vsell-rot'" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
-                    </button>
-                    <div x-show="open" x-collapse class="vsell-section-body vsell-price-grid">
-                        @foreach ($priceRangeLabels as $value => $label)
-                            @php $isActive = in_array($value, $priceRange ?? []); @endphp
-                            <label class="vsell-price-pill">
-                                <input type="checkbox" name="price_range[]" value="{{ $value }}"
-                                       onchange="this.form.submit()" {{ $isActive ? 'checked' : '' }}>
-                                <div class="vsell-price-pill-box {{ $isActive ? 'vsell-price-pill-box--active' : '' }}">
-                                    {{ $label }}
-                                    <span>FCFA</span>
-                                </div>
-                            </label>
-                        @endforeach
-                    </div>
-                </div>
-
-                {{-- Pays --}}
-                <div x-data="{ open: true }" class="vsell-section vsell-section--last">
-                    <button @click="open = !open" type="button" class="vsell-section-toggle">
-                        <span>Pays disponibles
-                            @if(count($selectedCountries ?? []))<span class="vsell-section-count">{{ count($selectedCountries) }}</span>@endif
-                        </span>
-                        <svg :class="open && 'vsell-rot'" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
-                    </button>
-                    <div x-show="open" x-collapse class="vsell-section-body">
-                        @foreach ($countryList as [$code, $label])
-                            @php $isActive = in_array($code, $selectedCountries ?? []); @endphp
-                            <label class="vsell-country">
-                                <input type="checkbox" name="country[]" value="{{ $code }}"
-                                       onchange="this.form.submit()" {{ $isActive ? 'checked' : '' }}>
-                                <span class="vsell-country-flag">{{ $code }}</span>
-                                <span>{{ $label }}</span>
-                            </label>
-                        @endforeach
-                    </div>
-                </div>
-            </form>
-        </aside>
-
-        {{-- ============ PRODUCTS ============ --}}
-        <div class="vsell-products-col">
-
-            {{-- ============ PANIER en haut, visible dès 1 article ============ --}}
-            {{-- Pas d'infos client ici : elles sont demandées sur la page Checkout --}}
+        {{-- ============ COLONNE DE GAUCHE : panier PUIS filtres ============
+             Le panier est placé AU-DESSUS des filtres pour que le revendeur
+             garde sa vente sous les yeux pendant qu'il parcourt le catalogue.
+             Les informations client ne sont pas demandées ici mais au Checkout.
+             ================================================================ --}}
+        <div class="vsell-side-col">
             <form method="POST" action="{{ route('vendor.checkout') }}"
                   @submit="if (cart.length === 0) { $event.preventDefault(); return false; }"
                   x-show="cart.length > 0" x-cloak
@@ -379,6 +312,124 @@
                 </div>
             </form>
 
+        {{-- ============ FILTER SIDEBAR ============ --}}
+        <aside class="vsell-sidebar" :class="filtersOpen ? 'vsell-sidebar--open' : ''">
+            <div class="vsell-sidebar-overlay" x-show="filtersOpen" x-cloak @click="filtersOpen = false"></div>
+
+            <form id="filterForm" action="{{ route('vendor.sell') }}" method="GET" class="vsell-sidebar-card">
+                <input type="hidden" name="search" value="{{ $search }}">
+                <input type="hidden" name="sort" value="{{ $sort }}">
+
+                <div class="vsell-sidebar-head">
+                    <div class="vsell-sidebar-head-l">
+                        <span class="vsell-sidebar-head-icon">
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.207A1 1 0 013 6.5V4z"/></svg>
+                        </span>
+                        <div>
+                            <h3>Filtres</h3>
+                            <p>{{ $activeFiltersCount > 0 ? "$activeFiltersCount actif".($activeFiltersCount > 1 ? 's' : '') : 'Affine ta recherche' }}</p>
+                        </div>
+                    </div>
+                    @if($activeFiltersCount > 0)
+                        <a href="{{ route('vendor.sell') }}" class="vsell-sidebar-clear">Effacer</a>
+                    @endif
+                    <button type="button" @click="filtersOpen = false" class="vsell-sidebar-close">×</button>
+                </div>
+
+                {{-- Catégories --}}
+                <div x-data="{ open: true }" class="vsell-section">
+                    <button @click="open = !open" type="button" class="vsell-section-toggle">
+                        <span>Catégories
+                            @if($categoryId)<span class="vsell-section-count">1</span>@endif
+                        </span>
+                        <svg :class="open && 'vsell-rot'" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
+                    <div x-show="open" x-collapse class="vsell-section-body">
+                        <a href="{{ route('vendor.sell', array_merge(request()->except(['category', 'page']), ['page' => 1])) }}"
+                           class="vsell-cat {{ !$categoryId ? 'vsell-cat--active' : '' }}">
+                            <span>Toutes</span>
+                            @if(!$categoryId)<svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>@endif
+                        </a>
+                        @foreach($categories as $category)
+                            <a href="{{ route('vendor.sell', array_merge(request()->except(['category', 'page']), ['category' => $category['id'], 'page' => 1])) }}"
+                               class="vsell-cat {{ $categoryId == $category['id'] ? 'vsell-cat--active' : '' }}">
+                                <span>{{ $category['name'] }}</span>
+                                @if($categoryId == $category['id'])<svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>@endif
+                            </a>
+                        @endforeach
+                    </div>
+                </div>
+
+                {{-- Gamme de prix --}}
+                <div x-data="{ open: true }" class="vsell-section">
+                    <button @click="open = !open" type="button" class="vsell-section-toggle">
+                        <span>Gamme de prix
+                            @if(count($priceRange ?? []))<span class="vsell-section-count">{{ count($priceRange) }}</span>@endif
+                        </span>
+                        <svg :class="open && 'vsell-rot'" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
+                    <div x-show="open" x-collapse class="vsell-section-body vsell-price-grid">
+                        @foreach ($priceRangeLabels as $value => $label)
+                            @php $isActive = in_array($value, $priceRange ?? []); @endphp
+                            <label class="vsell-price-pill">
+                                <input type="checkbox" name="price_range[]" value="{{ $value }}"
+                                       onchange="this.form.submit()" {{ $isActive ? 'checked' : '' }}>
+                                <div class="vsell-price-pill-box {{ $isActive ? 'vsell-price-pill-box--active' : '' }}">
+                                    {{ $label }}
+                                    <span>FCFA</span>
+                                </div>
+                            </label>
+                        @endforeach
+                    </div>
+                </div>
+
+                {{-- Région de la CARTE — mêmes paramètres que la boutique
+                     (loc[] / region[]). L'ancien filtre listait des pays de zone
+                     monétaire (Sénégal, Mali, Cameroun…) qu'aucune carte ne porte :
+                     il ne pouvait renvoyer aucun résultat. --}}
+                <div x-data="{ open: true }" class="vsell-section vsell-section--last">
+                    <button @click="open = !open" type="button" class="vsell-section-toggle">
+                        <span>Région
+                            @php $regionCount = count($selectedLoc ?? []) + count($selectedRegions ?? []); @endphp
+                            @if($regionCount)<span class="vsell-section-count">{{ $regionCount }}</span>@endif
+                        </span>
+                        <svg :class="open && 'vsell-rot'" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
+                    <div x-show="open" x-collapse class="vsell-section-body">
+                        @foreach([
+                            ['loc',    'FR',     '🇫🇷', 'France',          'fr'],
+                            ['region', 'europe', '🇪🇺', 'Europe',          'europe'],
+                            ['region', 'usa',    '🇺🇸', 'États-Unis',      'usa'],
+                            ['region', 'africa', '🌍', 'Gabon & Afrique', 'africa'],
+                            ['region', 'global', '🌐', 'International',   'global'],
+                        ] as [$param, $value, $flag, $label, $facetKey])
+                            @php
+                                $checked = $param === 'loc'
+                                    ? in_array($value, $selectedLoc ?? [], true)
+                                    : in_array($value, $selectedRegions ?? [], true);
+                                $rCount = (int) ($facets['regions'][$facetKey] ?? 0);
+                                // Option à 0 : grisée mais jamais masquée, pour que
+                                // le vendeur sache qu'elle existe.
+                                $rDead  = $rCount === 0 && !$checked;
+                            @endphp
+                            <label class="vsell-country {{ $rDead ? 'vsell-country--dead' : '' }}">
+                                <input type="checkbox" name="{{ $param }}[]" value="{{ $value }}"
+                                       onchange="this.form.submit()" {{ $checked ? 'checked' : '' }} {{ $rDead ? 'disabled' : '' }}>
+                                <span class="vsell-country-flag">{{ $flag }}</span>
+                                <span style="flex:1;">{{ $label }}</span>
+                                <span class="vsell-country-count">{{ number_format($rCount, 0, ',', ' ') }}</span>
+                            </label>
+                        @endforeach
+                    </div>
+                </div>
+            </form>
+        </aside>
+        </div>{{-- /vsell-side-col --}}
+
+        {{-- ============ PRODUCTS ============ --}}
+        <div class="vsell-products-col">
+
+
             <div class="vsell-products">
                 @forelse($products as $p)
                     @php
@@ -428,12 +479,47 @@
                                     <span class="vsell-card-price">{{ number_format($price, 0, ',', ' ') }} FCFA</span>
                                 </div>
 
-                                <button type="button"
-                                        @click="addToCart({ product_id: '{{ $pid }}', name: '{{ addslashes($name) }}', brand: '{{ addslashes($brand) }}', image_url: '{{ $img }}', color: '{{ $color }}', price: {{ $price }}, currency: 'XAF', native_value: {{ $rawPrice }}, native_currency: '{{ $currency }}' })"
-                                        class="vsell-card-add">
-                                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
-                                    Ajouter
-                                </button>
+                                @php
+                                    // Variantes de montant : une pastille par valeur, chacune
+                                    // ajoutant SA variante au panier. Couvre aussi les cartes à
+                                    // montant libre (Apple), dépliées en échelle par
+                                    // App\Support\VirtualDenominations.
+                                    $vList = collect($p['variants'] ?? [])
+                                        ->filter(fn ($v) => ($v['face'] ?? 0) > 0 && ($v['price_min'] ?? 0) > 0)
+                                        ->sortBy('price_min')
+                                        ->values();
+                                @endphp
+
+                                @if($vList->count() > 1)
+                                    <div class="vsell-variants" role="group" aria-label="Montants disponibles pour {{ $brand }}">
+                                        @foreach($vList->take(6) as $v)
+                                            @php
+                                                $vCur   = $v['currency'] ?? $currency;
+                                                $vFcfa  = \App\Support\Money::toFcfa($v['price_min'], $vCur);
+                                                $vLabel = \App\Support\Money::formatOriginal($v['face'], $vCur)
+                                                          ?? number_format($v['face'], 0, ',', ' ');
+                                                $vName  = trim($brand . ' ' . $vLabel);
+                                            @endphp
+                                            <button type="button"
+                                                    @click="addToCart({ product_id: '{{ $v['product_id'] }}', name: '{{ addslashes($vName) }}', brand: '{{ addslashes($brand) }}', image_url: '{{ $img }}', color: '{{ $color }}', price: {{ $vFcfa }}, currency: 'XAF', native_value: {{ $v['face'] }}, native_currency: '{{ $vCur }}' })"
+                                                    class="vsell-variant"
+                                                    title="{{ $vLabel }} — {{ number_format($vFcfa, 0, ',', ' ') }} FCFA">
+                                                {{ $vLabel }}
+                                            </button>
+                                        @endforeach
+                                        @if($vList->count() > 6)
+                                            <span class="vsell-variant-more">+{{ $vList->count() - 6 }}</span>
+                                        @endif
+                                    </div>
+                                    <p class="vsell-variants-hint">Touche un montant pour l'ajouter</p>
+                                @else
+                                    <button type="button"
+                                            @click="addToCart({ product_id: '{{ $pid }}', name: '{{ addslashes($name) }}', brand: '{{ addslashes($brand) }}', image_url: '{{ $img }}', color: '{{ $color }}', price: {{ $price }}, currency: 'XAF', native_value: {{ $rawPrice }}, native_currency: '{{ $currency }}' })"
+                                            class="vsell-card-add">
+                                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+                                        Ajouter
+                                    </button>
+                                @endif
                             </div>
                         </div>
                     @endif
@@ -1051,6 +1137,35 @@
     }
 
     /* ====================== PRODUCTS ====================== */
+    /* Colonne de gauche : panier au-dessus des filtres, l'ensemble suit le
+       scroll sur grand écran comme le faisait la sidebar seule. */
+    .vsell-side-col { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+    @media (min-width: 1024px) {
+        .vsell-side-col { position: sticky; top: 84px; align-self: start; }
+    }
+
+    /* Pastilles de montant : chaque variante s'ajoute directement au panier. */
+    .vsell-variants { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+    .vsell-variant {
+        min-height: 36px; padding: 0 11px;
+        border: 1px solid #CBD5E1; border-radius: 9px;
+        background: #F8FAFC; color: #0F172A;
+        font-family: inherit; font-size: 12.5px; font-weight: 700;
+        font-variant-numeric: tabular-nums; cursor: pointer;
+        transition: border-color .15s ease, background .15s ease, transform .1s ease;
+    }
+    .vsell-variant:hover { border-color: #44A08D; background: #F0FDF9; color: #0F766E; }
+    .vsell-variant:active { transform: scale(.97); }
+    .vsell-variant:focus-visible { outline: 3px solid #4ECDC4; outline-offset: 2px; }
+    .vsell-variant-more {
+        display: inline-flex; align-items: center; min-height: 36px;
+        font-size: 12px; font-weight: 700; color: #94A3B8;
+    }
+    .vsell-variants-hint { font-size: 11px; color: #94A3B8; margin: 6px 0 0; }
+
+    .vsell-country--dead { opacity: .4; cursor: not-allowed; }
+    .vsell-country-count { font-size: 11px; color: #94A3B8; font-variant-numeric: tabular-nums; }
+
     .vsell-products-col { min-width: 0; }
     .vsell-products {
         display: grid;
@@ -1378,6 +1493,30 @@
         flex-direction: column;
         gap: 10px;
         background: #FAFBFC;
+    }
+
+    /* ============================================================
+       Panier en colonne étroite (260 px) : il occupait auparavant toute la
+       largeur de la zone produits. Sans ces règles, la ligne d'article et le
+       sélecteur de quantité se chevauchent.
+       ============================================================ */
+    @media (min-width: 1024px) {
+        .vsell-cart-top { font-size: 13px; }
+        /* Article : vignette au-dessus du texte plutôt qu'à côté. */
+        .vct-item { flex-direction: column; gap: 8px; padding: 10px; }
+        .vct-item-media, .vct-item-visual { width: 100%; height: 54px; }
+        .vct-item-right, .vct-item-actions {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 8px; width: 100%;
+        }
+        .vct-qty { flex-shrink: 0; }
+        .vct-item-name, .vct-item-brand {
+            white-space: normal; overflow-wrap: anywhere;
+        }
+        /* Totaux : libellé et montant sur deux lignes, jamais tronqués. */
+        .vct-foot-row, .vct-total {
+            flex-wrap: wrap; row-gap: 2px;
+        }
     }
 
     .vct-item {

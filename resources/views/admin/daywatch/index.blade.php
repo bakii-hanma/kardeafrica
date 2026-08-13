@@ -88,12 +88,37 @@
             @endif
         </form>
 
+        <form action="{{ route('admin.daywatch.sync') }}" method="POST" style="display:inline;">
+            @csrf
+            <button type="submit"
+                    style="display:inline-flex;align-items:center;gap:8px;padding:12px 18px;background:white;color:#334155;border:1px solid #E2E8F0;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;box-shadow:0 1px 2px rgba(15,23,42,0.04);">
+                <svg style="width:16px;height:16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992V4.356m-.981 5.023A8.25 8.25 0 106.03 6.03m-2.05 8.622H8.97v4.992m.98-5.023a8.25 8.25 0 0014.004 3.352"/></svg>
+                Synchroniser
+            </button>
+        </form>
+
         <a href="{{ route('admin.daywatch.create') }}"
            style="display:inline-flex;align-items:center;gap:8px;padding:12px 18px;background:linear-gradient(135deg,#44A08D,#4ECDC4);color:white;border-radius:12px;font-size:14px;font-weight:600;text-decoration:none;box-shadow:0 10px 24px -10px rgba(68,160,141,0.5);">
             <svg style="width:16px;height:16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
             Nouveau Daywatch
         </a>
     </div>
+
+    @if(($stats['synced'] ?? 0) > 0)
+        {{-- Sans cet avertissement, un prix corrigé à la main disparaît sans --}}
+        {{-- explication à la passe de 4h20 : l'API Daywatch fait autorité.   --}}
+        <div style="display:flex;align-items:flex-start;gap:12px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:12px;padding:12px 16px;margin-bottom:18px;">
+            <svg style="width:18px;height:18px;color:#2563EB;flex-shrink:0;margin-top:1px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"/></svg>
+            <div style="font-size:13px;color:#1E3A8A;line-height:1.5;">
+                <strong>{{ $stats['synced'] }} formule{{ $stats['synced'] > 1 ? 's' : '' }} synchronisée{{ $stats['synced'] > 1 ? 's' : '' }}</strong>
+                depuis l'API Daywatch (passe quotidienne à 4h20).
+                Toute modification manuelle du nom, du prix ou de la durée sera écrasée à la prochaine synchronisation.
+                @if(!empty($stats['synced_at']))
+                    <span style="color:#3B82F6;">Dernière synchro : {{ \Carbon\Carbon::parse($stats['synced_at'])->timezone('Africa/Libreville')->format('d/m/Y à H\\hi') }}.</span>
+                @endif
+            </div>
+        </div>
+    @endif
 
     {{-- Liste cards --}}
     @if($products->count() > 0)

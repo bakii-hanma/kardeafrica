@@ -1,6 +1,7 @@
 @extends('layouts.app')
 
 @section('title', 'Télécharger l\'app Kardafrica — Android')
+@section('meta_description', 'Téléchargez l\'application KardAfrica pour Android : achetez vos cartes cadeaux Netflix, Steam, PSN et plus, payez par Airtel Money ou Moov Money, code reçu en 30 secondes.')
 
 @section('content')
 <style>
@@ -115,19 +116,14 @@
 
                 {{-- Trust row --}}
                 <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 24px 16px; margin-top: 34px;">
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <div style="display: flex;">
-                            @foreach (['#44A08D', '#7C3AED', '#EA580C', '#3B82F6'] as $i => $c)
-                                <div style="width: 26px; height: 26px; border-radius: 50%; background: {{ $c }}; border: 2px solid #0F172A; margin-left: {{ $i === 0 ? '0' : '-8px' }};"></div>
-                            @endforeach
-                        </div>
-                        <span style="font-size: 12px; font-weight: 600; color: #CBD5E1;">+50 000 utilisateurs</span>
+                    {{-- Preuves VÉRIFIABLES uniquement (audit SEO : pas de faux compteurs) --}}
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="#4ECDC4" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                        <span style="font-size: 12px; font-weight: 600; color: #CBD5E1;">Plus de 300 marques</span>
                     </div>
-                    <div style="display: flex; align-items: center; gap: 6px;">
-                        @for ($i = 0; $i < 5; $i++)
-                            <svg style="width: 14px; height: 14px;" viewBox="0 0 24 24" fill="#FBBF24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-                        @endfor
-                        <span style="margin-left: 6px; font-size: 12px; font-weight: 600; color: #CBD5E1;">4.9/5</span>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="#FBBF24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                        <span style="font-size: 12px; font-weight: 600; color: #CBD5E1;">Code en 30 s · Airtel & Moov Money</span>
                     </div>
                 </div>
             </div>

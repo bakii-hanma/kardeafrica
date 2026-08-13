@@ -105,9 +105,26 @@ class MerchantCard extends Model
     // ============================================================
 
     /** Cartes affichables sur la vitrine publique : catalogue admin actif. */
+    /**
+     * Cartes réellement vendables.
+     *
+     * `is_active` ne suffit pas : une carte sans propriétaire ne peut être
+     * débitée par PERSONNE — `Owner\ScanController` exige que la carte
+     * appartienne au commerçant qui scanne. Publiée, elle se vend normalement
+     * et le client se présente au comptoir pour rien.
+     *
+     * Le cas n'est pas théorique : la contrainte est `ON DELETE SET NULL`, donc
+     * supprimer un commerçant orpheline silencieusement toutes ses cartes.
+     */
     public function scopeActive($query)
     {
-        return $query->where('is_active', true);
+        return $query->where('is_active', true)->whereNotNull('card_owner_id');
+    }
+
+    /** Cartes sans propriétaire — anomalie à corriger, jamais à vendre. */
+    public function scopeOrphan($query)
+    {
+        return $query->whereNull('card_owner_id');
     }
 
     public function scopeByCategory($query, string $category)

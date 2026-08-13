@@ -52,6 +52,12 @@
             Nouvelle carte
         </a>
 
+        <a href="{{ route('admin.merchant-cards.reseller-sales') }}"
+           style="display:inline-flex;align-items:center;gap:8px;padding:12px 18px;background:white;color:#0F172A;border:1px solid #E2E8F0;border-radius:12px;font-size:14px;font-weight:700;text-decoration:none;order:2;">
+            <svg style="width:16px;height:16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>
+            Ventes revendeurs
+        </a>
+
         <form method="GET" action="{{ route('admin.merchant-cards.index') }}"
               style="flex:1 1 auto;min-width:280px;background:white;border-radius:14px;padding:10px;border:1px solid #E2E8F0;box-shadow:0 1px 2px rgba(15,23,42,0.04);display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
             <div style="position:relative;flex:1 1 240px;min-width:200px;">

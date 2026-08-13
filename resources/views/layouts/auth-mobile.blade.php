@@ -43,6 +43,10 @@
             animation: float 4s ease-in-out infinite;
         }
     </style>
+    {{-- Styles empilés par les vues et les composants (`@push('head')`).
+         Sans cette pile, un composant réutilisable ne peut pas porter son propre
+         style : la page sort sans mise en forme. --}}
+    @stack('head')
 </head>
 <body class="bg-[#1F2937] min-h-screen flex items-center justify-center p-4 overflow-hidden relative">
     <!-- Background Decor -->

@@ -4,16 +4,23 @@
 
 @section('content')
 @php
+    use App\Support\VendorSalesFeed;
+
     $statusOptions = [
-        'all'        => ['label' => 'Toutes',     'color' => '#0F172A', 'bg' => '#F1F5F9'],
-        'completed'  => ['label' => 'Livrées',    'color' => '#047857', 'bg' => '#D1FAE5'],
-        'processing' => ['label' => 'En cours',   'color' => '#1D4ED8', 'bg' => '#DBEAFE'],
-        'pending'    => ['label' => 'En attente', 'color' => '#B45309', 'bg' => '#FEF3C7'],
-        'cancelled'  => ['label' => 'Annulées',   'color' => '#475569', 'bg' => '#E2E8F0'],
-        'failed'     => ['label' => 'Échec',      'color' => '#BE123C', 'bg' => '#FEE2E2'],
+        'all'       => '#0F172A',
+        'completed' => '#047857',
+        'pending'   => '#B45309',
+        'failed'    => '#BE123C',
+        'cancelled' => '#475569',
+        'refunded'  => '#7C3AED',
     ];
-    $currentStatus = request('status', 'all');
-    $currentSearch = request('search', '');
+    $fmt = fn ($n) => number_format((float) $n, 0, ',', ' ');
+
+    // Le type de vente survit à un changement de statut et inversement :
+    // ce sont deux axes indépendants, pas deux jeux de filtres concurrents.
+    $urlWith = function (array $params) {
+        return route('vendor.orders', array_merge(request()->except('page'), $params));
+    };
 @endphp
 
 <div class="vo-wrap">
@@ -23,12 +30,25 @@
         <div>
             <div class="vo-eyebrow">Historique</div>
             <h1 class="vo-title">Mes ventes</h1>
-            <p class="vo-lead">{{ $stats['total'] }} vente{{ $stats['total'] > 1 ? 's' : '' }} au total · <strong>{{ number_format($stats['commission'], 0, ',', ' ') }} FCFA</strong> de commissions</p>
+            <p class="vo-lead">
+                {{ $stats['total'] }} vente{{ $stats['total'] > 1 ? 's' : '' }} au total ·
+                <strong>{{ $fmt($stats['commission']) }} FCFA</strong> de commissions créditées
+                @if ($stats['local_commission'] > 0)
+                    · <strong>{{ $fmt($stats['local_commission']) }} FCFA</strong> de marge Carte Gabon gardée en espèces
+                @endif
+            </p>
         </div>
-        <a href="{{ route('vendor.sell') }}" class="vo-cta">
-            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
-            Nouvelle vente
-        </a>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            {{-- Export comptable : reprend les filtres actifs de l'écran. --}}
+            <a href="{{ route('vendor.orders.export', request()->only(['type', 'status', 'search', 'from', 'to'])) }}" class="vo-export">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                Exporter
+            </a>
+            <a href="{{ route('vendor.sell') }}" class="vo-cta">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+                Nouvelle vente
+            </a>
+        </div>
     </div>
 
     {{-- ============= STATS STRIP ============= --}}
@@ -74,43 +94,52 @@
     {{-- ============= TOOLBAR ============= --}}
     <div class="vo-toolbar">
         <form action="{{ route('vendor.orders') }}" method="GET" class="vo-search" data-no-loader>
-            <input type="hidden" name="status" value="{{ $currentStatus !== 'all' ? $currentStatus : '' }}">
+            <input type="hidden" name="type" value="{{ $type !== 'all' ? $type : '' }}">
+            <input type="hidden" name="status" value="{{ $bucket !== 'all' ? $bucket : '' }}">
             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-            <input type="text" name="search" value="{{ $currentSearch }}" placeholder="Rechercher #commande, client…">
-            @if($currentSearch)
-                <a href="{{ route('vendor.orders', request()->except(['search', 'page'])) }}" class="vo-search-clear">×</a>
+            <input type="text" name="search" value="{{ $search }}" placeholder="Rechercher #commande, code carte, client…">
+            @if($search)
+                <a href="{{ $urlWith(['search' => null]) }}" class="vo-search-clear" aria-label="Effacer la recherche">×</a>
             @endif
             <button type="submit" class="vo-search-btn">OK</button>
         </form>
     </div>
 
-    {{-- ============= STATUS PILLS ============= --}}
-    <div class="vo-pills">
-        @foreach($statusOptions as $key => $opt)
-            @php
-                $url = $key === 'all'
-                    ? route('vendor.orders', request()->except(['status', 'page']))
-                    : route('vendor.orders', array_merge(request()->except('page'), ['status' => $key]));
-                $isActive = $currentStatus === $key;
-            @endphp
-            <a href="{{ $url }}"
-               class="vo-pill {{ $isActive ? 'vo-pill--active' : '' }}"
-               style="{{ $isActive ? "background:{$opt['color']};color:white;border-color:{$opt['color']};" : '' }}">
-                {{ $opt['label'] }}
+    {{-- ============= BASCULE DIGITAL / CARTE GABON ============= --}}
+    <div class="vo-types" role="group" aria-label="Nature de la vente">
+        @foreach (VendorSalesFeed::TYPES as $key => $label)
+            @php $n = $key === 'all' ? array_sum($typeCounts) : ($typeCounts[$key] ?? 0); @endphp
+            <a href="{{ $urlWith(['type' => $key === 'all' ? null : $key]) }}"
+               class="vo-type {{ $type === $key ? 'vo-type--active' : '' }}"
+               @if($type === $key) aria-current="true" @endif>
+                {{ $label }}
+                <span class="vo-type-n">{{ $n }}</span>
             </a>
         @endforeach
     </div>
 
-    {{-- ============= ORDERS ============= --}}
-    @if($orders->count() > 0)
+    {{-- ============= STATUTS ============= --}}
+    <div class="vo-pills">
+        @foreach(VendorSalesFeed::BUCKETS as $key => $label)
+            @php $isActive = $bucket === $key; @endphp
+            <a href="{{ $urlWith(['status' => $key === 'all' ? null : $key]) }}"
+               class="vo-pill {{ $isActive ? 'vo-pill--active' : '' }}"
+               style="{{ $isActive ? "background:{$statusOptions[$key]};color:white;border-color:{$statusOptions[$key]};" : '' }}">
+                {{ $label }}
+            </a>
+        @endforeach
+    </div>
+
+    {{-- ============= VENTES ============= --}}
+    @if($rows->count() > 0)
         {{-- Desktop : table --}}
         <div class="vo-table-wrap">
             <table class="vo-table">
                 <thead>
                     <tr>
-                        <th>Commande</th>
+                        <th>Vente</th>
                         <th>Client</th>
-                        <th>Articles</th>
+                        <th>Détail</th>
                         <th class="vo-th-r">Total</th>
                         <th class="vo-th-r">Commission</th>
                         <th class="vo-th-c">Statut</th>
@@ -118,34 +147,33 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach($orders as $o)
-                        @php
-                            $statusMap = [
-                                'pending'    => ['#B45309','#FEF3C7','En attente'],
-                                'processing' => ['#1D4ED8','#DBEAFE','En cours'],
-                                'completed'  => ['#047857','#D1FAE5','Livrée'],
-                                'cancelled'  => ['#475569','#E2E8F0','Annulée'],
-                                'failed'     => ['#BE123C','#FEE2E2','Échec'],
-                                'refunded'   => ['#7C3AED','#EDE9FE','Remboursée'],
-                            ];
-                            $st = $statusMap[$o->status] ?? ['#475569','#E2E8F0',ucfirst($o->status)];
-                        @endphp
-                        <tr onclick="window.location='{{ route('vendor.orders.show', $o) }}'">
+                    @foreach($rows as $r)
+                        <tr onclick="window.location='{{ $r['url'] }}'">
                             <td>
-                                <div class="vo-table-num">#{{ $o->order_number }}</div>
-                                <div class="vo-table-date">{{ $o->created_at->format('d/m/Y H:i') }}</div>
+                                <div class="vo-table-num">{{ $r['reference'] }}</div>
+                                <div class="vo-table-date">
+                                    <span class="vo-tag vo-tag--{{ $r['type'] }}">{{ $r['type_label'] }}</span>
+                                    {{ $r['date']->format('d/m/Y H:i') }}
+                                </div>
                             </td>
                             <td>
-                                <div class="vo-table-customer">{{ $o->customer_name ?: '—' }}</div>
-                                @if($o->customer_phone)<div class="vo-table-phone">{{ $o->customer_phone }}</div>@endif
+                                <div class="vo-table-customer">{{ $r['customer'] ?: '—' }}</div>
+                                @if($r['phone'])<div class="vo-table-phone">{{ $r['phone'] }}</div>@endif
                             </td>
-                            <td class="vo-table-items">{{ $o->items->sum('quantity') }} carte{{ $o->items->sum('quantity') > 1 ? 's' : '' }}</td>
-                            <td class="vo-th-r vo-table-amount">{{ number_format($o->total_amount, 0, ',', ' ') }} <span>FCFA</span></td>
-                            <td class="vo-th-r vo-table-comm">+{{ number_format($o->commission_earned, 0, ',', ' ') }}</td>
-                            <td class="vo-th-c"><span class="vo-status" style="background:{{ $st[1] }};color:{{ $st[0] }};">{{ $st[2] }}</span></td>
+                            <td class="vo-table-items">{{ $r['detail'] }}</td>
+                            <td class="vo-th-r vo-table-amount">{{ $fmt($r['amount']) }} <span>FCFA</span></td>
+                            <td class="vo-th-r vo-table-comm">
+                                @if($r['commission'] === null)
+                                    <span class="vo-comm-none" title="La commission n'est acquise qu'une fois la carte remise">—</span>
+                                @else
+                                    +{{ $fmt($r['commission']) }}
+                                    <span class="vo-comm-kind">{{ $r['commission_kind'] === 'cash' ? 'espèces' : 'portefeuille' }}</span>
+                                @endif
+                            </td>
+                            <td class="vo-th-c"><span class="vo-status" style="background:{{ $r['status_bg'] }};color:{{ $r['status_fg'] }};">{{ $r['status_label'] }}</span></td>
                             <td class="vo-th-r">
-                                <a href="{{ route('vendor.orders.show', $o) }}" class="vo-table-action" onclick="event.stopPropagation();">
-                                    Voir
+                                <a href="{{ $r['url'] }}" class="vo-table-action" onclick="event.stopPropagation();">
+                                    {{ $r['todo'] ? 'Traiter' : 'Voir' }}
                                     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
                                 </a>
                             </td>
@@ -157,37 +185,30 @@
 
         {{-- Mobile : cards --}}
         <div class="vo-mobile">
-            @foreach($orders as $o)
-                @php
-                    $statusMap = [
-                        'pending'    => ['#B45309','#FEF3C7','En attente'],
-                        'processing' => ['#1D4ED8','#DBEAFE','En cours'],
-                        'completed'  => ['#047857','#D1FAE5','Livrée'],
-                        'cancelled'  => ['#475569','#E2E8F0','Annulée'],
-                        'failed'     => ['#BE123C','#FEE2E2','Échec'],
-                        'refunded'   => ['#7C3AED','#EDE9FE','Remboursée'],
-                    ];
-                    $st = $statusMap[$o->status] ?? ['#475569','#E2E8F0',ucfirst($o->status)];
-                @endphp
-                <a href="{{ route('vendor.orders.show', $o) }}" class="vo-mob">
+            @foreach($rows as $r)
+                <a href="{{ $r['url'] }}" class="vo-mob {{ $r['todo'] ? 'vo-mob--todo' : '' }}">
                     <div class="vo-mob-head">
-                        <div class="vo-mob-num">#{{ $o->order_number }}</div>
-                        <span class="vo-status" style="background:{{ $st[1] }};color:{{ $st[0] }};">{{ $st[2] }}</span>
+                        <div class="vo-mob-num">{{ $r['reference'] }}</div>
+                        <span class="vo-status" style="background:{{ $r['status_bg'] }};color:{{ $r['status_fg'] }};">{{ $r['status_label'] }}</span>
                     </div>
                     <div class="vo-mob-customer">
-                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
-                        {{ $o->customer_name ?: 'Client anonyme' }}
-                        @if($o->customer_phone)<span class="vo-mob-phone"> · {{ $o->customer_phone }}</span>@endif
+                        <span class="vo-tag vo-tag--{{ $r['type'] }}">{{ $r['type_label'] }}</span>
+                        {{ $r['customer'] ?: 'Client anonyme' }}
+                        @if($r['phone'])<span class="vo-mob-phone"> · {{ $r['phone'] }}</span>@endif
                     </div>
                     <div class="vo-mob-foot">
                         <div class="vo-mob-meta">
-                            <span>{{ $o->items->sum('quantity') }} carte{{ $o->items->sum('quantity') > 1 ? 's' : '' }}</span>
+                            <span>{{ $r['detail'] }}</span>
                             <span>·</span>
-                            <span>{{ $o->created_at->diffForHumans() }}</span>
+                            <span>{{ $r['date']->diffForHumans() }}</span>
                         </div>
                         <div class="vo-mob-amounts">
-                            <div class="vo-mob-total">{{ number_format($o->total_amount, 0, ',', ' ') }} <span>FCFA</span></div>
-                            <div class="vo-mob-comm">+{{ number_format($o->commission_earned, 0, ',', ' ') }} commission</div>
+                            <div class="vo-mob-total">{{ $fmt($r['amount']) }} <span>FCFA</span></div>
+                            @if($r['commission'] !== null)
+                                <div class="vo-mob-comm">
+                                    +{{ $fmt($r['commission']) }} {{ $r['commission_kind'] === 'cash' ? 'en espèces' : 'commission' }}
+                                </div>
+                            @endif
                         </div>
                     </div>
                 </a>
@@ -195,26 +216,27 @@
         </div>
 
         {{-- Pagination --}}
-        @if($orders->hasPages())
-            <div class="vo-pagination">{{ $orders->onEachSide(1)->links() }}</div>
+        @if($rows->hasPages())
+            <div class="vo-pagination">{{ $rows->onEachSide(1)->links() }}</div>
         @endif
     @else
         {{-- Empty state --}}
+        @php $filtre = $search !== '' || $bucket !== 'all' || $type !== 'all'; @endphp
         <div class="vo-empty">
             <div class="vo-empty-ico">
-                @if($currentSearch || $currentStatus !== 'all')
+                @if($filtre)
                     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.6"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
                 @else
                     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.6"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
                 @endif
             </div>
-            @if($currentSearch || $currentStatus !== 'all')
+            @if($filtre)
                 <h3>Aucun résultat</h3>
-                <p>Aucune vente ne correspond à tes filtres. Essaie d'ajuster la recherche ou le statut.</p>
+                <p>Aucune vente ne correspond à tes filtres. Essaie une autre nature de vente, un autre statut ou une autre recherche.</p>
                 <a href="{{ route('vendor.orders') }}" class="vo-empty-cta vo-empty-cta--ghost">Effacer les filtres</a>
             @else
                 <h3>Aucune vente pour le moment</h3>
-                <p>Démarre ta première vente pour gagner ta commission et voir l'activité ici.</p>
+                <p>Tes ventes de cartes digitales et de Cartes Gabon apparaîtront ici, dans la même liste.</p>
                 <a href="{{ route('vendor.sell') }}" class="vo-empty-cta">
                     Démarrer une vente
                     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
@@ -260,6 +282,17 @@
     }
     .vo-cta:active { transform: scale(0.98); }
     .vo-cta svg { width: 13px; height: 13px; }
+    .vo-export {
+        display: inline-flex; align-items: center; gap: 6px;
+        min-height: 44px; padding: 0 16px;
+        background: #fff; border: 1px solid #CBD5E1; border-radius: 11px;
+        color: #334155;
+        font-family: 'Inter', sans-serif;
+        font-size: 13px; font-weight: 700;
+        text-decoration: none; white-space: nowrap;
+    }
+    .vo-export:hover { border-color: #94A3B8; color: #0F172A; }
+    .vo-export svg { width: 13px; height: 13px; }
 
     /* ====================== STATS ====================== */
     .vo-stats {
@@ -359,6 +392,52 @@
         cursor: pointer;
         flex-shrink: 0;
     }
+
+    /* ====================== BASCULE DE TYPE ====================== */
+    .vo-types {
+        display: flex; gap: 6px; margin-bottom: 10px;
+        background: #F1F5F9; border-radius: 12px; padding: 4px;
+        overflow-x: auto; scrollbar-width: none;
+    }
+    .vo-types::-webkit-scrollbar { display: none; }
+    .vo-type {
+        display: inline-flex; align-items: center; gap: 6px;
+        flex: 1; justify-content: center; white-space: nowrap;
+        min-height: 38px; padding: 0 14px;
+        border-radius: 9px; color: #475569;
+        font-size: 12.5px; font-weight: 700; text-decoration: none;
+        transition: background .15s ease, color .15s ease;
+    }
+    .vo-type--active { background: #fff; color: #0F172A; font-weight: 800; box-shadow: 0 1px 3px rgba(15,23,42,.10); }
+    .vo-type-n {
+        font-size: 11px; font-weight: 800; font-variant-numeric: tabular-nums;
+        background: #E2E8F0; color: #475569; border-radius: 9999px; padding: 1px 7px;
+    }
+    .vo-type--active .vo-type-n { background: #0F9E8E; color: #fff; }
+    /* À 375 px les trois onglets débordaient et le troisième passait hors écran :
+       un filtre qu'il faut faire défiler pour découvrir n'est pas un filtre. */
+    @media (max-width: 430px) {
+        .vo-types { gap: 3px; }
+        .vo-type { padding: 0 8px; font-size: 11.5px; gap: 4px; }
+        .vo-type-n { font-size: 10px; padding: 1px 5px; }
+    }
+
+    /* Étiquette de nature, sur chaque ligne : sans elle, une liste fusionnée
+       ne dit plus d'où vient la vente. */
+    .vo-tag {
+        display: inline-block; padding: 2px 7px; border-radius: 6px;
+        font-size: 9.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em;
+        margin-right: 6px; vertical-align: middle;
+    }
+    .vo-tag--digital { background: #E0F2F1; color: #0B7F72; }
+    .vo-tag--local   { background: #FEF3C7; color: #B45309; }
+
+    .vo-comm-none { color: #CBD5E1; font-weight: 700; }
+    .vo-comm-kind {
+        display: block; font-size: 9.5px; font-weight: 700; color: #94A3B8;
+        text-transform: uppercase; letter-spacing: .04em;
+    }
+    .vo-mob--todo { border-color: #FCD34D; background: #FFFBEB; }
 
     /* ====================== STATUS PILLS ====================== */
     .vo-pills {

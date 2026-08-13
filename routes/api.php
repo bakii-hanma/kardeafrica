@@ -17,7 +17,13 @@ use Illuminate\Support\Facades\Route;
  * "Cannot redeclare" en prod.
  */
 if (!function_exists('formatUserCardForApi')) {
-    function formatUserCardForApi(UserCard $card): array
+    /**
+     * @param bool $reveal  M1 : n'inclut code/PIN/serial QUE si true. La liste
+     *                      passe toujours false ; le détail ne passe true que si
+     *                      une fenêtre de révélation a été ouverte par
+     *                      verify-password (contrôle serveur, pas client).
+     */
+    function formatUserCardForApi(UserCard $card, bool $reveal = false): array
     {
         $pricePaid = $card->price_paid_xaf;
 
@@ -31,9 +37,10 @@ if (!function_exists('formatUserCardForApi')) {
             'price_paid_xaf' => $pricePaid,
             'face_value'     => (float) $card->face_value,
             'face_currency'  => $card->currency,
-            'code'           => $card->card_code,
-            'pin'            => $card->pin,
-            'serial_number'  => $card->serial_number,
+            'code'           => $reveal ? $card->card_code : null,
+            'pin'            => $reveal ? $card->pin : null,
+            'serial_number'  => $reveal ? $card->serial_number : null,
+            'locked'         => !$reveal,
             'expiry_date'    => $card->expiration_date?->toDateString(),
             'image'          => $card->image_url,
             'status'         => $card->status,
@@ -44,6 +51,15 @@ if (!function_exists('formatUserCardForApi')) {
             'created_at'     => $card->created_at->toIso8601String(),
             'updated_at'     => $card->updated_at->toIso8601String(),
         ];
+    }
+}
+
+if (!function_exists('userCardRevealAllowed')) {
+    // M1 : la fenêtre de révélation est ouverte par POST /api/verify-password
+    // (mot de passe requis + throttle 5/min) et expire au bout de 120 s.
+    function userCardRevealAllowed(int $userId): bool
+    {
+        return (bool) \Illuminate\Support\Facades\Cache::get('card-reveal:' . $userId, false);
     }
 }
 
@@ -76,11 +92,12 @@ Route::middleware('auth:sanctum')->group(function () {
     // User Cards (purchased cards from checkout API)
     // ========================================
     Route::get('/cards', function (Request $request) {
+        // M1 : la liste ne révèle JAMAIS code/PIN (reveal=false forcé).
         $cards = UserCard::where('user_id', $request->user()->id)
             ->with('orderItem')
             ->latest()
             ->get()
-            ->map(fn($card) => formatUserCardForApi($card));
+            ->map(fn($card) => formatUserCardForApi($card, false));
 
         return response()->json($cards);
     });
@@ -95,7 +112,11 @@ Route::middleware('auth:sanctum')->group(function () {
             return response()->json(['message' => 'Carte non trouvee'], 404);
         }
 
-        return response()->json(formatUserCardForApi($card));
+        // M1 : code/PIN uniquement si une fenêtre de révélation est ouverte
+        // (verify-password réussi il y a moins de 120 s).
+        $reveal = userCardRevealAllowed($request->user()->id);
+
+        return response()->json(formatUserCardForApi($card, $reveal));
     });
 
     // ========================================
@@ -122,8 +143,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/payment/create-ebill', [App\Http\Controllers\PaymentController::class, 'createEbill'])
         ->middleware('throttle:10,1')
         ->name('api.payment.create-ebill');
+    // C3 : throttle — sans limite, finalize permettait le bruteforce de références
     Route::post('/payment/finalize', [App\Http\Controllers\PaymentController::class, 'finalize'])
-        ->name('api.payment.finalize'); // legacy
+        ->middleware('throttle:30,1')
+        ->name('api.payment.finalize');
 });
 
 // Status polling — public car appele frequemment depuis le WebView mobile
@@ -133,6 +156,13 @@ Route::get('/payment/check-status', [App\Http\Controllers\PaymentController::cla
 
 // Webhook E-Billing
 Route::any('/payment/callback', [App\Http\Controllers\PaymentController::class, 'handleCallback']);
+
+// Webhook WHAPI (messages entrants + statuts de livraison). Public, protégé par
+// un secret partagé (config services.whapi.webhook_secret). Throttle large car
+// WHAPI peut envoyer des rafales d'événements.
+Route::post('/webhooks/whapi', [App\Http\Controllers\WhapiWebhookController::class, 'handle'])
+    ->middleware('throttle:120,1')
+    ->name('api.webhooks.whapi');
 
 
 /* ============================================================

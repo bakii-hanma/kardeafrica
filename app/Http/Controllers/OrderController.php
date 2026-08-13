@@ -168,7 +168,7 @@ class OrderController extends Controller
         $missing  = [];
         $payload  = [];
         foreach ($afrikardItems as $item) {
-            $productId = (int) $item->product_id;
+            $productId = (int) $item->product_id;   // id RÉEL afrikard ("1571149v25" → 1571149)
             $qty       = (int) $item->quantity;
 
             // 1. Native value stocké sur l'OrderItem (commandes récentes)
@@ -177,14 +177,15 @@ class OrderController extends Controller
                 continue;
             }
 
-            // 2. Lookup rapide cache + API ciblée
-            $resolved = $service->resolveNativeValue($productId, deepScan: false);
+            // 2. Lookup rapide cache + API ciblée — sur l'id ORIGINAL (un id
+            // virtuel encode sa valeur ; l'id réel retomberait sur le bas de plage)
+            $resolved = $service->resolveNativeValue($item->product_id, deepScan: false);
             if ($resolved && $resolved['value'] > 0) {
                 $payload[] = ['ProductId' => $productId, 'Quantity' => $qty, 'Value' => $resolved['value']];
                 continue;
             }
 
-            $missing[] = $productId;
+            $missing[] = (string) $item->product_id;
         }
 
         // Si manquants : on warm-cache (deepScan) et retry
@@ -266,39 +267,90 @@ class OrderController extends Controller
     {
         if ($order->user_id !== Auth::id()) abort(403);
 
+        // Gardes rapides (messages précis) — re-testées ensuite DANS le verrou,
+        // seules les gardes verrouillées font foi contre un double submit.
         if ($order->userCards()->exists()) {
             return back()->with('error', 'Cette commande a déjà été livrée — impossible de rembourser automatiquement.');
         }
         if ($order->payment_status !== Order::PAYMENT_STATUS_COMPLETED) {
             return back()->with('error', 'Cette commande n\'a pas été payée.');
         }
-        if ($order->status === Order::STATUS_REFUNDED) {
-            return back()->with('error', 'Cette commande est déjà remboursée.');
+        if (in_array($order->status, [Order::STATUS_REFUNDED, Order::STATUS_REFUNDING], true)) {
+            return back()->with('error', 'Cette commande est déjà remboursée ou un remboursement est en cours.');
         }
 
         // Cash chez vendeur : on ne peut pas rembourser via API, le vendeur doit
-        // rendre l'argent en physique. On informe le client.
+        // rendre l'argent en physique. On informe le client. Tout est local →
+        // une seule transaction verrouillée suffit (pas d'appel PSP).
         if ($order->payment_method === Order::PAYMENT_METHOD_CASH_RESELLER) {
             try {
-                DB::transaction(function () use ($order) {
-                    // Restitue le wallet du vendeur (les cartes n'ont pas été livrées)
-                    $reseller = Reseller::lockForUpdate()->find($order->cash_reseller_id);
-                    if ($reseller) {
-                        $reseller->credit((float) $order->total_amount, null, "Remboursement commande #{$order->order_number}", $order->order_number);
+                $already = DB::transaction(function () use ($order) {
+                    // Verrou de la commande + re-test des gardes DANS le verrou
+                    $locked = Order::where('id', $order->id)->lockForUpdate()->first();
+                    if ($locked->payment_status !== Order::PAYMENT_STATUS_COMPLETED
+                        || in_array($locked->status, [Order::STATUS_REFUNDED, Order::STATUS_REFUNDING], true)
+                        || $locked->userCards()->exists()) {
+                        return true;
                     }
-                    $order->update([
+
+                    // Restitue le wallet du vendeur (les cartes n'ont pas été livrées)
+                    $reseller = Reseller::lockForUpdate()->find($locked->cash_reseller_id);
+                    if ($reseller) {
+                        $reseller->refundCredit((float) $locked->total_amount, "Remboursement commande #{$locked->order_number}", $locked->order_number);
+                    }
+                    $locked->update([
                         'status'         => Order::STATUS_REFUNDED,
                         'payment_status' => Order::PAYMENT_STATUS_REFUNDED,
                         'notes'          => 'Remboursée — le vendeur doit rendre le cash au client',
                     ]);
+                    return false;
                 });
+
+                if ($already) {
+                    return back()->with('error', 'Cette commande est déjà remboursée ou un remboursement est en cours.');
+                }
                 return back()->with('success', 'Remboursement enregistré. Va voir le vendeur Kardafrica pour récupérer ton argent en cash.');
             } catch (\Throwable $e) {
                 return back()->with('error', 'Erreur : ' . $e->getMessage());
             }
         }
 
-        // E-Billing : appel transfer
+        // ============================================================
+        // Machine à états anti double-virement (H5) :
+        // 1. transaction {verrou + re-test des gardes + état 'refunding'}
+        // 2. virement E-Billing HORS transaction
+        // 3. transaction {statut REFUNDED}
+        // ============================================================
+
+        // Transaction 1 : réserve le remboursement. Un double submit concurrent
+        // trouve la commande en 'refunding' (ou 'refunded') et sort proprement.
+        $previousStatus = null;
+        try {
+            $claimed = DB::transaction(function () use ($order, &$previousStatus) {
+                $locked = Order::where('id', $order->id)->lockForUpdate()->first();
+
+                if ($locked->payment_status !== Order::PAYMENT_STATUS_COMPLETED
+                    || in_array($locked->status, [Order::STATUS_REFUNDED, Order::STATUS_REFUNDING], true)
+                    || $locked->userCards()->exists()) {
+                    return false;
+                }
+
+                $previousStatus = $locked->status;
+                $locked->update(['status' => Order::STATUS_REFUNDING]);
+                return true;
+            });
+        } catch (\Throwable $e) {
+            Log::error('Customer refund claim exception', ['order_id' => $order->id, 'error' => $e->getMessage()]);
+            return back()->with('error', 'Erreur : ' . $e->getMessage());
+        }
+
+        if (!$claimed) {
+            return back()->with('error', 'Cette commande est déjà remboursée ou un remboursement est en cours.');
+        }
+
+        // E-Billing : appel transfer — HORS transaction (appel HTTP externe).
+        // La référence de transfert est déterministe (REFUND_<ref d'origine>),
+        // le PSP peut donc dédupliquer un éventuel double appel.
         if ($order->payment_method === 'ebilling') {
             $result = $refundSvc->refund(
                 originalReference: $order->external_reference,
@@ -311,10 +363,13 @@ class OrderController extends Controller
                 ],
             );
             if (!$result['ok']) {
+                // Échec du virement → retour à l'état antérieur pour permettre un retry
+                Order::where('id', $order->id)->update(['status' => $previousStatus]);
                 return back()->with('error', 'Remboursement E-Billing refusé : ' . $result['message']);
             }
         }
 
+        // Transaction 2 : clôture du remboursement
         try {
             DB::transaction(function () use ($order) {
                 $order->update([
@@ -326,6 +381,9 @@ class OrderController extends Controller
             return back()->with('success', 'Remboursement effectué — l\'argent te sera renvoyé sur ton moyen de paiement.');
         } catch (\Throwable $e) {
             Log::error('Customer refund exception', ['order_id' => $order->id, 'error' => $e->getMessage()]);
+            // Retour à l'état antérieur : le retry est sûr même côté E-Billing
+            // grâce à la référence de transfert déterministe (déduplication PSP).
+            Order::where('id', $order->id)->update(['status' => $previousStatus]);
             return back()->with('error', 'Erreur : ' . $e->getMessage());
         }
     }
@@ -343,12 +401,14 @@ class OrderController extends Controller
                 ?? $order->orderItems->firstWhere('product_id', $productId);
 
             foreach ($cards as $card) {
-                UserCard::create([
+                // H4 : idempotence — un rejeu avec le même checkout_card_id ne
+                // recrée pas la carte (et n'entre pas en conflit avec l'unique).
+                $ccid  = $card['id'] ?? null;
+                $attrs = [
                     'user_id'          => $order->user_id,
                     'order_id'         => $order->id,
                     'order_item_id'    => $orderItem?->id,
                     'product_id'       => (string) $productId,
-                    'checkout_card_id' => $card['id'] ?? null,
                     'name'             => $orderItem?->name ?? 'Carte cadeau',
                     'brand'            => $orderItem?->name ? explode(' ', $orderItem->name)[0] : null,
                     'serial_number'    => $card['serialNumber'] ?? null,
@@ -367,7 +427,10 @@ class OrderController extends Controller
                         'retry'              => true,
                         'checkout_order_id'  => $checkoutData['orderId'] ?? null,
                     ],
-                ]);
+                ];
+                $ccid !== null
+                    ? UserCard::firstOrCreate(['checkout_card_id' => $ccid], $attrs)
+                    : UserCard::create($attrs + ['checkout_card_id' => null]);
             }
         }
     }

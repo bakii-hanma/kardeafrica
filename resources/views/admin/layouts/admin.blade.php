@@ -8,25 +8,19 @@
     <link rel="icon" type="image/png" href="{{ asset('assets/logo/FAVCON-KARDAFRICA-.png') }}">
 
     <link rel="preconnect" href="https://fonts.bunny.net">
-    <link href="https://fonts.bunny.net/css?family=figtree:400,500,600,700&display=swap" rel="stylesheet" />
-    <link href="https://fonts.bunny.net/css?family=inter:400,500,600,700,800,900|space-grotesk:500,600,700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.bunny.net/css?family=inter:400,500,600,700,800,900|space-grotesk:300,500,600,700&display=swap" rel="stylesheet" />
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.3/dist/cdn.min.js"></script>
 
+    {{-- Le langage visuel « layered » vit dans resources/css/admin-tokens.css
+         (tokens scopés .adm + shell + primitives ui/). Ne restent ici que les
+         classes héritées consommées par les écrans non encore refondus. --}}
     <style>
         [x-cloak] { display: none !important; }
-
         * { box-sizing: border-box; }
 
-        .sidebar-link { display: flex; align-items: center; padding: 10px 12px; border-radius: 8px; font-size: 14px; font-weight: 500; color: #D1D5DB; white-space: nowrap; transition: all 0.2s ease; text-decoration: none; }
-        .sidebar-link:hover, .sidebar-link.active { background: rgba(78, 205, 196, 0.15); color: #4ECDC4; }
-        .sidebar-link.active { border-right: 3px solid #4ECDC4; }
-        .sidebar-link svg { width: 20px; height: 20px; margin-right: 12px; flex-shrink: 0; }
-
-        .stat-card { transition: all 0.3s ease; }
-        .stat-card:hover { transform: translateY(-2px); box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
-
+        /* ===== HÉRITAGE — badges de statut des écrans pré-refonte ===== */
         .badge-pending { background: #FEF3C7; color: #92400E; }
         .badge-processing { background: #DBEAFE; color: #1E40AF; }
         .badge-completed { background: #D1FAE5; color: #065F46; }
@@ -38,172 +32,189 @@
         .badge-admin { background: #EDE9FE; color: #5B21B6; }
         .badge-moderator { background: #FEF3C7; color: #92400E; }
         .badge-user { background: #DBEAFE; color: #1E40AF; }
-
-        /* ===== DESKTOP SIDEBAR ===== */
-        #desktop-sidebar {
-            display: none;
-            position: fixed;
-            top: 0; left: 0; bottom: 0;
-            width: 256px;
-            background: #111827;
-            color: white;
-            z-index: 40;
-            flex-direction: column;
-            transition: transform 0.3s ease;
-        }
-        @media (min-width: 1024px) {
-            #desktop-sidebar { display: flex; }
-            #desktop-sidebar.collapsed { transform: translateX(-256px); }
-        }
-
-        /* ===== MAIN CONTENT ===== */
-        #main-wrapper {
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            margin-left: 0;
-            transition: margin-left 0.3s ease;
-        }
-        @media (min-width: 1024px) {
-            #main-wrapper { margin-left: 256px; }
-            #main-wrapper.pushed-off { margin-left: 0; }
-        }
-
-        /* ===== MOBILE OVERLAY ===== */
-        #mobile-overlay {
-            display: none;
-            position: fixed;
-            inset: 0;
-            z-index: 50;
-        }
-        #mobile-overlay.open { display: block; }
-        #mobile-overlay .overlay-bg { position: absolute; inset: 0; background: rgba(0,0,0,0.5); }
-        #mobile-sidebar {
-            position: absolute;
-            top: 0; left: 0; bottom: 0;
-            width: 280px;
-            background: #111827;
-            color: white;
-            display: flex;
-            flex-direction: column;
-            box-shadow: 0 25px 50px rgba(0,0,0,0.25);
-            transform: translateX(-100%);
-            transition: transform 0.3s ease;
-        }
-        #mobile-overlay.open #mobile-sidebar { transform: translateX(0); }
-
-        /* ===== TOP BAR ===== */
-        .admin-topbar {
-            background: white;
-            border-bottom: 1px solid #E5E7EB;
-            height: 64px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0 16px;
-            position: sticky;
-            top: 0;
-            z-index: 30;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-        }
-        @media (min-width: 640px) { .admin-topbar { padding: 0 24px; } }
-
-        .sidebar-logo { display: flex; align-items: center; height: 64px; padding: 0 24px; border-bottom: 1px solid #1F2937; flex-shrink: 0; }
-        .sidebar-logo img { width: 32px; height: 32px; margin-right: 8px; }
-        .sidebar-logo span { font-size: 18px; font-weight: 700; }
-
-        .sidebar-section-label { padding: 12px 16px 8px 28px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #6B7280; font-weight: 600; }
-        .sidebar-nav { flex: 1; padding: 0 12px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
-        .sidebar-bottom { padding: 16px; border-top: 1px solid #1F2937; flex-shrink: 0; }
+        .stat-card { transition: all 0.3s ease; }
+        .stat-card:hover { transform: translateY(-2px); box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
     </style>
+    {{-- Styles empilés par les écrans et composants (`@push('head')`). --}}
+    @stack('head')
 </head>
-<body style="background: #FAFAF7; margin: 0; font-family: 'Inter', 'Figtree', sans-serif;">
+<body class="adm" style="margin:0;font-family:'Inter',sans-serif;">
 
-    <!-- ============ MOBILE OVERLAY ============ -->
-    <div id="mobile-overlay">
-        <div class="overlay-bg" onclick="closeMobileSidebar()"></div>
-        <div id="mobile-sidebar">
-            <div class="sidebar-logo" style="justify-content: space-between;">
-                <a href="{{ route('admin.dashboard') }}" style="display:flex;align-items:center;text-decoration:none;color:white;gap:10px;">
-                    <img src="{{ asset('assets/logo/FAVCON-KARDAFRICA-.png') }}" alt="Logo" style="width:32px;height:32px;">
-                    <div style="display:flex;flex-direction:column;line-height:1;">
-                        <span style="font-family:'Space Grotesk', 'Inter', sans-serif;font-size:17px;font-weight:700;letter-spacing:-0.01em;"><span style="color:white;">Kard</span><span style="color:#4ECDC4;">Africa</span></span>
-                        <span style="font-size:9px;color:#64748B;letter-spacing:0.15em;text-transform:uppercase;font-weight:600;margin-top:2px;">Console admin</span>
-                    </div>
+    <!-- ============ RAIL D'ICÔNES (≥1024px) ============ -->
+    <aside class="adm-rail" aria-label="Navigation principale">
+        <a href="{{ route('admin.dashboard') }}" class="adm-rail-logo" title="Kardafrica">
+            <img src="{{ asset('assets/logo/FAVCON-KARDAFRICA-.png') }}" alt="Kardafrica">
+        </a>
+
+        <a href="{{ route('admin.dashboard') }}" class="adm-rail-ic {{ request()->routeIs('admin.dashboard') ? 'is-active' : '' }}" title="Tableau de bord">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+        </a>
+        <a href="{{ route('admin.orders.index') }}" class="adm-rail-ic {{ request()->routeIs('admin.orders.*') ? 'is-active' : '' }}" title="Commandes">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+        </a>
+        <a href="{{ route('admin.catalog.index') }}" class="adm-rail-ic {{ request()->routeIs('admin.catalog.*') || request()->routeIs('admin.daywatch.*') ? 'is-active' : '' }}" title="Catalogue">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+        </a>
+        <a href="{{ route('admin.cards.index') }}" class="adm-rail-ic {{ request()->routeIs('admin.cards.*') || request()->routeIs('admin.merchant-cards.*') ? 'is-active' : '' }}" title="Cartes">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
+        </a>
+        <a href="{{ route('admin.payments.index') }}" class="adm-rail-ic {{ request()->routeIs('admin.payments.*') || request()->routeIs('admin.versements.*') ? 'is-active' : '' }}" title="Finance">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        </a>
+        <a href="{{ route('admin.settings.index') }}" class="adm-rail-ic {{ request()->routeIs('admin.settings.*') ? 'is-active' : '' }}" title="Paramètres">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+        </a>
+
+        <div class="adm-rail-spacer"></div>
+
+        <a href="{{ route('home') }}" target="_blank" class="adm-rail-ic" title="Voir le site">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+        </a>
+    </aside>
+
+    <!-- ============ ARBORESCENCE (≥1024px, repliable) ============ -->
+    <aside class="adm-tree" id="adm-tree" aria-label="Navigation détaillée">
+        <div class="adm-tree-head">
+            <a href="{{ route('admin.dashboard') }}" class="adm-tree-title">
+                <strong>Kard<em>africa</em></strong>
+                <span>Console admin</span>
+            </a>
+        </div>
+        <nav class="adm-tree-nav">
+            @include('admin.layouts._nav')
+        </nav>
+        <div class="adm-tree-foot">
+            <a href="{{ route('home') }}" target="_blank" class="adm-nav-item">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                <span class="adm-nav-txt">Voir le site</span>
+            </a>
+        </div>
+    </aside>
+
+    <!-- ============ DRAWER MOBILE (<1024px) ============ -->
+    <div class="adm-overlay" id="adm-overlay">
+        <div class="adm-overlay-bg" onclick="admCloseDrawer()"></div>
+        <div class="adm-drawer">
+            <div class="adm-tree-head" style="justify-content:space-between;">
+                <a href="{{ route('admin.dashboard') }}" class="adm-tree-title">
+                    <strong>Kard<em>africa</em></strong>
+                    <span>Console admin</span>
                 </a>
-                <button onclick="closeMobileSidebar()" style="background:none;border:none;color:#9CA3AF;cursor:pointer;padding:4px;">
-                    <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                <button onclick="admCloseDrawer()" class="adm-burger" style="color:rgb(255 255 255 / .6);" aria-label="Fermer le menu">
+                    <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
             </div>
-            <div class="sidebar-section-label">Administration</div>
-            <nav class="sidebar-nav">
+            <nav class="adm-tree-nav">
                 @include('admin.layouts._nav')
             </nav>
-            <div class="sidebar-bottom">
-                <a href="{{ route('home') }}" class="sidebar-link" style="color:#9CA3AF;">
-                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
-                    Voir le site
+            <div class="adm-tree-foot">
+                <a href="{{ route('home') }}" target="_blank" class="adm-nav-item">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                    <span class="adm-nav-txt">Voir le site</span>
                 </a>
             </div>
         </div>
     </div>
 
-    <!-- ============ DESKTOP SIDEBAR ============ -->
-    <aside id="desktop-sidebar">
-        <div class="sidebar-logo">
-            <a href="{{ route('admin.dashboard') }}" style="display:flex;align-items:center;text-decoration:none;color:white;">
-                <img src="{{ asset('assets/logo/FAVCON-KARDAFRICA-.png') }}" alt="Logo">
-                <span><span style="color:white;">Kard</span><span style="color:#4ECDC4;">africa</span></span>
-            </a>
-        </div>
-        <div class="sidebar-section-label">Administration</div>
-        <nav class="sidebar-nav">
-            @include('admin.layouts._nav')
-        </nav>
-        <div class="sidebar-bottom">
-            <a href="{{ route('home') }}" class="sidebar-link" style="color:#9CA3AF;">
-                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
-                Voir le site
-            </a>
-        </div>
-    </aside>
+    <!-- ============ ZONE PRINCIPALE ============ -->
+    <div class="adm-main" id="adm-main">
 
-    <!-- ============ MAIN CONTENT ============ -->
-    <div id="main-wrapper">
-        <!-- Top Bar -->
-        <header class="admin-topbar">
-            <div style="display:flex;align-items:center;gap:8px;">
-                <button onclick="toggleSidebar()" style="background:none;border:none;cursor:pointer;padding:8px;border-radius:10px;color:#64748B;transition:all 0.15s;" onmouseover="this.style.background='#F1F5F9';this.style.color='#0F172A';" onmouseout="this.style.background='none';this.style.color='#64748B';">
-                    <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
-                </button>
-                <h1 style="font-family:'Space Grotesk', 'Inter', sans-serif;font-size:18px;font-weight:700;color:#0F172A;margin:0;letter-spacing:-0.01em;">@yield('page-title', 'Tableau de bord')</h1>
+        <!-- Topbar flottante -->
+        <header class="adm-topbar">
+            <button onclick="admToggleNav()" class="adm-burger" aria-label="Ouvrir le menu">
+                <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
+            </button>
+
+            <h1 class="adm-page-title">@yield('page-title', 'Tableau de bord')</h1>
+
+            {{-- Recherche globale : aucun endpoint n'existe encore côté admin —
+                 la pill est rendue mais inerte, avec l'explication en tooltip.
+                 À brancher quand l'endpoint existera (hors périmètre P1). --}}
+            <div class="adm-search" title="Recherche globale — bientôt disponible" aria-disabled="true">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                Rechercher une commande, un client…
             </div>
-            <div style="display:flex;align-items:center;gap:10px;">
-                <a href="{{ route('home') }}" target="_blank" style="display:none;align-items:center;gap:6px;padding:7px 12px;border-radius:8px;background:#F1F5F9;color:#475569;font-size:12px;font-weight:600;text-decoration:none;transition:all 0.15s;" class="topbar-view-site" onmouseover="this.style.background='#E2E8F0';" onmouseout="this.style.background='#F1F5F9';">
-                    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
-                    Voir le site
-                </a>
-                <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:10px;background:#F8FAFC;border:1px solid #E2E8F0;">
-                    <div style="width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,#4ECDC4,#44A08D);display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:12px;">
-                        {{ strtoupper(substr(Auth::user()->name, 0, 1)) }}
-                    </div>
-                    <div style="display:flex;flex-direction:column;line-height:1.1;">
-                        <span style="font-size:12px;font-weight:600;color:#0F172A;">{{ explode(' ', Auth::user()->name)[0] }}</span>
-                        <span style="font-size:10px;color:#64748B;text-transform:uppercase;letter-spacing:0.05em;font-weight:600;">Admin</span>
-                    </div>
-                </div>
-                <form method="POST" action="{{ route('admin.logout') }}" style="margin:0;">
-                    @csrf
-                    <button type="submit" style="background:none;border:1px solid #E2E8F0;cursor:pointer;padding:8px;border-radius:10px;color:#64748B;transition:all 0.15s;" title="Déconnexion" onmouseover="this.style.color='#DC2626';this.style.borderColor='#FECACA';this.style.background='#FEF2F2';" onmouseout="this.style.color='#64748B';this.style.borderColor='#E2E8F0';this.style.background='none';">
-                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
-                    </button>
+
+            <div style="flex:1;"></div>
+
+            {{-- Période : soumet `date_from`/`date_to` à l'URL COURANTE — ce sont
+                 les noms que consomment déjà Commandes et Paiements. Les autres
+                 pages les ignorent sans dommage. --}}
+            <div class="adm-period" x-data="{ open: false }" @click.outside="open = false">
+                <button type="button" class="adm-period-btn" @click="open = !open">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                    @if (request('date_from') || request('date_to'))
+                        {{ request('date_from') ?: '…' }} → {{ request('date_to') ?: '…' }}
+                    @else
+                        Période
+                    @endif
+                </button>
+                <form x-show="open" x-cloak class="adm-period-pop" method="GET" action="{{ request()->url() }}">
+                    @foreach (request()->except(['date_from', 'date_to', 'page']) as $k => $v)
+                        @if (is_scalar($v))
+                            <input type="hidden" name="{{ $k }}" value="{{ $v }}">
+                        @endif
+                    @endforeach
+                    <label for="adm-date-from">Du</label>
+                    <input type="date" id="adm-date-from" name="date_from" value="{{ request('date_from') }}">
+                    <label for="adm-date-to">Au</label>
+                    <input type="date" id="adm-date-to" name="date_to" value="{{ request('date_to') }}">
+                    <button type="submit" class="adm-period-apply">Appliquer</button>
                 </form>
             </div>
-        </header>
 
-        <style>
-            @media (min-width: 640px) { .topbar-view-site { display:inline-flex !important; } }
-        </style>
+            {{-- Export : visible seulement quand la page déclare son export réel
+                 via @section('export-url') — jamais d'action inventée. --}}
+            @hasSection('export-url')
+                <a href="@yield('export-url')" class="adm-top-ic" title="Exporter">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                </a>
+            @endif
+
+            <div class="adm-avatar">
+                <div class="adm-avatar-badge">{{ strtoupper(substr(Auth::user()->name, 0, 1)) }}</div>
+                <div class="adm-avatar-name">
+                    <strong>{{ explode(' ', Auth::user()->name)[0] }}</strong>
+                    <span>Admin</span>
+                </div>
+            </div>
+
+            <form method="POST" action="{{ route('admin.logout') }}" style="margin:0;">
+                @csrf
+                <button type="submit" class="adm-top-ic" title="Déconnexion" style="border:0;">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+                </button>
+            </form>
+
+            {{-- FAB : uniquement les créations qui EXISTENT déjà dans l'admin. --}}
+            <div style="position:relative;" x-data="{ open: false }" @click.outside="open = false">
+                <button type="button" class="adm-fab" @click="open = !open" aria-label="Actions rapides" :aria-expanded="open">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+                </button>
+                <div x-show="open" x-cloak class="adm-fab-menu">
+                    <a href="{{ route('admin.merchant-cards.create') }}" class="adm-fab-item">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
+                        Nouvelle carte locale
+                    </a>
+                    <a href="{{ route('admin.card-owners.create') }}" class="adm-fab-item">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                        Nouveau propriétaire
+                    </a>
+                    <a href="{{ route('admin.resellers.create') }}" class="adm-fab-item">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                        Nouveau vendeur
+                    </a>
+                    <a href="{{ route('admin.users.create') }}" class="adm-fab-item">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/></svg>
+                        Nouvel utilisateur
+                    </a>
+                    <a href="{{ route('admin.daywatch.create') }}" class="adm-fab-item">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        Nouveau Daywatch
+                    </a>
+                </div>
+            </div>
+        </header>
 
         <!-- Flash Modal (style carte) -->
         @if(session('success') || session('error') || session('info'))
@@ -215,38 +226,33 @@
         @endif
 
         <!-- Page Content -->
-        <main style="flex:1;padding:16px;">
+        <main class="adm-content">
             @yield('content')
         </main>
 
         <!-- Footer -->
-        <footer style="background:white;border-top:1px solid #E5E7EB;padding:12px 24px;text-align:center;font-size:12px;color:#9CA3AF;">
+        <footer class="adm-footer">
             Kardafrica Admin &copy; {{ date('Y') }}
         </footer>
     </div>
 
     <script>
-        // Sidebar state
-        var desktopOpen = true;
+        // Repli du volet : sur desktop on replie l'arborescence, sur mobile on
+        // ouvre le drawer. Même bouton, geste attendu différent.
+        var admTreeOpen = true;
 
-        function toggleSidebar() {
+        function admToggleNav() {
             if (window.innerWidth >= 1024) {
-                desktopOpen = !desktopOpen;
-                document.getElementById('desktop-sidebar').classList.toggle('collapsed', !desktopOpen);
-                document.getElementById('main-wrapper').classList.toggle('pushed-off', !desktopOpen);
+                admTreeOpen = !admTreeOpen;
+                document.getElementById('adm-tree').classList.toggle('collapsed', !admTreeOpen);
+                document.getElementById('adm-main').classList.toggle('wide', !admTreeOpen);
             } else {
-                openMobileSidebar();
+                document.getElementById('adm-overlay').classList.add('open');
             }
         }
 
-        function openMobileSidebar() {
-            var el = document.getElementById('mobile-overlay');
-            el.classList.add('open');
-        }
-
-        function closeMobileSidebar() {
-            var el = document.getElementById('mobile-overlay');
-            el.classList.remove('open');
+        function admCloseDrawer() {
+            document.getElementById('adm-overlay').classList.remove('open');
         }
     </script>
 </body>

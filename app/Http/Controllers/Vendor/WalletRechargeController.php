@@ -23,6 +23,19 @@ class WalletRechargeController extends Controller
     /** Montants suggérés rapides */
     public const QUICK_AMOUNTS = [10000, 20000, 50000, 100000];
 
+    /**
+     * Place réellement rechargeable dans la cagnotte : ce qui reste sous le
+     * plafond, MOINS ce qu'il faut pour accueillir la remise du cash déjà
+     * encaissé. Cette réserve garantit qu'un vendeur peut toujours reverser
+     * sa dette à KardAfrica — c'est de l'argent qui ne lui appartient pas.
+     */
+    public static function availableHeadroom(Reseller $reseller): float
+    {
+        return max(0, (float) $reseller->max_wallet
+            - (float) $reseller->wallet_balance
+            - (float) $reseller->cash_to_remit);
+    }
+
     /** Page d'accueil : montant courant + form + historique */
     public function index()
     {
@@ -35,6 +48,7 @@ class WalletRechargeController extends Controller
             ->take(5)
             ->get();
 
+        // Paginé : l'historique était coupé à 20 sans aucun moyen de voir plus loin.
         $history = WalletRecharge::where('reseller_id', $reseller->id)
             ->whereIn('status', [
                 WalletRecharge::STATUS_COMPLETED,
@@ -42,10 +56,14 @@ class WalletRechargeController extends Controller
                 WalletRecharge::STATUS_CANCELLED,
             ])
             ->latest()
-            ->take(20)
-            ->get();
+            ->paginate(20)
+            ->withQueryString();
 
-        $headroom = max(0, (float) $reseller->max_wallet - (float) $reseller->wallet_balance);
+        // La place nécessaire pour encaisser la remise du cash déjà collecté est
+        // RÉSERVÉE : sans cela le vendeur pouvait recharger jusqu'au plafond,
+        // puis se retrouver incapable de reverser sa dette (l'écran de remise
+        // n'affichait alors plus aucun bouton). Voir RemittanceController::init.
+        $headroom = self::availableHeadroom($reseller);
 
         return view('vendor.wallet.recharge', [
             'reseller'      => $reseller,
@@ -75,16 +93,19 @@ class WalletRechargeController extends Controller
         ]);
 
         $amount   = (int) $validated['amount'];
-        $headroom = (float) $reseller->max_wallet - (float) $reseller->wallet_balance;
+        $headroom = self::availableHeadroom($reseller);
 
         if ($amount > $headroom) {
-            return response()->json([
-                'success' => false,
-                'message' => "Recharge max possible : " . number_format($headroom, 0, ',', ' ') . " FCFA (plafond wallet atteint).",
-            ], 422);
+            $cashDue = (float) $reseller->cash_to_remit;
+            $message = "Recharge maximum possible : " . number_format($headroom, 0, ',', ' ') . " FCFA.";
+            if ($cashDue > 0) {
+                $message .= " " . number_format($cashDue, 0, ',', ' ') . " FCFA de place sont gardés"
+                    . " pour ta remise de cash en attente.";
+            }
+            return response()->json(['success' => false, 'message' => $message], 422);
         }
 
-        $externalRef = 'RECH_' . time() . '_' . rand(1000, 9999);
+        $externalRef = 'RECH_' . time() . '_' . strtoupper(bin2hex(random_bytes(4)));
 
         try {
             $recharge = DB::transaction(function () use ($reseller, $amount, $externalRef) {
@@ -199,11 +220,13 @@ class WalletRechargeController extends Controller
         }
 
         try {
+            // 1. Check PSP — HORS transaction (appel HTTP externe)
             $check = Http::timeout(10)->get(config('services.payment_backend.check_url'), [
                 'external_reference' => $ref,
             ]);
 
             $status = 'pending';
+            $body   = null;
             if ($check->successful()) {
                 $body = $check->json();
                 $status = $body['status'] ?? ($body['data']['status'] ?? 'pending');
@@ -219,25 +242,51 @@ class WalletRechargeController extends Controller
                 ]);
             }
 
-            // Atomique : crédit wallet + marque recharge comme complétée
-            DB::transaction(function () use ($reseller, $recharge) {
-                $reseller->refresh();
+            // M19 — Réconciliation du montant : si le PSP renvoie le montant
+            // réellement payé, il doit correspondre au montant attendu. Défensif :
+            // check_status.php ne documente pas ce champ de façon garantie, on ne
+            // bloque donc que s'il est PRÉSENT et DIFFÉRENT.
+            $paidAmount = $body['data']['amount'] ?? $body['amount'] ?? null;
+            if ($paidAmount !== null && (int) round((float) $paidAmount) !== (int) round((float) $recharge->amount)) {
+                Log::warning('Wallet recharge finalize: montant PSP différent du montant attendu', [
+                    'ref'      => $ref,
+                    'expected' => (float) $recharge->amount,
+                    'paid'     => (float) $paidAmount,
+                ]);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Le montant payé ne correspond pas au montant de la recharge. Contacte le support.',
+                ], 422);
+            }
+
+            // 2. Transaction courte : verrou de la recharge + re-test du statut
+            //    À L'INTÉRIEUR (idempotence anti double-polling), puis crédit.
+            $already = DB::transaction(function () use ($reseller, $recharge) {
+                $locked = WalletRecharge::where('id', $recharge->id)->lockForUpdate()->first();
+
+                if ($locked->status === WalletRecharge::STATUS_COMPLETED) {
+                    return true; // déjà finalisée par un poll concurrent
+                }
+
                 $reseller->credit(
-                    (float) $recharge->amount,
+                    (float) $locked->amount,
                     null,
-                    "Recharge Airtel/E-Billing #{$recharge->external_reference}",
-                    $recharge->external_reference,
+                    "Recharge Airtel/E-Billing #{$locked->external_reference}",
+                    $locked->external_reference,
                 );
-                $recharge->update([
+                $locked->update([
                     'status'       => WalletRecharge::STATUS_COMPLETED,
                     'processed_at' => now(),
                 ]);
+                return false;
             });
 
             return response()->json([
                 'success'      => true,
                 'redirect_url' => route('vendor.wallet.recharge'),
-                'message'      => 'Recharge confirmée — ton wallet a été crédité.',
+                'message'      => $already
+                    ? 'Recharge déjà confirmée.'
+                    : 'Recharge confirmée — ton wallet a été crédité.',
             ]);
         } catch (\Throwable $e) {
             Log::error('Wallet recharge finalize exception', ['ref' => $ref, 'error' => $e->getMessage()]);

@@ -21,6 +21,9 @@
     [$_flag, $_regionLabel] = \App\Support\BrandStyle::region($countryCode ?? null);
     $_compact     = $compact ?? false;
     $_logoUrl     = $logoUrl ?? null;
+    // Valeur faciale nominale dans la devise d'origine (ex: "100 €"), affichée
+    // sur le visuel après « · EUR ». Null pour XAF/XOF (déjà en FCFA).
+    $_faceLabel   = \App\Support\Money::formatOriginal($faceValue ?? 0, $currency ?? null);
     $_fill        = $fill ?? false;   // true = remplit le parent (hauteur+largeur),
                                       // utilisé par card-type.blade.php (3D flip card)
     // Si on a un logoUrl ET pas de SVG inline (= marque inconnue), on push
@@ -50,8 +53,10 @@
             <span class="gc-frame-brand-mark"></span>
             KardAfrica
         </span>
-        <span class="gc-verified">
-            <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+        {{-- Le badge seul n'apportait rien : l'infobulle dit ce qu'il garantit. --}}
+        <span class="gc-verified" title="Code testé et fournisseur validé par KardAfrica"
+              aria-label="Vérifié : code testé et fournisseur validé par KardAfrica">
+            <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
             Vérifié
         </span>
     </div>
@@ -71,7 +76,7 @@
     {{-- Chip doré --}}
     <div class="gc-chip" aria-hidden="true"></div>
 
-    {{-- Région + drapeau --}}
+    {{-- Région + drapeau + valeur faciale --}}
     <div class="gc-bottom">
         <span class="gc-region">
             @if($_flag)<span class="gc-flag">{{ $_flag }}</span>@endif
@@ -80,6 +85,9 @@
                 · {{ strtoupper($currency) }}
             @endif
         </span>
+        @if($_faceLabel)
+            <span class="gc-value">{{ $_faceLabel }}</span>
+        @endif
     </div>
 </div>
 
@@ -99,7 +107,7 @@
         position: relative;
         width: 100%;
         aspect-ratio: 1.586 / 1;
-        padding: 14px 16px;
+        padding: 8px 12px;
         overflow: hidden;
         display: flex;
         flex-direction: column;
@@ -118,7 +126,7 @@
     }
     .gc-hybrid--compact { padding: 12px 14px; }
     @media (min-width: 1024px) {
-        .gc-hybrid { padding: 22px 24px; }
+        .gc-hybrid--fill { padding: 22px 24px; }
     }
 
     /* Glow par-dessus le gradient */
@@ -129,8 +137,11 @@
         position: absolute;
         inset: 0;
         background-repeat: no-repeat;
-        background-position: 78% center;
-        background-size: 55% auto;
+        /* Logo CENTRÉ et plus grand : il était calé à droite, ce qui donnait
+           des vignettes de composition différente d'une marque à l'autre selon
+           la forme du logo. Centré, la structure est identique partout. */
+        background-position: center center;
+        background-size: 46% auto;
         pointer-events: none;
         z-index: 0;
         filter: drop-shadow(0 2px 8px rgba(0,0,0,0.15));
@@ -163,46 +174,52 @@
         opacity: 0.75;
         white-space: nowrap;
     }
-    /* Sur grandes cards (card-type detail), le frame est plus gros */
+    /* Sur grandes cards (card-type detail --fill), le frame est plus gros */
     @media (min-width: 768px) {
-        .gc-hybrid:not(.gc-hybrid--compact) .gc-frame-brand,
-        .gc-hybrid:not(.gc-hybrid--compact) .gc-verified { font-size: 10px; }
-        .gc-hybrid:not(.gc-hybrid--compact) .gc-frame-brand-mark { width: 14px; height: 14px; }
+        .gc-hybrid--fill .gc-frame-brand,
+        .gc-hybrid--fill .gc-verified { font-size: 10px; }
+        .gc-hybrid--fill .gc-frame-brand-mark { width: 14px; height: 14px; }
     }
 
     /* ===== Logo + nom ===== */
     .gc-brand { position: relative; z-index: 2; }
     .gc-logo {
-        width: 48px; height: 48px;
-        margin-bottom: 4px;
+        width: 34px; height: 34px;
+        margin-bottom: 2px;
         display: flex; align-items: center; justify-content: center;
     }
     .gc-logo svg { width: 100%; height: 100%; display: block; }
     .gc-logo-fallback {
-        width: 44px; height: 44px; border-radius: 12px;
+        width: 32px; height: 32px; border-radius: 9px;
         display: grid; place-items: center;
         font-family: 'Bricolage Grotesque', serif;
-        font-size: 22px; font-weight: 800; letter-spacing: -0.04em;
-        margin-bottom: 4px;
+        font-size: 17px; font-weight: 800; letter-spacing: -0.04em;
+        margin-bottom: 2px;
     }
     .gc-name {
         font-family: 'Bricolage Grotesque', 'Inter', serif;
-        font-size: 18px; font-weight: 700;
-        letter-spacing: -0.02em; line-height: 1;
-        margin-top: 2px;
-        max-width: 65%;             /* laisse de la place au chip */
-        white-space: nowrap;
+        font-size: 15px; font-weight: 700;
+        letter-spacing: -0.02em; line-height: 1.05;
+        margin-top: 0;
+        max-width: 72%;             /* laisse de la place au chip */
+        /* Mobile : 1 ligne (le nom complet est dans le bloc infos sous la carte,
+           2 lignes feraient déborder la ligne région + valeur hors du visuel).
+           ≥640 px : jusqu'à 2 lignes. */
+        display: -webkit-box;
+        -webkit-line-clamp: 1;
+        -webkit-box-orient: vertical;
         overflow: hidden;
-        text-overflow: ellipsis;
     }
     @media (min-width: 640px) {
         .gc-logo { width: 56px; height: 56px; }
-        .gc-name { font-size: 22px; }
+        .gc-name { font-size: 22px; -webkit-line-clamp: 2; }
     }
-    /* Sur card-type detail (grand format) */
+    /* Sur card-type detail (grand format) — UNIQUEMENT la grande carte (--fill),
+       pas les cartes de grille (sinon logo/nom trop hauts → la ligne
+       région + valeur déborde hors du visuel). */
     @media (min-width: 768px) {
-        .gc-hybrid:not(.gc-hybrid--compact) .gc-logo { width: 64px; height: 64px; }
-        .gc-hybrid:not(.gc-hybrid--compact) .gc-name { font-size: 28px; }
+        .gc-hybrid--fill .gc-logo { width: 64px; height: 64px; }
+        .gc-hybrid--fill .gc-name { font-size: 28px; }
     }
 
     /* ===== Chip doré ===== */
@@ -226,7 +243,7 @@
         .gc-chip { right: 16px; width: 38px; height: 28px; }
     }
     @media (min-width: 768px) {
-        .gc-hybrid:not(.gc-hybrid--compact) .gc-chip {
+        .gc-hybrid--fill .gc-chip {
             right: 22px; width: 46px; height: 34px;
         }
     }
@@ -245,7 +262,31 @@
         .gc-region { font-size: 13px; }
     }
     @media (min-width: 768px) {
-        .gc-hybrid:not(.gc-hybrid--compact) .gc-region { font-size: 14px; }
+        .gc-hybrid--fill .gc-region { font-size: 14px; }
+    }
+
+    /* ===== Valeur faciale (pilule verre dépoli, lisible sur tout fond) ===== */
+    .gc-value {
+        flex-shrink: 0;
+        display: inline-flex; align-items: center;
+        padding: 2px 7px;
+        font-size: 10.5px; font-weight: 800;
+        letter-spacing: -0.01em;
+        line-height: 1;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.22);
+        color: #fff;
+        border: 1px solid rgba(255, 255, 255, 0.35);
+        backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px);
+        text-shadow: 0 1px 2px rgba(0,0,0,0.25);
+        white-space: nowrap;
+    }
+    @media (min-width: 640px) {
+        .gc-value { font-size: 13px; padding: 4px 11px; }
+    }
+    @media (min-width: 768px) {
+        .gc-hybrid:not(.gc-hybrid--compact) .gc-value { font-size: 15px; padding: 5px 13px; }
     }
 </style>
 @endonce

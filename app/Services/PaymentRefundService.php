@@ -28,7 +28,11 @@ class PaymentRefundService
      */
     public function refund(string $originalReference, int $amountFcfa, string $reason = '', array $extras = []): array
     {
-        $transferRef = 'REFUND_' . time() . '_' . rand(1000, 9999);
+        // Référence DÉTERMINISTE dérivée du paiement d'origine : deux appels de
+        // remboursement pour la même commande produisent la MÊME référence, ce
+        // qui permet à E-Billing de dédupliquer côté PSP (anti double-virement).
+        // Tronquée à 64 caractères (format max des références E-Billing).
+        $transferRef = substr('REFUND_' . $originalReference, 0, 64);
 
         $payload = array_filter([
             'amount'            => $amountFcfa,

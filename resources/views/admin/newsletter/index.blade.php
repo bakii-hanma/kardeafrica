@@ -1,6 +1,7 @@
 @extends('admin.layouts.admin')
 
 @section('title', 'Newsletter')
+@section('export-url', route('admin.newsletter.export'))
 @section('page-title', 'Newsletter')
 
 @section('content')

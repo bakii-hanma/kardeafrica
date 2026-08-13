@@ -31,7 +31,7 @@
             foreach ($brandPalette as $k => $c) if (stripos($name, $k) !== false) return $c;
             $palette = ['#0F172A', '#44A08D', '#0EA5E9', '#7C3AED', '#DC2626', '#EA580C', '#059669'];
             $hash = 0;
-            for ($i = 0; $i < strlen($name); $i++) $hash = ord($name[$i]) + (($hash << 5) - $hash);
+            for ($i = 0; $i < strlen($name); $i++) $hash = (ord($name[$i]) + (($hash << 5) - $hash)) & 0x7FFFFFFF;
             return $palette[(($hash % count($palette)) + count($palette)) % count($palette)];
         };
 
@@ -52,6 +52,14 @@
     </style>
 </head>
 <body class="bg-[#FAFAF7] text-slate-900">
+@if (!empty($connecte))
+    {{-- Ouvrir ce lien a prouvé la possession du numéro WhatsApp : le client est
+         connecté, ses cartes sont dans son compte. Plus besoin de capture. --}}
+    <div style="max-width:640px;margin:16px auto 0;padding:14px 16px;background:#064E3B;border:1px solid #10B981;border-radius:14px;color:#D1FAE5;font-size:14px;font-weight:700;line-height:1.5;">
+        ✅ Ces cartes sont enregistrées dans ton compte KardAfrica.
+        <a href="{{ route('cards.index') }}" style="color:#6EE7B7;text-decoration:underline;">Les retrouver quand tu veux</a>.
+    </div>
+@endif
 
 <div class="min-h-screen pb-20" x-data="claimPage()">
 

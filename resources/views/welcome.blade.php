@@ -1,6 +1,9 @@
 @extends('layouts.app')
 
-@section('title', 'Kardafrica - Cartes numériques en un clic !')
+@section('title', 'KardAfrica — Cartes cadeaux Netflix, Apple, Steam | Mobile Money Gabon')
+@section('meta_description', 'Achetez vos cartes cadeaux Netflix, Apple, Steam, PlayStation et plus de 300 marques. Payez par Airtel Money, Moov Money ou carte bancaire — code reçu en 30 secondes sur KardAfrica.')
+@section('og_title', 'KardAfrica — Cartes cadeaux en Mobile Money')
+@section('og_description', 'Netflix, Apple, Steam, PlayStation et +300 marques. Payez par Airtel Money, Moov Money ou carte bancaire — code reçu en 30 secondes.')
 
 @php
     // Helpers locaux pour ne pas polluer les vues / preparer les donnees
@@ -43,7 +46,7 @@
         // 2) Sinon, couleur déterministe par hash du nom
         $hash = 0;
         for ($i = 0; $i < strlen($name); $i++) {
-            $hash = ord($name[$i]) + (($hash << 5) - $hash);
+            $hash = (ord($name[$i]) + (($hash << 5) - $hash)) & 0x7FFFFFFF;
         }
         $count = count($brandPalette);
         // Modulo positif garanti même si $hash est négatif (overflow bitshift sur PHP 64-bit)
@@ -89,7 +92,7 @@
     // (filtre pays whitelist FR/US/GLOBAL — l'API ne contient parfois que des cartes UAE)
     $demoBrands = [
         ['name' => 'Netflix Premium',     'brand' => 'Netflix',     'color' => '#E50914', 'price' => 9900,  'currency' => 'XAF'],
-        ['name' => 'Spotify Premium',     'brand' => 'Spotify',     'color' => '#1DB954', 'price' => 6500,  'currency' => 'XAF'],
+        ['name' => 'Deezer Premium',      'brand' => 'Deezer',      'color' => '#A238FF', 'price' => 6500,  'currency' => 'XAF'],
         ['name' => 'Steam Wallet',        'brand' => 'Steam',       'color' => '#171a21', 'price' => 5000,  'currency' => 'XAF'],
         ['name' => 'Apple Gift Card',     'brand' => 'Apple',       'color' => '#000000', 'price' => 15000, 'currency' => 'XAF'],
         ['name' => 'Amazon Gift Card',    'brand' => 'Amazon',      'color' => '#FF9900', 'price' => 12000, 'currency' => 'XAF'],
@@ -104,15 +107,23 @@
 
     // Premieres 3 cartes pour le hero stack — vraies si dispo, sinon demo
     if ($hasRealData) {
-        $heroCards = collect($cardTypes)->take(3)->map(fn($c) => [
-            'name'        => $c['name'] ?? 'Carte cadeau',
-            'brand'       => explode(' ', $c['name'] ?? 'Brand')[0],
-            'color'       => $brandColor($c['name'] ?? ''),
-            'price'       => $c['products'][0]['price']['min'] ?? 0,
-            'currency'    => $c['products'][0]['price']['currencyCode'] ?? 'XAF',
-            'logoUrl'     => $sanitizeLogo($c['logoUrl'] ?? null),
-            'countryCode' => $c['countryCode'] ?? null,
-        ]);
+        $heroCards = collect($cardTypes)->take(3)->map(function ($c) use ($brandColor, $sanitizeLogo) {
+            // 1.3 — produit le moins cher (prix + valeur faciale nominale)
+            $cheap = collect($c['products'] ?? [])
+                ->filter(fn ($p) => ($p['price']['min'] ?? 0) > 0)
+                ->sortBy(fn ($p) => $p['price']['min'])
+                ->first() ?? ($c['products'][0] ?? []);
+            return [
+                'name'        => $c['name'] ?? 'Carte cadeau',
+                'brand'       => explode(' ', $c['name'] ?? 'Brand')[0],
+                'color'       => $brandColor($c['name'] ?? ''),
+                'price'       => $cheap['price']['min'] ?? 0,
+                'currency'    => $cheap['price']['currencyCode'] ?? 'XAF',
+                'faceValue'   => $cheap['minFaceValue'] ?? ($cheap['price']['min'] ?? 0),
+                'logoUrl'     => $sanitizeLogo($c['logoUrl'] ?? null),
+                'countryCode' => $c['countryCode'] ?? null,
+            ];
+        });
     } else {
         $heroCards = collect($demoBrands)->take(3)->map(fn($d) => array_merge($d, [
             'logoUrl'     => null,
@@ -152,6 +163,7 @@
                                         'brandColor'  => $card['color'],
                                         'countryCode' => $card['countryCode'] ?? null,
                                         'currency'    => $card['currency'],
+                                        'faceValue'   => $card['faceValue'] ?? null,
                                         'compact'     => true,
                                         'logoUrl'     => $card['logoUrl'] ?? null,
                                     ])
@@ -179,11 +191,33 @@
                     </h1>
 
                     <p class="mt-6 text-base sm:text-lg text-slate-600 max-w-lg mx-auto lg:mx-0">
-                        Achetez vos cartes cadeaux Netflix, Apple, Steam, Nintendo et plus de 300 marques.
-                        Paiement Mobile Money, code reçu instantanément.
+                        Netflix, Apple, Steam, PlayStation et plus de 300 marques. Payez par
+                        Airtel Money, Moov Money ou carte bancaire — votre code arrive en 30 secondes.
                     </p>
 
-                    <div class="mt-8 flex flex-col sm:flex-row gap-3 justify-center lg:justify-start">
+                    {{-- §4 — Recherche marque-first INTÉGRÉE au hero (ouvre le modal
+                         de recherche avec autocomplete + logos). --}}
+                    <div class="mt-7 max-w-lg mx-auto lg:mx-0">
+                        <button type="button" data-search-trigger
+                                class="group w-full flex items-center gap-3 bg-white rounded-2xl border border-slate-200 shadow-lg shadow-slate-900/5 px-4 py-3.5 text-left hover:border-[#44A08D]/50 hover:shadow-xl transition">
+                            <svg class="h-5 w-5 text-[#44A08D] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                            <span class="flex-1 text-slate-400 text-sm sm:text-base">Rechercher une marque : Netflix, Steam, PSN…</span>
+                            <kbd class="hidden sm:inline-flex items-center gap-0.5 px-2 py-1 rounded-md bg-slate-100 border border-slate-200 text-[11px] font-semibold text-slate-500">⌘K</kbd>
+                        </button>
+
+                        {{-- Chips marques populaires (autocomplete direct au clic) --}}
+                        <div class="mt-3 flex flex-wrap gap-2 justify-center lg:justify-start">
+                            <span class="text-xs text-slate-400 font-medium self-center mr-0.5">Populaires :</span>
+                            @foreach (['Netflix', 'Deezer', 'PlayStation', 'Steam', 'Apple'] as $chip)
+                                <button type="button" data-search-suggestion="{{ $chip }}"
+                                        class="px-3 py-1.5 rounded-full bg-white border border-slate-200 text-xs font-semibold text-slate-700 hover:border-[#44A08D] hover:text-[#44A08D] transition active:scale-95">
+                                    {{ $chip }}
+                                </button>
+                            @endforeach
+                        </div>
+                    </div>
+
+                    <div class="mt-7 flex flex-col sm:flex-row gap-3 justify-center lg:justify-start">
                         <a href="{{ route('boutique') }}"
                            class="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-[#44A08D] hover:bg-[#3d9180] text-white font-semibold shadow-lg shadow-[#44A08D]/25 transition-all duration-200 active:scale-95">
                             <span>Voir le catalogue</span>
@@ -191,13 +225,11 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
                             </svg>
                         </a>
-                        <a href="#how-it-works"
+                        <a href="https://wa.me/24100000000?text={{ rawurlencode('Bonjour KardAfrica, j\'ai besoin d\'aide 🙂') }}"
+                           target="_blank" rel="noopener"
                            class="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-white hover:bg-slate-50 text-slate-900 font-semibold border border-slate-200 transition-all duration-200 active:scale-95">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            <span>Comment ça marche</span>
+                            <svg class="h-4 w-4 text-[#25D366]" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                            <span>Support WhatsApp</span>
                         </a>
                     </div>
 
@@ -235,6 +267,7 @@
                                         'brandColor'  => $card['color'],
                                         'countryCode' => $card['countryCode'] ?? null,
                                         'currency'    => $card['currency'],
+                                        'faceValue'   => $card['faceValue'] ?? null,
                                         'compact'     => false,
                                     ])
                                 </div>
@@ -259,46 +292,258 @@
 
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
-        {{-- ================================================================
-             SEARCH (desktop) — bouton qui ouvre le command palette (Ctrl+K)
-             ================================================================ --}}
-        <section class="hidden md:block mb-12">
-            <button type="button" data-search-trigger
-                    style="width: 100%; max-width: 640px; margin: 0 auto; display: flex; align-items: center;
-                           padding: 16px 20px; background: #ffffff; border: 1px solid #E2E8F0; border-radius: 16px;
-                           cursor: pointer; text-align: left; transition: all .2s ease;
-                           box-shadow: 0 1px 2px rgba(15,23,42,0.04);"
-                    onmouseover="this.style.borderColor='#44A08D';this.style.boxShadow='0 10px 24px -8px rgba(68,160,141,0.20)';"
-                    onmouseout="this.style.borderColor='#E2E8F0';this.style.boxShadow='0 1px 2px rgba(15,23,42,0.04)';"
-                    aria-label="Rechercher une carte">
-                <svg style="width: 20px; height: 20px; color: #94A3B8; margin-right: 12px; flex-shrink: 0;"
-                     fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-                <span style="flex: 1; color: #94A3B8; font-size: 15px; font-weight: 500;">
-                    Rechercher une carte (Netflix, Apple, Steam, Nintendo…)
-                </span>
-                <span style="display: inline-flex; align-items: center; gap: 4px; margin-left: 12px;
-                             padding: 4px 8px; border-radius: 6px;
-                             background: #F8FAFC; border: 1px solid #E2E8F0;
-                             font-family: ui-monospace, monospace; font-size: 10px; font-weight: 700; color: #64748B;">
-                    ⌘ K
-                </span>
-            </button>
+        {{-- La recherche est désormais INTÉGRÉE au hero (§4). --}}
+        {{-- Réassurance + paiement : déplacés sous la section Carte Gabon. --}}
 
-            {{-- Suggestions chips — déclenchent le modal pré-rempli --}}
-            <div class="mt-4 flex flex-wrap justify-center gap-2 text-sm">
-                <span class="text-slate-500 mr-1">Populaires :</span>
-                @foreach (['Netflix', 'Spotify', 'Apple', 'Steam', 'Nintendo', 'PlayStation'] as $suggestion)
-                    <button type="button" data-search-suggestion="{{ $suggestion }}" data-search-trigger
-                            style="padding: 4px 12px; border-radius: 9999px; cursor: pointer;
-                                   background: #ffffff; border: 1px solid #E2E8F0;
-                                   color: #475569; font-size: 12px; font-weight: 500; transition: all .15s;"
-                            onmouseover="this.style.borderColor='#44A08D';this.style.color='#44A08D';"
-                            onmouseout="this.style.borderColor='#E2E8F0';this.style.color='#475569';">
-                        {{ $suggestion }}
-                    </button>
+        {{-- ================================================================
+             TRUST STRIP — galerie de logos défilante (marquee CSS pur)
+             ================================================================ --}}
+        @php
+            // Galerie 1 seule ligne (marquee) — 28 marques.
+            $marqueeLogos = [
+                ['netflix', 'Netflix'], ['deezer', 'Deezer'], ['playstation', 'PlayStation'],
+                ['xbox', 'Xbox'], ['steam', 'Steam'], ['nintendo', 'Nintendo'], ['apple', 'Apple'],
+                ['amazon', 'Amazon'], ['googleplay', 'Google Play'], ['roblox', 'Roblox'],
+                ['epicgames', 'Epic Games'], ['crunchyroll', 'Crunchyroll'], ['deezer', 'Deezer'],
+                ['openai', 'ChatGPT'], ['airbnb', 'Airbnb'], ['ubereats', 'Uber Eats'],
+                ['deliveroo', 'Deliveroo'], ['tinder', 'Tinder'], ['strava', 'Strava'],
+                ['zalando', 'Zalando'], ['adidas', 'Adidas'], ['ikea', 'IKEA'],
+                ['carrefour', 'Carrefour'], ['handm', 'H&M'], ['fnac', 'Fnac'],
+                ['darty', 'Darty'], ['paypal', 'PayPal'], ['meta', 'Meta'],
+            ];
+        @endphp
+        <section class="mb-12">
+            <p class="text-center text-xs font-bold tracking-[0.2em] uppercase text-slate-400 mb-6">
+                Plus de 300 marques de confiance
+            </p>
+
+            {{-- Marquee 1 ligne (décoratif) ; hover → pause. Piste = 2 moitiés
+                 identiques → boucle transparente translateX(-50%). --}}
+            <div class="ka-marquee-wrap">
+                <div class="ka-marquee" aria-hidden="true">
+                    <div class="ka-marquee-track">
+                        @for ($half = 0; $half < 2; $half++)
+                            <ul class="ka-marquee-group">
+                                @foreach ($marqueeLogos as [$file, $name])
+                                    <li>
+                                        <img src="{{ asset('logos/brands/'.$file.'.svg') }}" alt=""
+                                             class="ka-logo" width="120" height="40" loading="lazy" decoding="async">
+                                    </li>
+                                @endforeach
+                            </ul>
+                        @endfor
+                    </div>
+                </div>
+            </div>
+
+            {{-- Alternative accessible unique (lue par les lecteurs d'écran) --}}
+            <ul class="sr-only">
+                @foreach ($marqueeLogos as [$file, $name])
+                    <li>{{ $name }}</li>
                 @endforeach
+            </ul>
+        </section>
+
+        @once
+        <style>
+            .ka-marquee-wrap {
+                display: flex;
+                flex-direction: column;
+                gap: 1rem;
+            }
+            @media (min-width: 768px) { .ka-marquee-wrap { gap: 1.5rem; } }
+
+            .ka-marquee {
+                position: relative;
+                overflow: hidden;
+                width: 100%;
+                /* Fondu progressif sur les bords gauche/droite */
+                -webkit-mask-image: linear-gradient(to right, transparent, #000 8%, #000 92%, transparent);
+                        mask-image: linear-gradient(to right, transparent, #000 8%, #000 92%, transparent);
+            }
+            .ka-marquee-track {
+                display: flex;
+                width: max-content;
+                animation: ka-marquee 55s linear infinite;
+                will-change: transform;
+            }
+            /* Rangée du bas : sens inverse (vers la droite) */
+            .ka-marquee-track--reverse { animation-direction: reverse; }
+
+            /* Pause au survol de la galerie (les deux rangées) */
+            .ka-marquee-wrap:hover .ka-marquee-track { animation-play-state: paused; }
+
+            .ka-marquee-group {
+                display: flex;
+                align-items: center;
+                gap: 2.5rem;              /* espace entre logos */
+                padding: 0 1.25rem;       /* évite que 2 logos se collent à la jointure */
+                margin: 0;
+                list-style: none;
+                flex: 0 0 auto;
+            }
+            @media (min-width: 768px) { .ka-marquee-group { gap: 3.5rem; } }
+
+            .ka-logo {
+                height: 32px;             /* même hauteur fixe, largeur auto (ratio conservé) */
+                width: auto;
+                object-fit: contain;
+                filter: grayscale(1);
+                opacity: 0.45;
+                transition: opacity .3s ease, filter .3s ease, transform .3s ease;
+            }
+            @media (min-width: 768px) { .ka-logo { height: 40px; } }
+
+            /* Survol d'un logo individuel : net + opacité pleine */
+            .ka-logo:hover {
+                filter: grayscale(0);
+                opacity: 1;
+                transform: translateY(-2px);
+            }
+
+            @keyframes ka-marquee {
+                from { transform: translateX(0); }
+                to   { transform: translateX(-50%); }  /* 1 moitié exactement → loop sans saut */
+            }
+
+            /* Accessibilité : pas d'animation pour prefers-reduced-motion */
+            @media (prefers-reduced-motion: reduce) {
+                .ka-marquee-track { animation: none; flex-wrap: wrap; justify-content: center; width: 100%; }
+                .ka-marquee { -webkit-mask-image: none; mask-image: none; }
+                .ka-marquee-group:nth-child(2) { display: none; } /* une seule moitié en statique */
+                .ka-marquee-group { flex-wrap: wrap; justify-content: center; }
+            }
+        </style>
+        @endonce
+        {{-- ================================================================
+             COMMENT CA MARCHE — 3 etapes
+             ================================================================ --}}
+        <section id="how-it-works" class="mb-16 scroll-mt-24">
+            <div class="text-center mb-10">
+                <span class="inline-block px-3 py-1 rounded-full bg-teal-50 text-[#44A08D] text-xs font-bold tracking-wider uppercase mb-3 border border-teal-100">Simple & rapide</span>
+                <h2 class="font-display text-2xl md:text-3xl font-bold text-slate-900 tracking-tight">Comment ça marche</h2>
+                <p class="text-sm text-slate-500 mt-2 max-w-md mx-auto">Trois étapes pour obtenir votre carte cadeau et l'utiliser tout de suite.</p>
+            </div>
+
+            <div class="grid md:grid-cols-3 gap-6">
+                @foreach ([
+                    [
+                        'step'    => '01',
+                        'title'   => 'Choisissez',
+                        'desc'    => 'Parcourez le catalogue : Netflix, Steam, Apple, plus de 300 marques disponibles.',
+                        'icon'    => 'grid',
+                    ],
+                    [
+                        'step'    => '02',
+                        'title'   => 'Payez',
+                        'desc'    => 'Airtel Money, Moov Money ou carte bancaire. Paiement sécurisé via E-Billing, opérateur de paiement gabonais agréé.',
+                        'icon'    => 'wallet',
+                    ],
+                    [
+                        'step'    => '03',
+                        'title'   => 'Recevez',
+                        'desc'    => 'Votre code apparaît aussitôt dans votre espace client, rubrique « Mes cartes » — prêt à utiliser.',
+                        'icon'    => 'bolt',
+                    ],
+                ] as $i => $step)
+                    <div class="relative bg-white rounded-2xl p-6 border border-slate-100 shadow-card hover:shadow-card-hover transition-shadow group">
+                        {{-- Numero d'etape en filigrane --}}
+                        <span class="absolute top-4 right-5 font-display text-5xl font-bold text-slate-100 group-hover:text-teal-50 transition-colors select-none">{{ $step['step'] }}</span>
+
+                        <div class="relative">
+                            <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-[#4ECDC4] to-[#44A08D] flex items-center justify-center text-white shadow-lg shadow-[#44A08D]/20 mb-4">
+                                @if($step['icon'] === 'grid')
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
+                                @elseif($step['icon'] === 'wallet')
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
+                                @else
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                                @endif
+                            </div>
+
+                            <h3 class="font-display text-xl font-bold text-slate-900 mb-2">{{ $step['title'] }}</h3>
+                            <p class="text-sm text-slate-600 leading-relaxed">{{ $step['desc'] }}</p>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        </section>
+
+        {{-- Mise en avant d'une carte populaire — tirage différent à chaque visite --}}
+        <section class="mb-10">
+            @include('partials._popular-highlight')
+        </section>
+
+        {{-- ================================================================
+             POPULAR PRODUCTS — frame de carte conserve via <x-product-card>
+             ================================================================ --}}
+        <section class="mb-16">
+            <div class="flex items-end justify-between mb-6">
+                <div>
+                    <h2 class="font-display text-2xl md:text-3xl font-bold text-slate-900 tracking-tight">Populaires</h2>
+                    <p class="text-sm text-slate-500 mt-1">Les cartes que tout le monde s'arrache.</p>
+                </div>
+                <a href="{{ route('boutique') }}" class="inline-flex items-center gap-1 text-sm font-semibold text-[#44A08D] hover:underline">
+                    Tout voir
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+                </a>
+            </div>
+
+            {{-- 1.9 — grille uniforme (2 mobile / 4 desktop), plus de 5e colonne
+                 qui laissait des trous. --}}
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                @if($hasRealData)
+                    @foreach($cardTypes as $i => $cardType)
+                        @php
+                            // 1.3 — "À partir de" = le produit le MOINS CHER de la carte
+                            // (pas products[0]). On en dérive prix ET valeur faciale nominale
+                            // (minFaceValue = "100 EUR", ≠ price.min qui est le prix remisé).
+                            $cheapest = collect($cardType['products'] ?? [])
+                                ->filter(fn ($p) => ($p['price']['min'] ?? 0) > 0)
+                                ->sortBy(fn ($p) => $p['price']['min'])
+                                ->first() ?? ($cardType['products'][0] ?? []);
+                            $minPrice  = $cheapest['price']['min'] ?? 0;
+                            $currency  = $cheapest['price']['currencyCode'] ?? 'XAF';
+                            $faceValue = $cheapest['minFaceValue'] ?? $minPrice;
+                            $logoUrl  = $sanitizeLogo($cardType['logoUrl'] ?? null);
+                            $color    = $brandColor($cardType['name'] ?? '');
+                            $badge    = $i < 3 ? ['label' => 'POPULAIRE', 'tone' => 'warm'] : null;
+                        @endphp
+                        <x-product-card
+                            :name="$cardType['name'] ?? 'Carte cadeau'"
+                            :brand-color="$color"
+                            :logo-url="$logoUrl"
+                            :price="$minPrice"
+                            :face-value="$faceValue"
+                            :currency="$currency"
+                            :href="route('card-type.show', $cardType['internalId'] ?? $cardType['id'] ?? '')"
+                            :badge="$badge"
+                            :products-count="count($cardType['products'] ?? [])"
+                            :country-code="$cardType['countryCode'] ?? null"
+                        />
+                    @endforeach
+                @else
+                    {{-- Fallback demo : 10 marques iconiques quand l'API est vide --}}
+                    @foreach($demoBrands as $i => $demo)
+                        <x-product-card
+                            :name="$demo['name']"
+                            :brand-label="$demo['brand']"
+                            :brand-color="$demo['color']"
+                            :price="$demo['price']"
+                            :currency="$demo['currency']"
+                            :href="route('boutique')"
+                            :badge="$i < 3 ? ['label' => 'POPULAIRE', 'tone' => 'warm'] : null"
+                        />
+                    @endforeach
+                @endif
+            </div>
+        </section>
+
+        {{-- Garantie — la phrase qui débloque le 1er achat --}}
+        <section class="mb-16">
+            <div class="flex items-center justify-center gap-2.5 rounded-2xl bg-emerald-50 border border-emerald-200 px-5 py-4 text-center">
+                <svg class="h-5 w-5 text-emerald-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                <p class="text-sm font-semibold text-emerald-800">Code garanti : invalide ou non reçu = remboursé sous 24 h.</p>
             </div>
         </section>
 
@@ -315,6 +560,7 @@
                 'shopping'       => ['icon' => 'shopping-bag', 'gradient' => 'from-amber-500 via-orange-600 to-red-600',   'glow' => 'bg-amber-400/40',  'bg' => 'assets/banner/universes/shopping.jpg'],
                 'voyage'         => ['icon' => 'plane',        'gradient' => 'from-fuchsia-500 via-pink-600 to-rose-700',  'glow' => 'bg-fuchsia-400/40','bg' => 'assets/banner/universes/voyage.jpg'],
                 'daywatch'       => ['icon' => 'tv',           'gradient' => 'from-sky-500 via-blue-600 to-indigo-700',    'glow' => 'bg-sky-400/40',    'bg' => 'assets/banner/universes/daywatch.jpg'],
+                'intelligence'   => ['icon' => 'tag',          'gradient' => 'from-teal-500 via-emerald-600 to-cyan-800',  'glow' => 'bg-teal-400/40',   'bg' => 'assets/banner/universes/default.jpg'],
             ];
 
             $styleFor = function ($name) use ($categoryStyles) {
@@ -450,115 +696,62 @@
         </section>
 
         {{-- ================================================================
-             POPULAR PRODUCTS — frame de carte conserve via <x-product-card>
+             CARTES LOCALES GABON — galerie filtrée (Carte Gabon)
              ================================================================ --}}
+        @if(isset($gabonCards) && $gabonCards->count())
         <section class="mb-16">
-            <div class="flex items-end justify-between mb-6">
+            <div class="flex items-end justify-between gap-4 mb-6">
                 <div>
-                    <h2 class="font-display text-2xl md:text-3xl font-bold text-slate-900 tracking-tight">Populaires</h2>
-                    <p class="text-sm text-slate-500 mt-1">Les cartes que tout le monde s'arrache.</p>
+                    <span class="inline-block px-3 py-1 rounded-full bg-teal-50 text-[#44A08D] text-xs font-bold tracking-wider uppercase mb-3 border border-teal-100">Local</span>
+                    <h2 class="font-display text-2xl md:text-3xl font-bold text-slate-900 tracking-tight">Carte Gabon</h2>
+                    <p class="text-sm text-slate-500 mt-2 max-w-md">Les enseignes du Gabon déjà disponibles en carte cadeau, à offrir et utiliser sur place.</p>
                 </div>
-                <a href="{{ route('boutique') }}" class="inline-flex items-center gap-1 text-sm font-semibold text-[#44A08D] hover:underline">
-                    Tout voir
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+                <a href="{{ route('gabon.index') }}" class="hidden sm:inline-flex items-center gap-1.5 text-sm font-semibold text-[#44A08D] hover:text-[#3d9180] shrink-0">
+                    <span>Voir tout</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
                 </a>
             </div>
 
-            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                @if($hasRealData)
-                    @foreach($cardTypes as $i => $cardType)
-                        @php
-                            $minPrice = $cardType['products'][0]['price']['min'] ?? 0;
-                            $currency = $cardType['products'][0]['price']['currencyCode'] ?? 'XAF';
-                            $logoUrl  = $sanitizeLogo($cardType['logoUrl'] ?? null);
-                            $color    = $brandColor($cardType['name'] ?? '');
-                            $badge    = $i < 3 ? ['label' => 'POPULAIRE', 'tone' => 'warm'] : null;
-                        @endphp
-                        <x-product-card
-                            :name="$cardType['name'] ?? 'Carte cadeau'"
-                            :brand-color="$color"
-                            :logo-url="$logoUrl"
-                            :price="$minPrice"
-                            :currency="$currency"
-                            :href="route('card-type.show', $cardType['internalId'] ?? $cardType['id'] ?? '')"
-                            :badge="$badge"
-                            :products-count="count($cardType['products'] ?? [])"
-                            :country-code="$cardType['countryCode'] ?? null"
-                        />
-                    @endforeach
-                @else
-                    {{-- Fallback demo : 10 marques iconiques quand l'API est vide --}}
-                    @foreach($demoBrands as $i => $demo)
-                        <x-product-card
-                            :name="$demo['name']"
-                            :brand-label="$demo['brand']"
-                            :brand-color="$demo['color']"
-                            :price="$demo['price']"
-                            :currency="$demo['currency']"
-                            :href="route('boutique')"
-                            :badge="$i < 3 ? ['label' => 'POPULAIRE', 'tone' => 'warm'] : null"
-                        />
-                    @endforeach
-                @endif
-            </div>
-        </section>
+            <div class="grid grid-cols-2 lg:grid-cols-3 gap-4">
+                @foreach($gabonCards as $card)
+                    @php $min = collect($card->denominations ?? [])->min() ?? 0; @endphp
+                    <a href="{{ route('gabon.card', $card) }}"
+                       class="group block overflow-hidden rounded-2xl bg-white border border-slate-100 shadow-card hover:shadow-card-hover transition-all duration-300 hover:-translate-y-1 hover:scale-[1.02] active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#44A08D]">
+                        @include('partials._merchant-card-visual', ['card' => $card])
 
-        {{-- ================================================================
-             COMMENT CA MARCHE — 3 etapes
-             ================================================================ --}}
-        <section id="how-it-works" class="mb-16 scroll-mt-24">
-            <div class="text-center mb-10">
-                <span class="inline-block px-3 py-1 rounded-full bg-teal-50 text-[#44A08D] text-xs font-bold tracking-wider uppercase mb-3 border border-teal-100">Simple & rapide</span>
-                <h2 class="font-display text-2xl md:text-3xl font-bold text-slate-900 tracking-tight">Comment ça marche</h2>
-                <p class="text-sm text-slate-500 mt-2 max-w-md mx-auto">Trois étapes pour obtenir votre carte cadeau et l'utiliser tout de suite.</p>
-            </div>
-
-            <div class="grid md:grid-cols-3 gap-6">
-                @foreach ([
-                    [
-                        'step'    => '01',
-                        'title'   => 'Choisissez',
-                        'desc'    => 'Parcourez le catalogue : Netflix, Steam, Apple, plus de 300 marques disponibles.',
-                        'icon'    => 'grid',
-                    ],
-                    [
-                        'step'    => '02',
-                        'title'   => 'Payez',
-                        'desc'    => 'Mobile Money (Airtel, Moov) ou carte bancaire. Paiement 100% sécurisé via E-Billing.',
-                        'icon'    => 'wallet',
-                    ],
-                    [
-                        'step'    => '03',
-                        'title'   => 'Recevez',
-                        'desc'    => 'Le code de votre carte arrive instantanément dans votre espace personnel. Prêt à utiliser.',
-                        'icon'    => 'bolt',
-                    ],
-                ] as $i => $step)
-                    <div class="relative bg-white rounded-2xl p-6 border border-slate-100 shadow-card hover:shadow-card-hover transition-shadow group">
-                        {{-- Numero d'etape en filigrane --}}
-                        <span class="absolute top-4 right-5 font-display text-5xl font-bold text-slate-100 group-hover:text-teal-50 transition-colors select-none">{{ $step['step'] }}</span>
-
-                        <div class="relative">
-                            <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-[#4ECDC4] to-[#44A08D] flex items-center justify-center text-white shadow-lg shadow-[#44A08D]/20 mb-4">
-                                @if($step['icon'] === 'grid')
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
-                                @elseif($step['icon'] === 'wallet')
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
-                                @else
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-                                @endif
+                        <div class="relative bg-white p-3 sm:p-4">
+                            <h4 class="text-xs sm:text-sm font-semibold text-slate-900 leading-snug line-clamp-2 group-hover:text-[#44A08D] transition-colors">
+                                {{ $card->name }}
+                            </h4>
+                            <div class="mt-2.5 sm:mt-3 pt-2.5 sm:pt-3 border-t border-slate-100 flex items-end justify-between gap-2">
+                                <span class="text-[10px] text-slate-400 font-medium">À partir de</span>
+                                <span class="text-sm sm:text-base font-black tabular-nums text-slate-900 whitespace-nowrap">
+                                    {{ number_format($min, 0, ',', ' ') }} <span class="text-[10px] font-bold text-slate-500">FCFA</span>
+                                </span>
                             </div>
-
-                            <h3 class="font-display text-xl font-bold text-slate-900 mb-2">{{ $step['title'] }}</h3>
-                            <p class="text-sm text-slate-600 leading-relaxed">{{ $step['desc'] }}</p>
                         </div>
-                    </div>
+                    </a>
                 @endforeach
             </div>
+
+            <div class="mt-6 text-center sm:hidden">
+                <a href="{{ route('gabon.index') }}" class="inline-flex items-center gap-1.5 text-sm font-semibold text-[#44A08D]">
+                    <span>Voir toutes les cartes Gabon</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+                </a>
+            </div>
         </section>
+        @endif
+
+        {{-- Moyens de paiement — placé sous la section Carte Gabon --}}
+        @include('partials.home._payment-strip')
+
+        @include('partials.home._social-proof')
+
+        @include('partials.home._faq')
 
         {{-- ================================================================
-             PROMO BANNER
+             ESPACE PRO — inciter les professionnels à créer leurs cartes
              ================================================================ --}}
         <section class="mb-16">
             <div class="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#1F2937] via-[#1F2937] to-[#0F172A] p-8 md:p-12 shadow-pop">
@@ -569,20 +762,20 @@
                 <div class="relative grid md:grid-cols-2 gap-8 items-center">
                     <div>
                         <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#44A08D]/20 border border-[#44A08D]/30 mb-4">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-[#4ECDC4]" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd" /></svg>
-                            <span class="text-[#4ECDC4] font-bold text-[10px] tracking-wider uppercase">Offre Limitée</span>
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-[#4ECDC4]" fill="currentColor" viewBox="0 0 20 20"><path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z" /><path fill-rule="evenodd" d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z" clip-rule="evenodd" /></svg>
+                            <span class="text-[#4ECDC4] font-bold text-[10px] tracking-wider uppercase">Espace Pro</span>
                         </div>
 
                         <h3 class="font-display text-white font-bold text-3xl md:text-4xl leading-tight tracking-tight">
-                            Gagnez <span class="text-[#4ECDC4]">5% cashback</span><br>
-                            sur votre première commande.
+                            Créez vos <span class="text-[#4ECDC4]">cartes cadeaux digitales</span><br>
+                            à votre marque.
                         </h3>
                         <p class="text-slate-400 text-sm mt-3 max-w-md">
-                            Profitez de cette offre dès maintenant. Le cashback est crédité automatiquement après votre achat.
+                            Commerçants, restaurants, enseignes : lancez vos propres cartes cadeaux à votre image sur KardAfrica. Vendues et livrées en quelques secondes, sans logistique — fidélisez vos clients et créez un nouveau revenu.
                         </p>
 
-                        <a href="{{ route('boutique') }}" class="mt-6 inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-[#44A08D] hover:bg-[#3d9180] text-white font-semibold shadow-lg shadow-[#44A08D]/40 transition-all duration-200 active:scale-95">
-                            <span>En profiter</span>
+                        <a href="{{ route('pro.landing') }}" class="mt-6 inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-[#44A08D] hover:bg-[#3d9180] text-white font-semibold shadow-lg shadow-[#44A08D]/40 transition-all duration-200 active:scale-95">
+                            <span>Créer mes cartes</span>
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
                         </a>
                     </div>
@@ -598,8 +791,8 @@
                                     <div class="w-8 h-6 rounded bg-gradient-to-br from-yellow-200 to-yellow-400"></div>
                                 </div>
                                 <div>
-                                    <div class="text-xs text-slate-400 mb-1">CASHBACK</div>
-                                    <div class="font-display text-3xl font-black text-[#44A08D]">5%</div>
+                                    <div class="text-xs text-slate-400 mb-1">CARTE CADEAU</div>
+                                    <div class="font-display text-3xl font-black text-[#44A08D]">Votre marque</div>
                                 </div>
                             </div>
                         </div>
@@ -608,19 +801,6 @@
             </div>
         </section>
 
-        {{-- ================================================================
-             TRUST STRIP — fournisseurs / marques connues
-             ================================================================ --}}
-        <section class="mb-12">
-            <p class="text-center text-xs font-bold tracking-[0.2em] uppercase text-slate-400 mb-6">
-                Plus de 300 marques de confiance
-            </p>
-            <div class="flex flex-wrap items-center justify-center gap-x-8 gap-y-4 opacity-70 grayscale hover:grayscale-0 transition duration-500">
-                @foreach (['Netflix', 'Apple', 'Spotify', 'Steam', 'Nintendo', 'PlayStation', 'Xbox', 'Amazon'] as $brand)
-                    <div class="text-slate-500 font-display font-bold text-lg md:text-xl">{{ $brand }}</div>
-                @endforeach
-            </div>
-        </section>
 
     </div>
 </div>

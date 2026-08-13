@@ -53,6 +53,14 @@ class PaymentController extends Controller
             'revenue'    => (float) Payment::where('status', Payment::STATUS_COMPLETED)->sum('amount'),
         ];
 
-        return view('admin.payments.index', compact('payments', 'stats'));
+        // Compteurs par statut RÉEL, une requête groupée. `$stats` regroupe
+        // pending+processing et failed+cancelled : utile en synthèse, faux pour
+        // des onglets qui doivent refléter exactement la liste filtrée.
+        $statusCounts = Payment::query()
+            ->select('status', \DB::raw('COUNT(*) as n'))
+            ->groupBy('status')
+            ->pluck('n', 'status');
+
+        return view('admin.payments.index', compact('payments', 'stats', 'statusCounts'));
     }
 }

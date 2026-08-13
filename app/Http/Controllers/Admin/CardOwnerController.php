@@ -149,18 +149,6 @@ class CardOwnerController extends Controller
             ->with('success', 'Propriétaire supprimé.');
     }
 
-    /**
-     * Réinitialise le mot de passe d'un propriétaire (par un admin).
-     * Le cast 'hashed' du modèle CardOwner hashe automatiquement.
-     */
-    public function resetPassword(Request $request, CardOwner $cardOwner)
-    {
-        $request->validate(['password' => 'required|string|min:8|confirmed']);
-        $cardOwner->update(['password' => $request->password]);
-
-        return back()->with('success', "Mot de passe réinitialisé pour {$cardOwner->name}.");
-    }
-
     // ============================================================
     // API JSON — utilisée par le form admin merchant-cards pour
     // créer un propriétaire à la volée sans quitter la page.
@@ -247,6 +235,18 @@ class CardOwnerController extends Controller
         $filename = Str::random(40).'.'.strtolower($file->getClientOriginalExtension() ?: 'jpg');
         $file->move($absDir, $filename);
         return $relDir.'/'.$filename;
+    }
+
+    /**
+     * Réinitialise le mot de passe d'un propriétaire (par un admin).
+     * Le cast 'hashed' du modèle CardOwner hashe automatiquement.
+     */
+    public function resetPassword(Request $request, CardOwner $cardOwner)
+    {
+        $request->validate(['password' => 'required|string|min:8|confirmed']);
+        $cardOwner->update(['password' => $request->password]);
+
+        return back()->with('success', "Mot de passe réinitialisé pour {$cardOwner->name}.");
     }
 
     private function deleteLogo(?string $relPath): void

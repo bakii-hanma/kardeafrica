@@ -87,14 +87,16 @@ class WebAuthController extends Controller
             return back()->withErrors($validator)->withInput();
         }
 
-        $user = User::create([
+        // M21 : role/is_active ne sont plus mass-assignables — affectation explicite
+        $user = new User([
             'name' => $request->first_name . ' ' . $request->last_name,
             'email' => $request->email,
             'password' => Hash::make($request->password),
             'phone' => $request->phone,
-            'role' => 'user',
-            'is_active' => true,
         ]);
+        $user->role = 'user';
+        $user->is_active = true;
+        $user->save();
 
         UserProfile::create([
             'user_id' => $user->id,
@@ -133,7 +135,19 @@ class WebAuthController extends Controller
             ], 422);
         }
 
-        return response()->json(['ok' => true]);
+        // M1 : le gate de révélation est désormais APPLIQUÉ CÔTÉ SERVEUR.
+        // Une vérification réussie ouvre une fenêtre courte (120 s) pendant
+        // laquelle GET /api/cards/{id} accepte de renvoyer code+PIN. Sans cette
+        // fenêtre, l'endpoint ne renvoie jamais les secrets — le gate n'est plus
+        // décoratif/client-side.
+        $ttl = 120;
+        \Illuminate\Support\Facades\Cache::put(
+            'card-reveal:' . $request->user()->id,
+            true,
+            now()->addSeconds($ttl)
+        );
+
+        return response()->json(['ok' => true, 'reveal_ttl' => $ttl]);
     }
 
     public function logout(Request $request)

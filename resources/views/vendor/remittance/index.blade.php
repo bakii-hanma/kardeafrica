@@ -89,7 +89,12 @@
     @endif
 
     {{-- ============= FORMULAIRE REMISE — TOUT D'UN COUP ============= --}}
-    @if($cashToRemit > 0 && $headroom > 0)
+    {{-- Le formulaire n'apparaît que si TOUT le cash peut être reversé : la
+         politique côté serveur est « tout ou rien » (RemittanceController::init
+         reverse cash_to_remit entier). L'ancienne condition `headroom > 0`
+         affichait un bouton qui partait en 422 dès que le cash dépassait la
+         place disponible, en promettant « cash restant : 0 FCFA ». --}}
+    @if($cashToRemit > 0 && $cashToRemit <= $headroom)
         <div class="vrm-card">
             <h2 class="vrm-card-title">
                 <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
@@ -134,22 +139,26 @@
                 Tu seras redirigé vers le portail E-Billing pour payer <strong>l'intégralité</strong> du cash en Mobile Money ou par carte. Une fois validé, ton solde de vente est reconstitué automatiquement.
             </p>
         </div>
-    @elseif($cashToRemit > 0 && $headroom > 0 && $cashToRemit > $headroom)
-        {{-- Cas où on ne peut pas tout remettre d'un coup à cause du plafond --}}
+    @elseif($cashToRemit > 0)
+        {{-- Reste à libérer avant de pouvoir tout reverser d'un coup. --}}
+        @php $manque = $cashToRemit - $headroom; @endphp
         <div class="vrm-warn-card">
             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
             <div>
-                <strong>Plafond wallet trop bas pour tout reverser</strong>
-                <p>Tu as {{ number_format($cashToRemit, 0, ',', ' ') }} FCFA de cash mais ton wallet ne peut accueillir que {{ number_format($headroom, 0, ',', ' ') }} FCFA supplémentaires. Vends quelques cartes pour libérer de la place avant de pouvoir tout reverser.</p>
-            </div>
-        </div>
-    @elseif($cashToRemit > 0 && $headroom === 0)
-        {{-- wallet plein : impossible de remettre tant qu'il n'a pas vendu --}}
-        <div class="vrm-warn-card">
-            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-            <div>
-                <strong>Wallet déjà au plafond</strong>
-                <p>Ton solde de vente est déjà à {{ number_format($reseller->wallet_balance, 0, ',', ' ') }} FCFA / {{ number_format($reseller->max_wallet, 0, ',', ' ') }} FCFA. Vends quelques cartes pour libérer de la place avant de remettre.</p>
+                <strong>Ta cagnotte est trop pleine pour recevoir ce cash</strong>
+                <p>
+                    Tu dois reverser {{ number_format($cashToRemit, 0, ',', ' ') }} FCFA, mais ta cagnotte
+                    ne peut accueillir que {{ number_format($headroom, 0, ',', ' ') }} FCFA de plus
+                    (elle est à {{ number_format($reseller->wallet_balance, 0, ',', ' ') }} FCFA sur
+                    {{ number_format($reseller->max_wallet, 0, ',', ' ') }} FCFA).
+                    <br>
+                    <strong>Vends pour au moins {{ number_format($manque, 0, ',', ' ') }} FCFA</strong>
+                    et le bouton de remise apparaîtra ici.
+                </p>
+                <a href="{{ route('vendor.sell') }}" class="vrm-warn-cta">
+                    Vendre une carte
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
+                </a>
             </div>
         </div>
     @endif
@@ -205,6 +214,8 @@
                 </div>
             @endforeach
         </div>
+
+        <div style="margin-top:14px;">{{ $history->links() }}</div>
     @endif
 
 </div>
@@ -510,6 +521,14 @@
     .vrm-warn-card svg { width: 18px; height: 18px; color: #B45309; flex-shrink: 0; margin-top: 2px; }
     .vrm-warn-card strong { display: block; color: #92400E; font-size: 13px; margin-bottom: 2px; }
     .vrm-warn-card p { font-size: 12px; color: #78350F; line-height: 1.5; margin: 0; }
+    .vrm-warn-cta {
+        display: inline-flex; align-items: center; gap: 6px;
+        min-height: 44px; margin-top: 10px; padding: 0 16px;
+        background: #92400E; color: #fff; border-radius: 10px;
+        font-size: 13px; font-weight: 700; text-decoration: none;
+    }
+    .vrm-warn-cta svg { width: 14px; height: 14px; color: #fff; margin: 0; }
+    .vrm-warn-cta:hover { background: #78350F; }
 
     /* Pending + history */
     .vrm-section-title {

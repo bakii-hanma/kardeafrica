@@ -8,6 +8,7 @@ use App\Models\UserProfile;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 
@@ -36,15 +37,16 @@ class AuthController extends Controller
         try {
             DB::beginTransaction();
 
-            // Create User
-            $user = User::create([
+            // Create User — M21 : role/is_active en affectation explicite
+            $user = new User([
                 'name' => $request->first_name . ' ' . $request->last_name,
                 'email' => $request->email,
                 'password' => Hash::make($request->password),
                 'phone' => $request->phone,
-                'role' => 'user', // Default role
-                'is_active' => true,
             ]);
+            $user->role = 'user';
+            $user->is_active = true;
+            $user->save();
 
             // Create User Profile
             UserProfile::create([
@@ -71,9 +73,11 @@ class AuthController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
+            // H10 : ne pas exposer le message d'exception interne au client.
+            Log::error('API register exception', ['error' => $e->getMessage()]);
             return response()->json([
                 'status' => 'error',
-                'message' => 'Registration failed: ' . $e->getMessage()
+                'message' => "L'inscription a échoué. Réessaie plus tard."
             ], 500);
         }
     }
@@ -217,9 +221,11 @@ class AuthController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
+            // H10 : message générique, détail en log interne uniquement.
+            Log::error('API profile update exception', ['error' => $e->getMessage()]);
             return response()->json([
                 'status' => 'error',
-                'message' => 'Update failed: ' . $e->getMessage()
+                'message' => "La mise à jour a échoué. Réessaie plus tard."
             ], 500);
         }
     }

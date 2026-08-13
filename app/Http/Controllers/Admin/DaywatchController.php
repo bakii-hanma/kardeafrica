@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\DaywatchProduct;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
@@ -33,6 +34,8 @@ class DaywatchController extends Controller
             'active'   => DaywatchProduct::where('is_active', true)->count(),
             'featured' => DaywatchProduct::where('is_featured', true)->count(),
             'avg_price'=> (int) DaywatchProduct::where('is_active', true)->avg('price_xaf'),
+            'synced'   => DaywatchProduct::whereNotNull('plan_id')->count(),
+            'synced_at'=> DaywatchProduct::max('synced_at'),
         ];
 
         return view('admin.daywatch.index', compact('products', 'stats'));
@@ -93,6 +96,24 @@ class DaywatchController extends Controller
         return redirect()
             ->route('admin.daywatch.index')
             ->with('success', "Le produit Daywatch « {$name} » a été supprimé.");
+    }
+
+    /**
+     * Rejoue `daywatch:sync` depuis l'admin.
+     *
+     * L'API Daywatch fait autorité sur les prix : ce bouton sert quand une
+     * promotion vient de changer et qu'on ne veut pas attendre la passe de
+     * 4h20. Le rendu de la commande est renvoyé tel quel, échec compris.
+     */
+    public function sync()
+    {
+        $code = Artisan::call('daywatch:sync');
+
+        if ($code !== 0) {
+            return back()->with('error', 'Synchronisation Daywatch impossible — API injoignable ou catalogue vide. Rien n\'a été modifié.');
+        }
+
+        return back()->with('success', 'Formules Daywatch synchronisées depuis leur API.');
     }
 
     public function toggleActive(DaywatchProduct $daywatch)

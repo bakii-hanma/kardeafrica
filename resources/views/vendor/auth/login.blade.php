@@ -500,6 +500,9 @@
                     <input type="checkbox" name="remember" value="1">
                     Se souvenir de moi
                 </label>
+                <a href="{{ route('vendor.password.request') }}" class="ka-link">Mot de passe oublié ?</a>
+            </div>
+            <div class="ka-row" style="justify-content:flex-end;">
                 <a href="{{ route('home') }}" class="ka-link">← Retour au site</a>
             </div>
 

@@ -96,6 +96,14 @@ Route::prefix('proprietaire')->group(function () {
     // Auth (publique)
     Route::get('/login',  [\App\Http\Controllers\Owner\AuthController::class, 'showLoginForm'])->name('owner.login');
     Route::post('/login', [\App\Http\Controllers\Owner\AuthController::class, 'login'])->middleware('throttle:6,1')->name('owner.login.submit');
+
+    // Reset de mot de passe par OTP WhatsApp (dette onboarding — guard card_owner)
+    Route::get('/mot-de-passe-oublie',   [\App\Http\Controllers\Pro\PasswordResetController::class, 'showRequest'])->name('pro.password.request');
+    Route::post('/mot-de-passe-oublie',  [\App\Http\Controllers\Pro\PasswordResetController::class, 'sendCode'])
+        ->middleware('throttle:4,1')->name('pro.password.send');
+    Route::get('/mot-de-passe-oublie/verification',  [\App\Http\Controllers\Pro\PasswordResetController::class, 'showReset'])->name('pro.password.reset.show');
+    Route::post('/mot-de-passe-oublie/verification', [\App\Http\Controllers\Pro\PasswordResetController::class, 'reset'])
+        ->middleware('throttle:10,1')->name('pro.password.reset');
     Route::post('/logout',[\App\Http\Controllers\Owner\AuthController::class, 'logout'])->name('owner.logout');
 
     // Dashboard + tout le reste (protégé)
@@ -111,17 +119,65 @@ Route::prefix('proprietaire')->group(function () {
         Route::get('/historique',         [\App\Http\Controllers\Owner\DashboardController::class, 'history'])->name('owner.history');
 
         Route::get('/scanner',            [\App\Http\Controllers\Owner\ScanController::class, 'index'])->name('owner.scan');
-        Route::post('/scanner/lookup',    [\App\Http\Controllers\Owner\ScanController::class, 'lookup'])->name('owner.scan.lookup');
-        Route::post('/scanner/redeem',    [\App\Http\Controllers\Owner\ScanController::class, 'redeem'])->name('owner.scan.redeem');
+        // H2 : throttle anti brute-force — le couple code 8 chiffres + PIN 4
+        // chiffres est le secret d'authentification au comptoir.
+        Route::post('/scanner/lookup',    [\App\Http\Controllers\Owner\ScanController::class, 'lookup'])->middleware('throttle:15,1')->name('owner.scan.lookup');
+        Route::post('/scanner/redeem',    [\App\Http\Controllers\Owner\ScanController::class, 'redeem'])->middleware('throttle:15,1')->name('owner.scan.redeem');
     });
+});
+
+// ================================================================
+// ONBOARDING PRO/COMMERÇANT (/pro) — inscription + OTP WhatsApp + KYC
+// Voir docs/PROJET_ETAT_ET_ROADMAP.md §3
+// ================================================================
+Route::prefix('pro')->group(function () {
+    // Landing
+    Route::get('/', [\App\Http\Controllers\Pro\RegistrationController::class, 'landing'])->name('pro.landing');
+
+    // Étape 1 — inscription
+    Route::get('/inscription',  [\App\Http\Controllers\Pro\RegistrationController::class, 'showRegister'])->name('pro.register.show');
+    Route::post('/inscription', [\App\Http\Controllers\Pro\RegistrationController::class, 'register'])
+        ->middleware('throttle:6,1')->name('pro.register');
+
+    // Étape 2 — vérification OTP
+    Route::get('/verification',  [\App\Http\Controllers\Pro\OtpController::class, 'show'])->name('pro.verification.show');
+    Route::post('/verification', [\App\Http\Controllers\Pro\OtpController::class, 'verify'])
+        ->middleware('throttle:10,1')->name('pro.verification.verify');
+    Route::post('/verification/renvoyer', [\App\Http\Controllers\Pro\OtpController::class, 'resend'])
+        ->middleware('throttle:4,1')->name('pro.verification.resend');
+
+    // Étape 3 — dossier KYC (accessible aussi au pro connecté en re-soumission)
+    Route::get('/dossier',  [\App\Http\Controllers\Pro\KycController::class, 'show'])->name('pro.kyc.show');
+    Route::post('/dossier', [\App\Http\Controllers\Pro\KycController::class, 'submit'])
+        ->middleware('throttle:10,1')->name('pro.kyc.submit');
 });
 
 // Routes pour les produits de l'API
 Route::get('/boutique', [ProductController::class, 'boutique'])->name('boutique');
 Route::get('/category/{categoryId}', [ProductController::class, 'category'])->name('category');
 Route::get('/card-type/{cardTypeId}', [ProductController::class, 'cardType'])->name('card-type.show');
+// P1 §1 — URL par VARIANTE (montant, ex. /card-type/1810/50 = la carte 50 €).
+// Partageable + navigable ; canonical → fiche racine (décision SEO du 10/08).
+Route::get('/card-type/{cardTypeId}/{montant}', [ProductController::class, 'cardType'])
+    ->where('montant', '[0-9]+(?:\.[0-9]+)?')
+    ->name('card-type.variant');
+// Images Open Graph dynamiques par carte (aperçu de partage WhatsApp)
+Route::get('/og/card/{cardTypeId}.png', [\App\Http\Controllers\OgImageController::class, 'card'])->name('og.card');
+Route::get('/og/gabon/{merchantCard}.png', [\App\Http\Controllers\OgImageController::class, 'gabon'])->name('og.gabon');
+// Bannière OG par défaut (pages sans image dédiée) — 1200×630 générée + cachée
+Route::get('/og/default.png', [\App\Http\Controllers\OgImageController::class, 'default'])->name('og.default');
+
+// Sitemap XML (audit SEO) — dynamique, caché 12 h
+Route::get('/sitemap.xml', [\App\Http\Controllers\SitemapController::class, 'index'])->name('sitemap');
+
+// Guides éditoriaux SEO/GEO (audit 06/08 — ciblent les PAA hors marque)
+Route::get('/guides', [\App\Http\Controllers\GuideController::class, 'index'])->name('guides.index');
+Route::get('/guides/{slug}', [\App\Http\Controllers\GuideController::class, 'show'])->name('guides.show');
 Route::get('/product/{productId}', [ProductController::class, 'show'])->name('product.show');
 Route::get('/search', [ProductController::class, 'search'])->name('search');
+// P1 §7 — autocomplétion recherche boutique (JSON, synonymes + tolérance typo)
+Route::get('/boutique/suggest', [ProductController::class, 'suggest'])
+    ->middleware('throttle:60,1')->name('boutique.suggest');
 
 // Page de téléchargement de l'app mobile Android (APK hébergé sous public/downloads)
 Route::get('/telecharger', function () {
@@ -149,6 +205,7 @@ Route::patch('/cards/{card}/toggle-status', [CardController::class, 'toggleStatu
 
 // Routes pour les pages statiques
 Route::get('/about', function () { return view('about'); })->name('about');
+Route::get('/comment-ca-marche', function () { return view('comment-ca-marche'); })->name('how-it-works');
 Route::get('/contact', function () { return view('contact'); })->name('contact');
 Route::get('/support', function () { return view('support'); })->name('support');
 
@@ -202,7 +259,9 @@ Route::get('/newsletter/unsubscribe/{token}', [App\Http\Controllers\NewsletterCo
 Route::get('/payment/return', [App\Http\Controllers\PaymentController::class, 'handleReturn'])->middleware('auth')->name('payment.return');
 
 // Route de finalisation du paiement (API call from Verify View)
-Route::post('/payment/finalize', [App\Http\Controllers\PaymentController::class, 'finalize'])->middleware('auth')->name('payment.finalize');
+// C3 : throttle — finalize vérifie une référence de paiement, sans limite il
+// permettait le bruteforce de références (la page verify polle ~1 req/2s).
+Route::post('/payment/finalize', [App\Http\Controllers\PaymentController::class, 'finalize'])->middleware(['auth', 'throttle:30,1'])->name('payment.finalize');
 
 // ================================================================
 // PORTAIL VENDEUR (réseau revendeurs)
@@ -220,6 +279,16 @@ Route::prefix('vendor')->group(function () {
     Route::post('/login', [VendorAuthController::class, 'login'])->middleware('throttle:6,1')->name('vendor.login.attempt');
     Route::match(['get', 'post'], '/logout', [VendorAuthController::class, 'logout'])->name('vendor.logout');
 
+    // Mot de passe oublié par OTP WhatsApp — le revendeur ne dépend plus d'un admin.
+    Route::get('/mot-de-passe-oublie',  [\App\Http\Controllers\Vendor\PasswordResetController::class, 'showRequest'])
+        ->name('vendor.password.request');
+    Route::post('/mot-de-passe-oublie', [\App\Http\Controllers\Vendor\PasswordResetController::class, 'sendCode'])
+        ->middleware('throttle:4,1')->name('vendor.password.send');
+    Route::get('/mot-de-passe-oublie/verification',  [\App\Http\Controllers\Vendor\PasswordResetController::class, 'showReset'])
+        ->name('vendor.password.reset.show');
+    Route::post('/mot-de-passe-oublie/verification', [\App\Http\Controllers\Vendor\PasswordResetController::class, 'reset'])
+        ->middleware('throttle:10,1')->name('vendor.password.reset');
+
     // Authentifié
     Route::middleware('is_vendor')->group(function () {
         Route::get('/dashboard',        [VendorDashboardController::class, 'index'])->name('vendor.dashboard');
@@ -233,10 +302,20 @@ Route::prefix('vendor')->group(function () {
         Route::post('/sell/cash/{order}/confirm',   [VendorSaleController::class, 'cashConfirm'])->name('vendor.sell.cash.confirm');
         Route::post('/sell/cash/{order}/cancel',    [VendorSaleController::class, 'cashCancel'])->name('vendor.sell.cash.cancel');
         Route::match(['get', 'post'], '/checkout', [VendorSaleController::class, 'checkoutPage'])->name('vendor.checkout');
+        // Relevés : historique complet paginé + exports comptables (CSV).
+        Route::get('/releve',                  [\App\Http\Controllers\Vendor\StatementController::class, 'transactions'])->name('vendor.statement');
+        Route::get('/releve/export',           [\App\Http\Controllers\Vendor\StatementController::class, 'exportTransactions'])->name('vendor.statement.export');
+        Route::get('/orders/export',           [\App\Http\Controllers\Vendor\StatementController::class, 'exportOrders'])->name('vendor.orders.export');
+
         Route::get('/orders',           [VendorSaleController::class, 'orders'])->name('vendor.orders');
         Route::get('/orders/{order}',   [VendorSaleController::class, 'showOrder'])->name('vendor.orders.show');
         Route::post('/orders/{order}/retry-delivery', [VendorSaleController::class, 'retryDelivery'])->name('vendor.orders.retry-delivery');
         Route::post('/orders/{order}/refund',         [VendorSaleController::class, 'refund'])->name('vendor.orders.refund');
+        // Remise des cartes au client. Le revendeur ne voit plus les codes :
+        // il les envoie sur le WhatsApp du client, ou — sans WhatsApp — les
+        // affiche une seule fois, en clair dans le journal.
+        Route::post('/orders/{order}/send-cards',   [VendorSaleController::class, 'sendCards'])->middleware('throttle:10,1')->name('vendor.orders.send-cards');
+        Route::post('/orders/{order}/reveal-cards', [VendorSaleController::class, 'revealCards'])->middleware('throttle:10,1')->name('vendor.orders.reveal-cards');
 
         // Remise cash via E-Billing (vendeur reverse à KardAfrica)
         Route::get('/remittance',                       [VendorRemittanceController::class, 'index'])->name('vendor.remittance.index');
@@ -251,6 +330,14 @@ Route::prefix('vendor')->group(function () {
         Route::post('/cash/{order}/reject',          [VendorCashOrderController::class, 'reject'])->name('vendor.cash.reject');
 
         Route::get('/profile',          [VendorProfileController::class, 'show'])->name('vendor.profile');
+        // Autonomie du vendeur : ses coordonnées et son mot de passe lui appartiennent.
+        Route::put('/profile',          [VendorProfileController::class, 'update'])->name('vendor.profile.update');
+        Route::put('/profile/password', [VendorProfileController::class, 'updatePassword'])
+            ->middleware('throttle:10,1')->name('vendor.profile.password');
+        // Sortie du portefeuille de commissions : transfert vers le solde de vente.
+        Route::post('/profile/commissions/transfer', [VendorProfileController::class, 'transferCommission'])
+            ->middleware('throttle:10,1')
+            ->name('vendor.commissions.transfer');
 
         // Recharge wallet (cagnotte) via Airtel Money / Moov Money / carte
         Route::get('/wallet/recharge',           [VendorWalletRechargeController::class, 'index'])->name('vendor.wallet.recharge');
@@ -262,6 +349,19 @@ Route::prefix('vendor')->group(function () {
         // /admin/merchant-cards. Les boutiques NE créent plus de cartes, elles
         // les vendent seulement depuis le catalogue géré par l'admin.
 
+        // Vente de cartes locales (Carte Gabon) au comptoir — activation gated :
+        // réserver (inactive) → « Récupérer » (débit wallet + activation + code).
+        Route::get('/local-cards',                     [\App\Http\Controllers\Vendor\LocalCardController::class, 'index'])->name('vendor.local-cards.index');
+        Route::post('/local-cards',                    [\App\Http\Controllers\Vendor\LocalCardController::class, 'store'])->middleware('throttle:20,1')->name('vendor.local-cards.store');
+        Route::get('/local-cards/{purchase}',          [\App\Http\Controllers\Vendor\LocalCardController::class, 'show'])->name('vendor.local-cards.show');
+        Route::post('/local-cards/{purchase}/claim',   [\App\Http\Controllers\Vendor\LocalCardController::class, 'claim'])->middleware('throttle:20,1')->name('vendor.local-cards.claim');
+        // Remise du code au client. Le revendeur ne voit plus le secret : il
+        // l'envoie sur le WhatsApp du client, ou — si le client n'a pas
+        // WhatsApp — le fait afficher une seule fois, en clair dans le journal.
+        Route::post('/local-cards/{purchase}/send-code',   [\App\Http\Controllers\Vendor\LocalCardController::class, 'sendCode'])->middleware('throttle:10,1')->name('vendor.local-cards.send-code');
+        Route::post('/local-cards/{purchase}/reveal-here', [\App\Http\Controllers\Vendor\LocalCardController::class, 'revealHere'])->middleware('throttle:10,1')->name('vendor.local-cards.reveal-here');
+        Route::post('/local-cards/{purchase}/cancel',  [\App\Http\Controllers\Vendor\LocalCardController::class, 'cancel'])->name('vendor.local-cards.cancel');
+
         // E-Billing payment flow (return depuis le portail + vérification)
         Route::get('/payment/return',   [VendorSaleController::class, 'paymentReturn'])->name('vendor.payment.return');
         Route::post('/payment/finalize',[VendorSaleController::class, 'paymentFinalize'])->name('vendor.payment.finalize');
@@ -269,8 +369,14 @@ Route::prefix('vendor')->group(function () {
 });
 
 // PUBLIC : Récupération des cartes par le client via QR code
-Route::get('/claim/{token}',          [ClaimController::class, 'show'])->name('claim.show');
-Route::get('/claim/{token}/print',    [ClaimController::class, 'print'])->name('claim.print');
+// Lien de récupération des cartes digitales : à usage unique, expirant, et
+// délivré sur le WhatsApp du client — un QR montré sur l'écran du revendeur ne
+// prouve rien, il pouvait le scanner lui-même.
+Route::get('/claim/{order}/{token}', [ClaimController::class, 'show'])
+    ->middleware('throttle:20,1')->name('claim.show');
+
+// Anciens liens permanents : ils n'ouvrent plus rien, mais s'expliquent.
+Route::get('/claim/{token}', [ClaimController::class, 'legacy'])->name('claim.legacy');
 
 // ================================================================
 // ADMIN AUTH (page dédiée /admin/login — accessible même en maintenance)
@@ -347,6 +453,8 @@ Route::prefix('admin')->middleware(['auth', 'is_admin'])->group(function () {
     // Cartes-cadeau Carte Gabon — créées par l'admin, vendues par les boutiques
     Route::get('/merchant-cards',                            [AdminMerchantCardController::class, 'index'])->name('admin.merchant-cards.index');
     Route::get('/merchant-cards/nouvelle',                   [AdminMerchantCardController::class, 'create'])->name('admin.merchant-cards.create');
+    // Suivi des ventes revendeurs (activation gated) — AVANT {merchantCard} (catch-all)
+    Route::get('/merchant-cards/ventes-revendeurs',          [AdminMerchantCardController::class, 'resellerSales'])->name('admin.merchant-cards.reseller-sales');
     Route::post('/merchant-cards',                           [AdminMerchantCardController::class, 'store'])->name('admin.merchant-cards.store');
     Route::get('/merchant-cards/{merchantCard}',             [AdminMerchantCardController::class, 'show'])->name('admin.merchant-cards.show');
     Route::get('/merchant-cards/{merchantCard}/edit',        [AdminMerchantCardController::class, 'edit'])->name('admin.merchant-cards.edit');
@@ -354,6 +462,23 @@ Route::prefix('admin')->middleware(['auth', 'is_admin'])->group(function () {
     Route::patch('/merchant-cards/{merchantCard}/approve',   [AdminMerchantCardController::class, 'approve'])->name('admin.merchant-cards.approve');
     Route::patch('/merchant-cards/{merchantCard}/reject',    [AdminMerchantCardController::class, 'reject'])->name('admin.merchant-cards.reject');
     Route::delete('/merchant-cards/{merchantCard}',          [AdminMerchantCardController::class, 'destroy'])->name('admin.merchant-cards.destroy');
+
+    // Modération des comptes pro/commerçant (onboarding)
+    Route::get('/proprietaires',                                 [\App\Http\Controllers\Admin\ProprietaireController::class, 'index'])->name('admin.proprietaires.index');
+    Route::get('/proprietaires/{proprietaire}',                  [\App\Http\Controllers\Admin\ProprietaireController::class, 'show'])->name('admin.proprietaires.show');
+    Route::get('/proprietaires/{proprietaire}/piece/{which}',    [\App\Http\Controllers\Admin\ProprietaireController::class, 'document'])->name('admin.proprietaires.document');
+    Route::patch('/proprietaires/{proprietaire}/valider',        [\App\Http\Controllers\Admin\ProprietaireController::class, 'approve'])->name('admin.proprietaires.approve');
+        // Reversements au commerçant : enregistrés à la main, les virements
+        // Mobile Money se font hors application. La trace rend le solde vérifiable.
+        Route::post('/proprietaires/{proprietaire}/versement', [\App\Http\Controllers\Admin\ProprietaireController::class, 'storeSettlement'])->name('admin.proprietaires.settlement');
+        // Récapitulatif hebdomadaire : qui payer ce lundi, combien, et export
+        // du lot à virer. Sans lui, il fallait ouvrir chaque fiche une par une.
+        Route::get('/versements-commercants',        [\App\Http\Controllers\Admin\MerchantPayoutController::class, 'index'])->name('admin.versements.index');
+        Route::get('/versements-commercants/export', [\App\Http\Controllers\Admin\MerchantPayoutController::class, 'export'])->name('admin.versements.export');
+        Route::post('/versements-commercants',       [\App\Http\Controllers\Admin\MerchantPayoutController::class, 'store'])->name('admin.versements.store');
+    Route::patch('/proprietaires/{proprietaire}/pieces',         [\App\Http\Controllers\Admin\ProprietaireController::class, 'requestDocs'])->name('admin.proprietaires.request-docs');
+    Route::patch('/proprietaires/{proprietaire}/refuser',        [\App\Http\Controllers\Admin\ProprietaireController::class, 'reject'])->name('admin.proprietaires.reject');
+    Route::patch('/proprietaires/{proprietaire}/suspendre',      [\App\Http\Controllers\Admin\ProprietaireController::class, 'suspend'])->name('admin.proprietaires.suspend');
 
     // Daywatch (offre streaming locale — BDD)
     Route::get('/daywatch',                          [AdminDaywatchController::class, 'index'])->name('admin.daywatch.index');
@@ -363,6 +488,7 @@ Route::prefix('admin')->middleware(['auth', 'is_admin'])->group(function () {
     Route::put('/daywatch/{daywatch}',               [AdminDaywatchController::class, 'update'])->name('admin.daywatch.update');
     Route::delete('/daywatch/{daywatch}',            [AdminDaywatchController::class, 'destroy'])->name('admin.daywatch.destroy');
     Route::patch('/daywatch/{daywatch}/toggle',      [AdminDaywatchController::class, 'toggleActive'])->name('admin.daywatch.toggle');
+    Route::post('/daywatch/sync',                    [AdminDaywatchController::class, 'sync'])->name('admin.daywatch.sync');
 
     // Paramètres système
     Route::get('/settings',                       [AdminSettingsController::class, 'index'])->name('admin.settings.index');
@@ -378,3 +504,33 @@ Route::prefix('admin')->middleware(['auth', 'is_admin'])->group(function () {
     Route::patch('/newsletter/{subscriber}/toggle', [App\Http\Controllers\Admin\NewsletterController::class, 'toggle'])->name('admin.newsletter.toggle');
     Route::delete('/newsletter/{subscriber}', [App\Http\Controllers\Admin\NewsletterController::class, 'destroy'])->name('admin.newsletter.destroy');
 });
+
+/*
+|--------------------------------------------------------------------------
+| Révélation du code d'une Carte Gabon (lien à usage unique)
+|--------------------------------------------------------------------------
+| Publique par construction : le lien lui-même est le secret. Il est envoyé au
+| WhatsApp du client, expire en 30 minutes et ne s'ouvre qu'une fois.
+*/
+// Offrir une Carte Gabon : transfert de titulaire, pas une copie.
+Route::post('/cards/gabon/{purchase}/offrir', [\App\Http\Controllers\CardGiftController::class, 'store'])
+    ->middleware(['auth', 'throttle:10,1'])->name('cards.gift');
+
+/*
+|--------------------------------------------------------------------------
+| Connexion client par WhatsApp (vaut aussi création de compte)
+|--------------------------------------------------------------------------
+| Un client servi au comptoir n'a ni e-mail ni mot de passe : son compte a été
+| ouvert sur son seul numéro. C'est le chemin par lequel il y revient.
+*/
+Route::middleware('guest')->group(function () {
+    Route::get('/connexion-whatsapp',       [\App\Http\Controllers\Auth\ClientWhatsAppLoginController::class, 'show'])->name('client.whatsapp.login');
+    Route::post('/connexion-whatsapp',      [\App\Http\Controllers\Auth\ClientWhatsAppLoginController::class, 'send'])->middleware('throttle:6,1')->name('client.whatsapp.send');
+    Route::get('/connexion-whatsapp/code',  [\App\Http\Controllers\Auth\ClientWhatsAppLoginController::class, 'showCode'])->name('client.whatsapp.code');
+    Route::post('/connexion-whatsapp/code', [\App\Http\Controllers\Auth\ClientWhatsAppLoginController::class, 'verify'])->middleware('throttle:10,1')->name('client.whatsapp.verify');
+    Route::post('/connexion-whatsapp/renvoyer', [\App\Http\Controllers\Auth\ClientWhatsAppLoginController::class, 'resend'])->middleware('throttle:4,1')->name('client.whatsapp.resend');
+});
+
+Route::get('/carte-gabon/code/{purchase}/{token}', [\App\Http\Controllers\CardRevealController::class, 'show'])
+    ->middleware('throttle:20,1')
+    ->name('card.reveal');

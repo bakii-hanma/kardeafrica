@@ -71,7 +71,10 @@ class PaymentController extends Controller
                 return response()->json(['success' => false, 'message' => 'Commande deja payee.'], 409);
             }
 
-            $externalRef = $order->external_reference ?: ('KARD_' . time() . '_' . rand(1000, 9999));
+            // C3 : référence NON prédictible (l'ancien rand(1000,9999) laissait
+            // 9 000 valeurs par seconde d'horodatage, énumérables).
+            $externalRef = $order->external_reference
+                ?: ('KARD_' . time() . '_' . strtoupper(bin2hex(random_bytes(6))));
             if (!$order->external_reference) {
                 $order->update(['external_reference' => $externalRef]);
             }
@@ -183,7 +186,6 @@ class PaymentController extends Controller
 
         $user = $request->user();
 
-        // Montant FAISANT AUTORITÉ recalculé serveur (C1/C6) — jamais le client.
         $svc = app(\App\Services\ProductApiService::class);
         $amount = 0;
         foreach ($validated['items'] as $it) {
@@ -307,8 +309,16 @@ class PaymentController extends Controller
     }
 
     /**
-     * Finaliser le paiement : verifier statut + appeler checkout API + sauvegarder cartes
-     * Aussi utilise comme API endpoint pour le mobile
+     * Finaliser le paiement d'une commande EXISTANTE (créée par CheckoutController::start
+     * côté web, ou POST /api/orders + /api/payment/init côté mobile).
+     *
+     * H0 : cette méthode ne crée JAMAIS de commande ni de Payment — l'ancienne
+     * version recréait les deux et violait l'index unique payments.transaction_id
+     * (le Payment existait déjà depuis start/init) → rollback → client débité
+     * sans commande finalisée, sur le chemin nominal.
+     *
+     * Idempotente : rappeler finalize sur une commande déjà payée renvoie le même
+     * résultat (la page verify et le mobile pollent cet endpoint en boucle).
      */
     public function finalize(Request $request)
     {
@@ -327,214 +337,161 @@ class PaymentController extends Controller
 
         $userId = Auth::id();
 
-        // Prevent duplicate orders — CORRESPONDANCE EXACTE + SCOPE PROPRIÉTAIRE.
-        // Avant : `LIKE "%Ref: $ref%"` sans contrôle de propriété permettait, avec
-        // ref="%", de récupérer les cartes et PIN d'AUTRES clients. On ne retourne
-        // désormais que les commandes de l'utilisateur authentifié.
-        $existingOrder = Order::where('user_id', $userId)
-            ->where('notes', 'Ref: ' . $externalRef)
+        // SÉCURITÉ (C0 + C3) : la référence doit appartenir à une commande de
+        // l'utilisateur authentifié. Une référence payée par un autre client ne
+        // permet plus de finaliser quoi que ce soit à son profit — on répond 404
+        // générique sans révéler l'existence de la référence. Le `orWhere notes`
+        // couvre les commandes historiques du flux legacy (qui stockait la
+        // référence dans notes au lieu d'external_reference).
+        $order = Order::where('user_id', $userId)
+            ->where(function ($q) use ($externalRef) {
+                $q->where('external_reference', $externalRef)
+                  ->orWhere('notes', 'Ref: ' . $externalRef);
+            })
             ->first();
-        if ($existingOrder) {
-            $existingOrder->load('orderItems');
-            $userCards = UserCard::where('order_id', $existingOrder->id)->get();
+
+        if (!$order) {
             return response()->json([
-                'success' => true,
-                'redirect_url' => route('orders.show', $existingOrder),
-                'order' => $existingOrder,
-                'cards' => $userCards->makeVisible(['card_code', 'pin']),
-            ]);
+                'success' => false,
+                'message' => 'Commande introuvable pour cette référence.',
+            ], 404);
+        }
+
+        // Idempotence : déjà finalisée → même réponse que le premier succès.
+        if ($order->payment_status === Order::PAYMENT_STATUS_COMPLETED) {
+            return $this->finalizedResponse($order);
         }
 
         try {
-            // 1. Verify Payment Status
+            // 1. Vérifier le statut chez le PSP (hors transaction — appel réseau).
+            //    Normalisation d'enveloppe : certains endpoints renvoient le statut
+            //    à la racine, d'autres sous `data` (cf. checkStatus / Api checkout).
             $responseCheck = Http::timeout(10)->get(config('services.payment_backend.check_url'), [
                 'external_reference' => $externalRef
             ]);
 
             $status = 'pending';
+            $isCompleted = false;
             if ($responseCheck->successful()) {
-                $data = $responseCheck->json();
+                $body = $responseCheck->json();
+                $data = is_array($body) ? ($body['data'] ?? $body) : [];
                 $status = $data['status'] ?? 'pending';
+                $isCompleted = in_array($status, ['completed', 'success'], true)
+                    || (bool) ($data['is_completed'] ?? false);
             }
 
-            if ($status !== 'completed' && $status !== 'success') {
+            if (!$isCompleted) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Le paiement n\'a pas ete confirme (Statut: ' . $status . '). Veuillez reessayer.'
                 ]);
             }
 
-            // 2. Get cart items (support both user_id and token-based auth)
-            $userId = Auth::id();
-            $cartItems = ShoppingCart::where('user_id', $userId)->get();
-
-            if ($cartItems->isEmpty()) {
-                return response()->json([
-                    'success' => true,
-                    'message' => 'Panier deja traite',
-                    'redirect_url' => route('orders.index')
-                ]);
-            }
-
-            // C1 (Palier 3) — le montant à facturer est recalculé côté serveur
-            // depuis le catalogue, jamais le prix stocké seul. Défense en profondeur
-            // en plus du palier panier (couvre aussi les items ajoutés avant ou
-            // toute tentative de manipulation directe).
-            $priceSvc = app(\App\Services\ProductApiService::class);
-            foreach ($cartItems as $item) {
-                $item->auth_unit_price = $priceSvc->authoritativeUnitPrice($item->product_id, $item->price);
-            }
-            $subtotal = $cartItems->sum(fn($item) => $item->auth_unit_price * $item->quantity);
-
-            // C3 (Palier 4) — le montant LIVRÉ ne doit pas dépasser le montant
-            // PAYÉ. La facture E-Billing a été créée à l'init avec un montant
-            // verrouillé ; on le retrouve par la référence. Si le total recalculé
-            // du panier le dépasse (panier gonflé APRÈS paiement), on refuse la
-            // livraison plutôt que de livrer plus que ce qui a été encaissé.
-            $invoiced = Payment::where('transaction_id', $externalRef)->value('amount')
-                ?? Order::where('external_reference', $externalRef)->value('total_amount');
-            if ($invoiced !== null && (int) round($subtotal) > (int) round((float) $invoiced)) {
-                Log::warning('C3 total supérieur au montant payé — livraison refusée', [
-                    'ref'        => $externalRef,
-                    'recomputed' => $subtotal,
-                    'invoiced'   => $invoiced,
-                    'user_id'    => $userId,
+            // 2. C3 — réconciliation : la facture E-Billing a été créée à l'init
+            //    avec le montant serveur de la commande (Payment.amount). Si la
+            //    commande dépasse ce montant facturé, on refuse la livraison.
+            $invoiced = Payment::where('transaction_id', $externalRef)->value('amount');
+            if ($invoiced !== null
+                && (int) round((float) $order->total_amount) > (int) round((float) $invoiced)) {
+                Log::warning('C3 total commande supérieur au montant facturé — livraison refusée', [
+                    'ref'      => $externalRef,
+                    'total'    => $order->total_amount,
+                    'invoiced' => $invoiced,
+                    'user_id'  => $userId,
                 ]);
                 return response()->json([
                     'success' => false,
-                    'message' => 'Le panier a changé depuis le paiement. Contacte le support avec ta référence de commande.',
+                    'message' => 'Montant de la commande incohérent avec le paiement. Contacte le support avec ta référence.',
                 ], 422);
             }
 
-            // 3. DB Transaction for atomicity
-            $result = DB::transaction(function () use ($cartItems, $subtotal, $externalRef, $userId) {
-                // Create Order
-                $order = Order::create([
-                    'user_id' => $userId,
-                    'order_number' => Order::generateOrderNumber(),
-                    'status' => Order::STATUS_PROCESSING,
+            // 3. Transaction courte : verrou + re-test du statut À L'INTÉRIEUR
+            //    (C9 : la page verify polle en AJAX — deux réponses simultanées
+            //    ne doivent produire qu'une seule finalisation/livraison).
+            $didFinalize = DB::transaction(function () use ($order, $externalRef) {
+                $fresh = Order::whereKey($order->id)->lockForUpdate()->first();
+                if ($fresh->payment_status === Order::PAYMENT_STATUS_COMPLETED) {
+                    return false; // une requête concurrente a déjà finalisé
+                }
+
+                $fresh->update([
                     'payment_status' => Order::PAYMENT_STATUS_COMPLETED,
-                    'subtotal' => $subtotal,
-                    'tax_amount' => 0,
-                    'total_amount' => $subtotal,
-                    'currency' => 'XAF',
-                    'payment_method' => 'ebilling',
-                    'notes' => 'Ref: ' . $externalRef,
+                    'status'         => Order::STATUS_PROCESSING,
                 ]);
 
-                // H0 — Le paiement web passe d'abord par CheckoutController::start
-                // qui a DÉJÀ créé un Payment `firstOrCreate(transaction_id=ref)`.
-                // Un `Payment::create` ici entrait en collision avec la contrainte
-                // UNIQUE sur transaction_id → rollback → HTTP 500 → client débité,
-                // jamais livré. On RÉUTILISE donc le paiement existant (ou on le crée
-                // pour le flux mobile qui n'appelle pas start).
-                Payment::updateOrCreate(
-                    ['transaction_id' => $externalRef],
-                    [
-                        'order_id' => $order->id,
-                        'user_id' => $userId,
-                        'payment_method' => 'ebilling',
-                        'provider' => 'E-Billing',
-                        'amount' => $subtotal,
-                        'currency' => 'XAF',
-                        'status' => Payment::STATUS_COMPLETED,
-                        'external_transaction_id' => $externalRef,
+                $payment = Payment::where('transaction_id', $externalRef)->lockForUpdate()->first();
+                if ($payment) {
+                    $payment->update([
+                        'order_id'     => $fresh->id,
+                        'status'       => Payment::STATUS_COMPLETED,
                         'processed_at' => now(),
-                    ]
-                );
-
-                // H0 — annule la commande "pending" créée par start() pour la même
-                // référence : son paiement vient d'être rattaché à la commande
-                // finalisée ci-dessus. Évite une commande orpheline visible par le
-                // client. (Le flux mobile n'a pas de commande start → no-op.)
-                Order::where('external_reference', $externalRef)
-                    ->where('user_id', $userId)
-                    ->where('id', '!=', $order->id)
-                    ->whereIn('status', [Order::STATUS_PENDING, Order::STATUS_PROCESSING])
-                    ->update([
-                        'status'  => Order::STATUS_CANCELLED,
-                        'notes'   => 'Remplacée par la commande finalisée #' . $order->id . ' (H0)',
                     ]);
-
-                // Create Order Items — on résout la valeur NATIVE (10 EUR pour
-                // une Roblox FR 10€) maintenant pour que ProcessCheckoutJob/retry
-                // puissent appeler afrikard avec la bonne valeur. Sans ça, le job
-                // envoyait le prix XAF (6560) qu'afrikard rejette → toutes les
-                // commandes nécessitaient un retry manuel pour être livrées.
-                $productService = app(\App\Services\ProductApiService::class);
-                $orderItems = [];
-                foreach ($cartItems as $item) {
-                    // Skip lookupNativeValue pour items marchand (Carte Gabon)
-                    $isMerchant = str_starts_with((string) $item->product_id, 'merchant_');
-                    $native = $isMerchant ? null : $productService->resolveNativeValue($item->product_id);
-                    $orderItem = OrderItem::create([
-                        'order_id'        => $order->id,
-                        'product_id'      => $item->product_id,
-                        'card_id'         => null,
-                        'name'            => $item->name,
-                        'unit_price'      => $item->auth_unit_price,
-                        'total_price'     => $item->auth_unit_price * $item->quantity,
-                        'quantity'        => $item->quantity,
-                        'image_url'       => $item->image_url,
-                        'native_value'    => $native['value']    ?? null,
-                        'native_currency' => $native['currency'] ?? null,
-                    ]);
-                    $orderItems[] = $orderItem;
-                }
-
-                // 4. Clear Cart
-                ShoppingCart::where('user_id', $userId)->delete();
-
-                // 5a. Items marchand (Carte Gabon) : génération LOCALE en synchrone
-                //     pour ne PAS dépendre du queue worker (QUEUE_CONNECTION=database
-                //     sans worker sur shared hosting). Le code 8 chiffres + QR signé
-                //     sont créés immédiatement après le paiement.
-                $orderFresh = $order->fresh()->load('orderItems');
-                $merchantItems = $orderFresh->orderItems->filter(
-                    fn ($i) => \App\Support\MerchantCardCode::isMerchantOrderItem($i)
-                );
-                foreach ($merchantItems as $item) {
-                    try {
-                        \App\Support\MerchantCardCode::createPurchaseForOrderItem($orderFresh, $item);
-                    } catch (\Throwable $e) {
-                        Log::error('PaymentController finalize: échec MerchantCardPurchase', [
-                            'order_id'      => $order->id,
-                            'order_item_id' => $item->id,
-                            'product_id'    => $item->product_id,
-                            'error'         => $e->getMessage(),
-                        ]);
-                    }
-                }
-
-                // 5b. Items afrikard : dispatch du job async (= comportement historique)
-                $afrikardItems = $orderFresh->orderItems->reject(
-                    fn ($i) => \App\Support\MerchantCardCode::isMerchantOrderItem($i)
-                );
-                if ($afrikardItems->isNotEmpty()) {
-                    ProcessCheckoutJob::dispatch($order);
-                    Log::info('Checkout job dispatched (afrikard items present)', ['order_id' => $order->id]);
                 } else {
-                    // Commande 100% marchand → on complète immédiatement
-                    $order->update([
-                        'status'       => Order::STATUS_COMPLETED,
-                        'completed_at' => now(),
+                    // Cas limite (commande legacy sans intention de paiement tracée)
+                    Payment::create([
+                        'transaction_id'          => $externalRef,
+                        'order_id'                => $fresh->id,
+                        'user_id'                 => $fresh->user_id,
+                        'payment_method'          => 'ebilling',
+                        'provider'                => 'futursowax',
+                        'amount'                  => $fresh->total_amount,
+                        'currency'                => $fresh->currency ?? 'XAF',
+                        'status'                  => Payment::STATUS_COMPLETED,
+                        'external_transaction_id' => $externalRef,
+                        'processed_at'            => now(),
                     ]);
-                    Log::info('Order 100% marchand complétée inline', ['order_id' => $order->id]);
                 }
 
-                return [
-                    'order' => $order->fresh()->load('orderItems'),
-                ];
+                return true;
             });
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Commande creee avec succes. Vos cartes seront disponibles dans quelques instants.',
-                'redirect_url' => route('orders.show', $result['order']),
-                'order_id' => $result['order']->id,
-                'order' => $result['order'],
-                'cards' => [], // Cards will be delivered async via queue job
-            ]);
+            if (!$didFinalize) {
+                // Course perdue proprement : l'autre requête a livré, on renvoie l'état.
+                return $this->finalizedResponse($order->fresh());
+            }
+
+            $order = $order->fresh()->load('orderItems');
+
+            // 4a. Items marchand (Carte Gabon) : génération LOCALE synchrone pour
+            //     ne pas dépendre du queue worker. createPurchaseForOrderItem est
+            //     idempotent par order_item_id.
+            $merchantItems = $order->orderItems->filter(
+                fn ($i) => \App\Support\MerchantCardCode::isMerchantOrderItem($i)
+            );
+            foreach ($merchantItems as $item) {
+                try {
+                    \App\Support\MerchantCardCode::createPurchaseForOrderItem($order, $item);
+                } catch (\Throwable $e) {
+                    Log::error('PaymentController finalize: échec MerchantCardPurchase', [
+                        'order_id'      => $order->id,
+                        'order_item_id' => $item->id,
+                        'product_id'    => $item->product_id,
+                        'error'         => $e->getMessage(),
+                    ]);
+                }
+            }
+
+            // 4b. Items afrikard : dispatch du job async (une seule fois — garanti
+            //     par le flip payment_status sous verrou ci-dessus).
+            $afrikardItems = $order->orderItems->reject(
+                fn ($i) => \App\Support\MerchantCardCode::isMerchantOrderItem($i)
+            );
+            if ($afrikardItems->isNotEmpty()) {
+                ProcessCheckoutJob::dispatch($order);
+                Log::info('Checkout job dispatched (afrikard items present)', ['order_id' => $order->id]);
+            } else {
+                $order->update([
+                    'status'       => Order::STATUS_COMPLETED,
+                    'completed_at' => now(),
+                ]);
+                Log::info('Order 100% marchand complétée inline', ['order_id' => $order->id]);
+            }
+
+            // 5. Vider le panier serveur (le flux web start() ne le vide pas à
+            //    l'init pour permettre de réessayer un paiement abandonné).
+            ShoppingCart::where('user_id', $userId)->delete();
+
+            return $this->finalizedResponse($order->fresh());
 
         } catch (\Exception $e) {
             Log::error('Payment Finalize Error', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
@@ -546,55 +503,23 @@ class PaymentController extends Controller
     }
 
     /**
-     * Sauvegarder les cartes recues de l'API checkout dans user_cards
+     * Réponse standard (et idempotente) d'une commande finalisée : commande + cartes.
+     * makeVisible est légitime ici : la commande appartient à l'utilisateur
+     * authentifié (contrôle de propriété fait en amont dans finalize).
      */
-    private function saveCheckoutCards(array $checkoutData, Order $order, array $orderItems, $cartItems)
+    private function finalizedResponse(Order $order)
     {
-        $items = $checkoutData['items'] ?? [];
-        $savedCards = collect();
+        $order->load('orderItems');
+        $userCards = UserCard::where('order_id', $order->id)->get();
 
-        foreach ($items as $item) {
-            $productId = $item['productId'] ?? null;
-            $cards = $item['cards'] ?? [];
-
-            // Find matching order item and cart item
-            $matchingOrderItem = collect($orderItems)->firstWhere('product_id', (string) $productId);
-            $matchingCartItem = $cartItems->firstWhere('product_id', (string) $productId);
-
-            foreach ($cards as $card) {
-                $userCard = UserCard::create([
-                    'user_id' => Auth::id(),
-                    'order_id' => $order->id,
-                    'order_item_id' => $matchingOrderItem?->id,
-                    'product_id' => (string) $productId,
-                    'checkout_card_id' => $card['id'] ?? null,
-                    'name' => $matchingCartItem?->name ?? 'Carte cadeau',
-                    'brand' => $matchingCartItem?->name ? explode(' ', $matchingCartItem->name)[0] : null,
-                    'serial_number' => $card['serialNumber'] ?? null,
-                    'card_code' => $card['cardCode'] ?? '',
-                    'pin' => $card['pin'] ?? null,
-                    'expiration_date' => !empty($card['expirationDate']) ? $card['expirationDate'] : null,
-                    'status' => ($card['status'] ?? 'active') === 'active' ? 'active' : 'used',
-                    'face_value' => $item['productFaceValue'] ?? $matchingCartItem?->price ?? 0,
-                    'currency' => $checkoutData['currency'] ?? 'XAF',
-                    'image_url' => $matchingCartItem?->image_url ?? null,
-                    'metadata' => [
-                        'checkout_order_id' => $checkoutData['orderId'] ?? null,
-                        'checkout_status' => $checkoutData['status'] ?? null,
-                        'original_card_data' => $card,
-                    ],
-                ]);
-                $savedCards->push($userCard);
-            }
-        }
-
-        Log::info('Saved user cards from checkout', [
-            'user_id' => Auth::id(),
-            'order_id' => $order->id,
-            'total_cards' => $savedCards->count(),
+        return response()->json([
+            'success'      => true,
+            'message'      => 'Commande finalisée. Vos cartes seront disponibles dans quelques instants.',
+            'redirect_url' => route('orders.show', $order),
+            'order_id'     => $order->id,
+            'order'        => $order,
+            'cards'        => $userCards->makeVisible(['card_code', 'pin']),
         ]);
-
-        return $savedCards;
     }
 
     /**

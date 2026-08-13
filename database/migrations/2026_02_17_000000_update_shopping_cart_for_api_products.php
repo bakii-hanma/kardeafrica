@@ -11,20 +11,31 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('shopping_cart', function (Blueprint $table) {
-            // Drop indexes referencing card_id (required for SQLite)
+        $isSqlite = Schema::getConnection()->getDriverName() === 'sqlite';
+
+        Schema::table('shopping_cart', function (Blueprint $table) use ($isSqlite) {
+            // MySQL/MariaDB refusent de dropper un index utilisé par une FK
+            // (erreur 1553). Ici la FK user_id s'appuie sur l'index composite
+            // (user_id, card_id) : on doit donc supprimer la FK user_id AVANT
+            // ses index, puis la recréer plus bas sur le nouvel index
+            // (user_id, product_id). L'ancien ordre cassait toute installation
+            // fraîche. (Sur SQLite : pas de FK à gérer, seul le drop de colonne
+            // compte.)
+            if (!$isSqlite) {
+                // La FK user_id s'appuie sur l'index composite (user_id, card_id) ;
+                // la FK card_id sur son propre index — les deux doivent partir
+                // avant de dropper les index / la colonne card_id.
+                $table->dropForeign(['user_id']);
+                $table->dropForeign(['card_id']);
+            }
+
             $table->dropIndex(['user_id', 'card_id']);
             $table->dropIndex(['session_id', 'card_id']);
 
-            // Drop the foreign key and column for card_id
-            // (FK skipped on SQLite — only needs the column drop)
-            if (Schema::getConnection()->getDriverName() !== 'sqlite') {
-                $table->dropForeign(['card_id']);
-            }
             $table->dropColumn('card_id');
         });
 
-        Schema::table('shopping_cart', function (Blueprint $table) {
+        Schema::table('shopping_cart', function (Blueprint $table) use ($isSqlite) {
             // Add fields for API products
             $table->string('product_id')->after('session_id');
             $table->string('name')->after('product_id');
@@ -33,6 +44,12 @@ return new class extends Migration
 
             $table->index(['user_id', 'product_id']);
             $table->index(['session_id', 'product_id']);
+
+            // Recrée la FK user_id (l'index (user_id, product_id) ci-dessus la
+            // soutient désormais).
+            if (!$isSqlite) {
+                $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
+            }
         });
     }
 

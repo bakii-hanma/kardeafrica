@@ -9,6 +9,7 @@ use App\Support\MerchantCardCode;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -51,10 +52,35 @@ class ScanController extends Controller
                 'code' => ['required', 'string', 'size:8'],
                 'pin'  => ['required', 'string', 'size:4'],
             ]);
+
+            // SÉCURITÉ (H2) : anti brute-force du PIN — max 5 tentatives ÉCHOUÉES
+            // par minute, par propriétaire + code carte visé.
+            $rateKey = 'scan-pin:' . $owner->id . ':' . $request->input('code');
+            if (RateLimiter::tooManyAttempts($rateKey, 5)) {
+                return response()->json([
+                    'ok'      => false,
+                    'message' => 'Trop de tentatives. Réessaie dans une minute.',
+                ], 429);
+            }
+
             $purchase = MerchantCardPurchase::with('merchantCard:id,name,visual_url,card_owner_id,validity_months')
                 ->where('unique_code', $request->input('code'))
-                ->where('pin_code',    $request->input('pin'))
                 ->first();
+
+            // Le PIN n'est plus comparable en SQL (seul son condensat est stocké) :
+            // il se vérifie ici. Un PIN faux doit être indistinguable d'un code
+            // inconnu, sinon l'écran devient un oracle qui confirme l'existence
+            // d'une carte à qui n'en connaît que le numéro.
+            if ($purchase && !$purchase->checkPin($request->input('pin'))) {
+                $purchase = null;
+            }
+
+            if (!$purchase) {
+                // Compte uniquement les échecs de code/PIN
+                RateLimiter::hit($rateKey, 60);
+            } else {
+                RateLimiter::clear($rateKey);
+            }
         }
 
         if (!$purchase) {
@@ -107,8 +133,18 @@ class ScanController extends Controller
             'notes'       => ['nullable', 'string', 'max:500'],
         ]);
 
+        // SÉCURITÉ (H2) : anti brute-force du PIN — max 5 tentatives ÉCHOUÉES
+        // par minute, par propriétaire + purchase visée.
+        $rateKey = 'scan-pin:' . $owner->id . ':' . $request->input('purchase_id');
+        if (RateLimiter::tooManyAttempts($rateKey, 5)) {
+            return response()->json([
+                'ok'      => false,
+                'message' => 'Trop de tentatives. Réessaie dans une minute.',
+            ], 429);
+        }
+
         try {
-            $redemption = DB::transaction(function () use ($request, $owner) {
+            $redemption = DB::transaction(function () use ($request, $owner, $rateKey) {
                 $purchase = MerchantCardPurchase::with('merchantCard:id,name,card_owner_id')
                     ->lockForUpdate()
                     ->find($request->input('purchase_id'));
@@ -121,9 +157,15 @@ class ScanController extends Controller
                     throw ValidationException::withMessages(['amount' => 'Cette carte n\'est pas la tienne.']);
                 }
 
-                if ($purchase->pin_code !== $request->input('pin')) {
+                // Le PIN n'est plus stocké en clair : seul son condensat fait foi.
+                if (!$purchase->checkPin($request->input('pin'))) {
+                    // Le compteur est en cache : il survit au rollback de la transaction
+                    RateLimiter::hit($rateKey, 60);
                     throw ValidationException::withMessages(['pin' => 'PIN invalide.']);
                 }
+
+                // PIN correct → on remet le compteur à zéro
+                RateLimiter::clear($rateKey);
 
                 $reason = $this->unredeemableReason($purchase);
                 if ($reason) {
@@ -192,6 +234,11 @@ class ScanController extends Controller
 
     private function unredeemableReason(MerchantCardPurchase $p): ?string
     {
+        // Vente revendeur non finalisée : le code est inerte tant que le
+        // revendeur n'a pas « récupéré » la carte (débit wallet + activation).
+        if ($p->status === MerchantCardPurchase::STATUS_INACTIVE) {
+            return 'Cette carte n\'a pas encore été activée (vente non finalisée).';
+        }
         if ($p->payment_status !== MerchantCardPurchase::PAYMENT_PAID) {
             return 'Cette carte n\'a pas été payée.';
         }

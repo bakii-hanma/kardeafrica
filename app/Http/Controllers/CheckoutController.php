@@ -52,13 +52,19 @@ class CheckoutController extends Controller
         // C1 (Palier 3) — le montant à facturer (invoice E-Billing) est recalculé
         // côté serveur depuis le catalogue ; le prix stocké/client n'est jamais cru
         // seul. On écrase le prix de chaque item en mémoire → subtotal ET order
-        // items utilisent le prix faisant autorité.
-        $priceSvc = app(\App\Services\ProductApiService::class);
-        foreach ($cartItems as $item) {
-            $item->price = $priceSvc->authoritativeUnitPrice($item->product_id, $item->price);
+        // items utilisent le prix faisant autorité. Fail-closed : prix non
+        // résolvable → 422, jamais le prix client.
+        try {
+            $priceSvc = app(\App\Services\ProductApiService::class);
+            foreach ($cartItems as $item) {
+                $item->price = $priceSvc->authoritativeUnitPrice($item->product_id, $item->price);
+            }
+        } catch (\RuntimeException $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
         }
         $subtotal    = $cartItems->sum(fn($i) => $i->price * $i->quantity);
-        $externalRef = 'KARD_' . time() . '_' . rand(1000, 9999);
+        // C3 : référence non prédictible (rand(1000,9999) était énumérable)
+        $externalRef = 'KARD_' . time() . '_' . strtoupper(bin2hex(random_bytes(6)));
 
         try {
             $order = DB::transaction(function () use ($cartItems, $subtotal, $externalRef, $user, $validated) {
@@ -208,7 +214,7 @@ class CheckoutController extends Controller
         }
 
         $subtotal    = $cartItems->sum(fn($i) => $i->price * $i->quantity);
-        $externalRef = 'SIM_' . time() . '_' . rand(1000, 9999);
+        $externalRef = 'SIM_' . time() . '_' . strtoupper(bin2hex(random_bytes(6)));
 
         try {
             // 1. Cree l'order + items + payment dans une transaction
@@ -404,7 +410,7 @@ class CheckoutController extends Controller
             ]);
             return response()->json([
                 'success' => false,
-                'message' => 'Erreur lors de la simulation : ' . $e->getMessage(),
+                'message' => 'Erreur lors de la simulation.',
             ], 500);
         }
     }
@@ -437,12 +443,13 @@ class CheckoutController extends Controller
                 ?? $order->orderItems->firstWhere('product_id', $productId);
 
             foreach ($cards as $card) {
-                UserCard::create([
+                // H4 : idempotence sur checkout_card_id (rejeu / double appel).
+                $ccid  = $card['id'] ?? null;
+                $attrs = [
                     'user_id'          => $order->user_id,
                     'order_id'         => $order->id,
                     'order_item_id'    => $orderItem?->id,
                     'product_id'       => (string) $productId,
-                    'checkout_card_id' => $card['id'] ?? null,
                     'name'             => $orderItem?->name ?? 'Carte cadeau',
                     'brand'            => $orderItem?->name ? explode(' ', $orderItem->name)[0] : null,
                     'serial_number'    => $card['serialNumber'] ?? null,
@@ -453,12 +460,15 @@ class CheckoutController extends Controller
                     'face_value'       => $item['productFaceValue'] ?? $orderItem?->unit_price ?? 0,
                     'currency'         => $checkoutData['currency'] ?? 'XAF',
                     'image_url'        => $orderItem?->image_url,
+                    // C7 : plus de duplication du code/PIN en clair dans metadata
                     'metadata'         => [
                         'simulated'           => true,
                         'checkout_order_id'   => $checkoutData['orderId'] ?? null,
-                        'original_card_data'  => $card,
                     ],
-                ]);
+                ];
+                $ccid !== null
+                    ? UserCard::firstOrCreate(['checkout_card_id' => $ccid], $attrs)
+                    : UserCard::create($attrs + ['checkout_card_id' => null]);
             }
         }
     }
@@ -485,11 +495,19 @@ class CheckoutController extends Controller
             ]);
         }
 
+        // M23 : ne JAMAIS exposer le solde d'un vendeur à un client (l'endpoint
+        // permettait de cartographier la trésorerie du réseau par énumération de
+        // codes). On renvoie uniquement si le vendeur peut couvrir le panier
+        // ACTUEL de l'appelant — calculé côté serveur.
+        $cartTotal = (float) ShoppingCart::where('user_id', Auth::id())
+            ->get()
+            ->sum(fn ($i) => $i->price * $i->quantity);
+
         return response()->json([
-            'found'             => true,
-            'vendor_code'       => $reseller->vendor_code,
-            'name'              => $reseller->name,
-            'available_balance' => (float) $reseller->available_balance,
+            'found'       => true,
+            'vendor_code' => $reseller->vendor_code,
+            'name'        => $reseller->name,
+            'can_cover'   => $cartTotal > 0 && (float) $reseller->available_balance >= $cartTotal,
         ]);
     }
 
@@ -531,6 +549,16 @@ class CheckoutController extends Controller
             ], 422);
         }
 
+        // C1 — même règle que start() : le prix faisant autorité est recalculé
+        // côté serveur, le prix stocké/client n'est jamais cru seul (fail-closed).
+        try {
+            $priceSvc = app(\App\Services\ProductApiService::class);
+            foreach ($cartItems as $item) {
+                $item->price = $priceSvc->authoritativeUnitPrice($item->product_id, $item->price);
+            }
+        } catch (\RuntimeException $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        }
         $subtotal = (float) $cartItems->sum(fn($i) => $i->price * $i->quantity);
         if ((float) $reseller->available_balance < $subtotal) {
             return response()->json([
@@ -539,8 +567,10 @@ class CheckoutController extends Controller
             ], 422);
         }
 
-        $externalRef = 'KARD_CASH_' . time() . '_' . rand(1000, 9999);
-        $confirmCode = str_pad((string) rand(0, 999999), 6, '0', STR_PAD_LEFT);
+        $externalRef = 'KARD_CASH_' . time() . '_' . strtoupper(bin2hex(random_bytes(6)));
+        // Ce code autorise un encaissement physique : génération cryptographique
+        // obligatoire (rand() était prédictible — Mersenne Twister).
+        $confirmCode = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
         $expiresAt   = now()->addHours(2);
 
         try {
@@ -600,9 +630,10 @@ class CheckoutController extends Controller
                 'error'   => $e->getMessage(),
                 'user_id' => $user->id,
             ]);
+            // H10 : message générique (détail en log ci-dessus).
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage() ?: 'Impossible de créer la commande cash.',
+                'message' => 'Impossible de créer la commande cash. Réessaie plus tard.',
             ], 500);
         }
     }

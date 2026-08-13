@@ -42,7 +42,7 @@ class CreateAdmin extends Command
         }
 
         $name     = $this->option('name')  ?: $this->ask('Nom complet', 'Admin KardAfrica');
-        $phone    = $this->option('phone') ?: $this->ask('Téléphone (optionnel)', '+24106871309');
+        $phone    = $this->option('phone') ?: $this->ask('Téléphone (optionnel)', '+24100000000');
 
         $password = $this->option('password');
         if (!$password) {

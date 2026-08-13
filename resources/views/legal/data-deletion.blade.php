@@ -50,7 +50,7 @@
 
                 <h2>Contact</h2>
                 <p>Pour toute question sur la suppression de tes données :
-                   <a href="mailto:hello@kardafrica.com">hello@kardafrica.com</a> · +241 06 87 13 09.<br>
+                   <a href="mailto:hello@kardafrica.com">hello@kardafrica.com</a> · +241 00 00 00 00.<br>
                    Voir aussi notre <a href="{{ route('privacy') }}">Politique de confidentialité</a>.</p>
             </div>
         </div>

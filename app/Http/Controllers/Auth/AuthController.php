@@ -107,17 +107,18 @@ class AuthController extends Controller
         }
 
         try {
-            // Créer l'utilisateur
-            $user = User::create([
+            // Créer l'utilisateur — M21 : role/is_active en affectation explicite
+            $user = new User([
                 'name' => $request->name,
                 'email' => $request->email,
                 'password' => Hash::make($request->password),
                 'phone' => $request->phone,
-                'role' => 'user',
-                'is_active' => true,
                 'preferred_currency' => 'XOF',
                 'preferred_language' => 'fr',
             ]);
+            $user->role = 'user';
+            $user->is_active = true;
+            $user->save();
 
             // Créer le profil utilisateur
             UserProfile::create([

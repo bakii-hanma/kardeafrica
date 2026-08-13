@@ -18,13 +18,15 @@ class User extends Authenticatable
      *
      * @var list<string>
      */
+    // M21 : 'role' et 'is_active' NE sont PAS fillable — un mass-assignment
+    // accidentel (User::create($request->all())) permettrait une escalade de
+    // privilège / réactivation de compte. On les mute explicitement via
+    // forceFill() aux seuls endroits légitimes (register hardcodé, back-office).
     protected $fillable = [
         'name',
         'email',
         'password',
         'phone',
-        'role',
-        'is_active',
         'preferred_currency',
         'preferred_language',
     ];

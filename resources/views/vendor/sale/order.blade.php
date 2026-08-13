@@ -3,12 +3,10 @@
 @section('title', 'Commande #' . $order->order_number)
 
 @push('head')
-<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 @endpush
 
 @section('content')
 @php
-    $claimUrl = route('claim.show', $order->claim_token);
     $statusMap = [
         'pending'    => ['#B45309','#FEF3C7','En attente'],
         'processing' => ['#1D4ED8','#DBEAFE','En cours'],
@@ -321,33 +319,65 @@
         {{-- ====================== COLONNE QR CODE ====================== --}}
         <div class="vod-side">
             <div class="vod-qr-card">
-                <div class="vod-qr-eyebrow">À montrer au client</div>
-                <h3 class="vod-qr-title">Scan pour récupérer</h3>
+                {{-- Le QR affichant le lien a été retiré : il était sous les yeux
+                     du revendeur, qui pouvait le scanner lui-même et récupérer
+                     les codes avant son client. Un QR sur SON écran ne prouve
+                     rien ; un lien reçu sur le WhatsApp du client, si. --}}
+                <div class="vod-qr-eyebrow">Remise des cartes</div>
 
-                <div id="qrcode" class="vod-qr-box"></div>
+                @if($order->claimed_at)
+                    <h3 class="vod-qr-title">✅ Cartes remises</h3>
+                    <p class="vod-claim-note">
+                        Récupérées le {{ $order->claimed_at->format('d/m/Y à H:i') }}
+                        @if($order->claim_channel === 'comptoir')
+                            <strong>au comptoir</strong>.
+                        @else
+                            depuis le téléphone du client.
+                        @endif
+                        Les codes sont dans son compte KardAfrica — tu n'y as pas accès.
+                    </p>
+                @else
+                    <h3 class="vod-qr-title">Envoyer au client</h3>
+                    <p class="vod-claim-note">
+                        Tu ne vois pas les codes : ils partent sur le téléphone du client,
+                        par un lien qui expire en {{ \App\Models\ResellerOrder::CLAIM_TTL_MINUTES }} minutes
+                        et ne s'ouvre qu'une seule fois.
+                    </p>
 
-                <div class="vod-qr-link">
-                    <span class="vod-qr-link-label">Lien direct</span>
-                    <span class="vod-qr-link-url">{{ $claimUrl }}</span>
-                </div>
+                    @if($order->claim_sent_at)
+                        <div class="vod-claim-sent">
+                            Lien envoyé au <strong>{{ $order->claim_sent_to }}</strong>
+                            {{ $order->claim_sent_at->diffForHumans() }}
+                            @if($order->claimLinkIsLive())
+                                · expire {{ $order->claim_expires_at->diffForHumans() }}
+                            @else
+                                · <strong>expiré</strong>, tu peux le renvoyer
+                            @endif
+                        </div>
+                    @endif
 
-                <div class="vod-qr-actions">
-                    <button onclick="copyClaimLink()" type="button" class="vod-qr-btn vod-qr-btn--ghost">
-                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
-                        <span id="copy-label">Copier</span>
-                    </button>
-                    <button onclick="downloadQR()" type="button" class="vod-qr-btn vod-qr-btn--brand">
-                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                        Télécharger
-                    </button>
-                </div>
+                    <form method="POST" action="{{ route('vendor.orders.send-cards', $order) }}" class="vod-claim-form">
+                        @csrf
+                        <x-phone-input name="customer_phone" required
+                                       label="WhatsApp du client"
+                                       :value="$order->claim_sent_to ?: $order->customer_phone" />
+                        <button type="submit" class="vod-qr-btn vod-qr-btn--wa">
+                            📲 Envoyer les cartes sur WhatsApp
+                        </button>
+                        @if($order->claim_sends > 0)
+                            <p class="vod-claim-count">
+                                {{ $order->claim_sends }} / {{ \App\Models\ResellerOrder::CLAIM_MAX_SENDS }} envois utilisés
+                            </p>
+                        @endif
+                    </form>
 
-                @if($order->customer_phone)
-                    <a href="https://wa.me/{{ preg_replace('/\D/', '', $order->customer_phone) }}?text={{ urlencode('Voici tes cartes cadeaux KardAfrica : ' . $claimUrl) }}"
-                       target="_blank" rel="noopener" class="vod-qr-share">
-                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
-                        Envoyer le lien par WhatsApp
-                    </a>
+                    <form method="POST" action="{{ route('vendor.orders.reveal-cards', $order) }}"
+                          onsubmit="return confirm('Les codes s\'afficheront UNE SEULE FOIS sur cet écran, et cet affichage est enregistré à ton nom. Continuer ?');">
+                        @csrf
+                        <button type="submit" class="vod-qr-btn vod-qr-btn--ghost vod-claim-fallback">
+                            Le client n'a pas WhatsApp — afficher une fois ici
+                        </button>
+                    </form>
                 @endif
             </div>
 
@@ -875,6 +905,17 @@
         margin-top: 12px;
         position: relative;
     }
+    .vod-claim-note { font-size: 12.5px; color: #64748B; line-height: 1.6; margin: 8px 0 14px; }
+    .vod-claim-sent {
+        background: #F0FDF9; border: 1px solid #99F6E4; border-radius: 10px;
+        padding: 10px 12px; margin-bottom: 12px; font-size: 12px; color: #0F766E;
+    }
+    .vod-claim-form { margin-bottom: 10px; }
+    .vod-claim-form > button { width: 100%; margin-top: 10px; }
+    .vod-claim-count { font-size: 11px; color: #94A3B8; text-align: center; margin: 8px 0 0; }
+    .vod-claim-fallback { width: 100%; margin-top: 4px; }
+    .vod-qr-btn--wa { background: #25D366; color: #fff; border-color: #25D366; }
+
     .vod-qr-btn {
         display: inline-flex; align-items: center; justify-content: center; gap: 6px;
         padding: 11px;
@@ -1057,35 +1098,4 @@
     }
 </style>
 
-<script>
-    const claimUrl = @json($claimUrl);
-
-    document.addEventListener('DOMContentLoaded', () => {
-        new QRCode(document.getElementById('qrcode'), {
-            text: claimUrl,
-            width: 200, height: 200,
-            colorDark: '#0F172A',
-            colorLight: '#FFFFFF',
-            correctLevel: QRCode.CorrectLevel.H,
-        });
-    });
-
-    function copyClaimLink() {
-        navigator.clipboard.writeText(claimUrl).then(() => {
-            const lbl = document.getElementById('copy-label');
-            lbl.textContent = 'Copié ✓';
-            setTimeout(() => { lbl.textContent = 'Copier'; }, 1800);
-        });
-    }
-
-    function downloadQR() {
-        const img = document.querySelector('#qrcode img') || document.querySelector('#qrcode canvas');
-        if (!img) return;
-        const url = img.tagName === 'CANVAS' ? img.toDataURL('image/png') : img.src;
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'qrcode-{{ $order->order_number }}.png';
-        document.body.appendChild(a); a.click(); a.remove();
-    }
-</script>
 @endsection

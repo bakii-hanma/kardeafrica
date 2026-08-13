@@ -16,10 +16,21 @@ class IsCardOwner
         }
 
         $owner = Auth::guard('card_owner')->user();
-        if (!$owner->is_active) {
+
+        // Onboarding non terminé (numéro à vérifier / dossier à compléter) →
+        // on renvoie vers l'étape adéquate plutôt que vers l'espace.
+        if ($owner->needsOtp()) {
+            return redirect()->route('pro.verification.show');
+        }
+        if ($owner->needsKyc()) {
+            return redirect()->route('pro.kyc.show');
+        }
+
+        // Suspendu / refusé / inactif → accès refusé.
+        if (!$owner->is_active || !$owner->canCreateCards()) {
             Auth::guard('card_owner')->logout();
             return redirect()->route('owner.login')->withErrors([
-                'email' => 'Ton compte propriétaire est désactivé. Contacte l\'admin.',
+                'email' => 'Ton compte propriétaire n\'est pas actif. Contacte l\'admin.',
             ]);
         }
 

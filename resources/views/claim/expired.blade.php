@@ -40,9 +40,40 @@
         <div class="ico">
             <svg style="width:30px;height:30px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
         </div>
-        <h1>Ce lien a expiré</h1>
-        <p>Le délai de récupération de cette commande est dépassé. Contacte le vendeur ou notre support pour récupérer tes cartes.</p>
-        <div class="ref">#{{ $order->order_number }}</div>
+        @php $raison = $raison ?? ($legacy ?? false ? 'legacy' : 'expire'); @endphp
+
+        @if ($raison === 'deja_ouvert')
+            <h1>Ce lien a déjà été ouvert</h1>
+            <p>
+                Pour ta sécurité, un lien de récupération ne s'ouvre qu'une fois.
+                Tes cartes restent dans ton compte KardAfrica, au numéro qui a reçu
+                ce message.
+            </p>
+        @elseif ($raison === 'legacy')
+            <h1>Ce lien n'est plus valable</h1>
+            <p>
+                Les anciens liens de récupération ont été remplacés par des liens
+                à usage unique. Demande à ton vendeur de te renvoyer tes cartes,
+                ou connecte-toi avec ton numéro WhatsApp.
+            </p>
+        @elseif ($raison === 'invalide')
+            <h1>Lien invalide</h1>
+            <p>Ce lien ne correspond à aucune commande en attente de remise.</p>
+        @else
+            <h1>Ce lien a expiré</h1>
+            <p>Le délai de récupération de cette commande est dépassé. Contacte le vendeur ou notre support pour récupérer tes cartes.</p>
+        @endif
+
+        @if (!empty($order))
+            <div class="ref">#{{ $order->order_number }}</div>
+        @endif
+
+        <p style="margin-top:16px;">
+            <a href="{{ route('client.whatsapp.login') }}"
+               style="display:inline-block;padding:12px 20px;background:#25D366;color:#06281F;border-radius:12px;font-weight:800;text-decoration:none;font-size:14px;">
+                💬 Retrouver mes cartes avec WhatsApp
+            </a>
+        </p>
         <p style="margin-top:18px;font-size:13px;">
             Besoin d'aide ? <a href="mailto:hello@kardafrica.com">hello@kardafrica.com</a>
         </p>

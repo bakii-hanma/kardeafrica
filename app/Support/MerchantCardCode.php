@@ -2,11 +2,15 @@
 
 namespace App\Support;
 
+use Illuminate\Support\Facades\Hash;
 use App\Models\MerchantCard;
 use App\Models\MerchantCardPurchase;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\Reseller;
 use App\Models\UserCard;
+use Illuminate\Database\QueryException;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -28,6 +32,124 @@ use RuntimeException;
  */
 class MerchantCardCode
 {
+    /**
+     * Commission revendeur PAR DÉFAUT sur les cartes locales (décision produit
+     * du 10 août 2026 : 4,5 %). Le taux par carte (`vendor_commission_rate`,
+     * fixé par l'admin) prime s'il est renseigné (> 0).
+     */
+    public const DEFAULT_RESELLER_RATE = 4.5;
+
+    /**
+     * Commission KardAfrica sur les Cartes Gabon : 15 % du montant encaissé.
+     *
+     * Elle était structurellement nulle — `admin_commission_rate` valait 0 sur
+     * toutes les cartes et rien ne fournissait de valeur de repli, contrairement
+     * à la part revendeur.
+     *
+     * LA PART REVENDEUR SE PRÉLÈVE SUR CES 15 %, PAS EN PLUS.
+     * Le commerçant touche 85 % quel que soit le canal de vente — c'est un
+     * engagement envers lui, il n'a pas à être moins payé parce qu'un revendeur
+     * s'est interposé. KardAfrica garde donc 10,5 % sur une vente au comptoir
+     * (15 − 4,5) et 15 % sur une vente en ligne directe.
+     */
+    public const DEFAULT_ADMIN_RATE = 15.0;
+
+    /** Taux de commission revendeur applicable à une carte locale. */
+    /** Part KardAfrica, avec repli sur le taux plateforme. */
+    public static function adminRate(MerchantCard $card): float
+    {
+        $rate = (float) ($card->admin_commission_rate ?? 0);
+
+        return $rate > 0 ? $rate : self::DEFAULT_ADMIN_RATE;
+    }
+
+    public static function resellerRate(MerchantCard $card): float
+    {
+        $rate = (float) ($card->vendor_commission_rate ?? 0);
+        return $rate > 0 ? $rate : self::DEFAULT_RESELLER_RATE;
+    }
+
+    /**
+     * Réserve une carte locale pour une vente REVENDEUR au comptoir.
+     *
+     * La purchase naît `inactive` + `pending` : le code/PIN existent en base
+     * mais sont INERTES (refusés au scan comptoir) tant que le revendeur n'a
+     * pas « récupéré » la carte — action atomique qui débite son wallet,
+     * prouve la vente à KardAfrica et bascule le statut à `active` (voir
+     * Vendor\LocalCardController::claim). Aucune stat n'est incrémentée ici :
+     * total_sold/revenue ne bougent qu'à la récupération.
+     */
+    public static function createReservationForReseller(
+        MerchantCard $card,
+        float $amount,
+        Reseller $reseller,
+        ?string $buyerName = null,
+        ?string $buyerPhone = null,
+    ): MerchantCardPurchase {
+        // C2 — montant strictement conforme aux règles de la carte, carte ACTIVE
+        // exigée (contrairement au flux Order où le paiement a déjà eu lieu).
+        if (!$card->isValidAmount($amount, true)) {
+            throw new RuntimeException("Montant invalide pour la carte #{$card->id} : {$amount}");
+        }
+
+        // Une carte sans propriétaire ne pourra jamais être débitée au comptoir.
+        // Le scope `active()` l'écarte déjà des catalogues ; ce garde-fou couvre
+        // les appels directs et les cartes orphelinées entre-temps.
+        if ($card->card_owner_id === null) {
+            throw new RuntimeException(
+                "Carte #{$card->id} sans propriétaire : elle ne pourrait être validée par aucun commerçant."
+            );
+        }
+
+        return DB::transaction(function () use ($card, $amount, $reseller, $buyerName, $buyerPhone) {
+            // Snapshot commissions : la part revendeur suit resellerRate()
+            // (4,5 % par défaut), le reste du modèle est identique au flux en ligne.
+            $adminRate    = self::adminRate($card);
+            $vendorRate   = self::resellerRate($card);
+            $adminAmount  = round($amount * $adminRate / 100, 2);
+            $vendorAmount = round($amount * $vendorRate / 100, 2);
+            // 85 % au commerçant, invariablement : la part revendeur est
+            // déduite des 15 % de KardAfrica, pas de la sienne.
+            $ownerNet     = round($amount - $adminAmount, 2);
+
+            $purchase = MerchantCardPurchase::create([
+                'merchant_card_id'         => $card->id,
+                'reseller_id'              => $reseller->id,
+                'unique_code'              => self::generateUniqueCode(),
+                'pin_code'                 => $pinComptoir = str_pad((string) random_int(0, 9999), 4, '0', STR_PAD_LEFT),
+                'pin_hash'                 => Hash::make($pinComptoir),
+                'qr_payload'               => 'pending-' . uniqid('', true),
+                'buyer_name'               => $buyerName ?: 'Client comptoir',
+                // Jamais le téléphone du revendeur en repli : le lien de
+                // révélation du code partirait chez lui au lieu du client.
+                'buyer_phone'              => $buyerPhone ?: '',
+                'amount'                   => $amount,
+                'remaining_balance'        => $amount,
+                'currency'                 => 'XAF',
+                'admin_commission_amount'  => $adminAmount,
+                'vendor_commission_amount' => $vendorAmount,
+                'owner_net_amount'         => $ownerNet,
+                'payment_method'           => 'reseller_wallet',
+                'payment_status'           => MerchantCardPurchase::PAYMENT_PENDING,
+                'status'                   => MerchantCardPurchase::STATUS_INACTIVE,
+                'delivery_channel'         => ['reseller_counter'],
+                'expires_at'               => now()->addMonths((int) ($card->validity_months ?? 12)),
+            ]);
+
+            // Finalise le QR signé avec l'ID réel (même pattern que le flux en ligne).
+            $purchase->update(['qr_payload' => self::buildQrPayload($purchase->id)]);
+
+            Log::info('MerchantCardCode: réservation revendeur créée (inactive)', [
+                'purchase_id' => $purchase->id,
+                'card_id'     => $card->id,
+                'reseller_id' => $reseller->id,
+                'amount'      => $amount,
+            ]);
+
+            return $purchase;
+        });
+    }
+
     /**
      * Génère un code unique 8 chiffres en évitant les collisions DB.
      * Pool = 10^8 = 100M combinaisons, donc collisions très rares.
@@ -112,8 +234,10 @@ class MerchantCardCode
 
         // Génère un PIN unique à cet achat s'il manque (vieilles purchases)
         if (empty($purchase->pin_code)) {
+            $pinRattrapage = str_pad((string) random_int(0, 9999), 4, '0', STR_PAD_LEFT);
             $purchase->update([
-                'pin_code' => str_pad((string) random_int(0, 9999), 4, '0', STR_PAD_LEFT),
+                'pin_code' => $pinRattrapage,
+                'pin_hash' => Hash::make($pinRattrapage),
             ]);
             $purchase->refresh();
         }
@@ -191,45 +315,99 @@ class MerchantCardCode
 
     public static function createPurchaseForOrderItem(Order $order, OrderItem $item): MerchantCardPurchase
     {
-        // Idempotence : si la purchase existe déjà, on s'assure qu'elle a un
-        // PIN ET une UserCard miroir, puis on retourne. Permet de réparer les
-        // achats créés avant l'ajout du PIN/mirror.
-        $existing = MerchantCardPurchase::where('order_item_id', $item->id)->first();
-        if ($existing) {
-            self::backfillPinAndUserCard($existing, $item, $order);
-            Log::info('MerchantCardCode: purchase déjà existante, backfill check', [
-                'order_id'       => $order->id,
-                'order_item_id'  => $item->id,
-                'purchase_id'    => $existing->id,
-            ]);
-            return $existing;
+        try {
+            return self::createOrGetPurchase($order, $item);
+        } catch (QueryException $e) {
+            // H16 — course perdante : une requête concurrente a créé la purchase
+            // entre notre contrôle et notre INSERT. La contrainte UNIQUE sur
+            // order_item_id fait rollback notre transaction (23000) : on relit
+            // et on retourne l'enregistrement gagnant au lieu d'échouer.
+            $isUniqueViolation = $e instanceof UniqueConstraintViolationException
+                || (string) $e->getCode() === '23000';
+            if (!$isUniqueViolation) {
+                throw $e;
+            }
+
+            $existing = MerchantCardPurchase::where('order_item_id', $item->id)->first();
+            if ($existing) {
+                self::backfillPinAndUserCard($existing, $item, $order);
+                Log::info('MerchantCardCode: course détectée (unique order_item_id), purchase existante retournée', [
+                    'order_id'      => $order->id,
+                    'order_item_id' => $item->id,
+                    'purchase_id'   => $existing->id,
+                ]);
+                return $existing;
+            }
+
+            // Violation d'unicité sur autre chose (unique_code, qr_payload…) :
+            // pas notre cas, on laisse remonter.
+            throw $e;
         }
+    }
 
-        if (!preg_match('/^merchant_(\d+)(?:_(\d+))?$/', (string) $item->product_id, $m)) {
-            throw new RuntimeException("product_id marchand invalide : {$item->product_id}");
-        }
+    /**
+     * Cœur de createPurchaseForOrderItem : contrôle d'existence + création,
+     * le tout DANS une même transaction (H16). Le contrôle hors transaction
+     * permettait à deux requêtes simultanées (self-heal de OrderController::show
+     * dans deux onglets) de créer deux purchases pour un seul item payé.
+     */
+    private static function createOrGetPurchase(Order $order, OrderItem $item): MerchantCardPurchase
+    {
+        return DB::transaction(function () use ($order, $item) {
+            // Idempotence : si la purchase existe déjà, on s'assure qu'elle a un
+            // PIN ET une UserCard miroir, puis on retourne. Permet de réparer les
+            // achats créés avant l'ajout du PIN/mirror. lockForUpdate : sérialise
+            // les appels concurrents sur le même order_item.
+            $existing = MerchantCardPurchase::where('order_item_id', $item->id)
+                ->lockForUpdate()
+                ->first();
+            if ($existing) {
+                self::backfillPinAndUserCard($existing, $item, $order);
+                Log::info('MerchantCardCode: purchase déjà existante, backfill check', [
+                    'order_id'       => $order->id,
+                    'order_item_id'  => $item->id,
+                    'purchase_id'    => $existing->id,
+                ]);
+                return $existing;
+            }
 
-        $cardId = (int) $m[1];
-        $amount = isset($m[2]) ? (float) $m[2] : (float) $item->unit_price;
+            if (!preg_match('/^merchant_(\d+)(?:_(\d+))?$/', (string) $item->product_id, $m)) {
+                throw new RuntimeException("product_id marchand invalide : {$item->product_id}");
+            }
 
-        $card = MerchantCard::find($cardId);
-        if (!$card) {
-            throw new RuntimeException("MerchantCard #{$cardId} introuvable (peut-être supprimée)");
-        }
+            $cardId = (int) $m[1];
+            $amount = isset($m[2]) ? (float) $m[2] : (float) $item->unit_price;
 
-        // SÉCURITÉ (C2) — le montant (= solde encaissable de la carte) ne doit
-        // JAMAIS être hors des règles de la carte. On tolère is_active=false ici
-        // (la commande a déjà été payée quand la carte était en vente), mais on
-        // refuse tout montant hors denominations / hors plage libre.
-        if (!$card->isValidAmount($amount, false)) {
-            throw new RuntimeException("Montant marchand invalide pour la carte #{$cardId} : {$amount}");
-        }
+            $card = MerchantCard::find($cardId);
+            if (!$card) {
+                throw new RuntimeException("MerchantCard #{$cardId} introuvable (peut-être supprimée)");
+            }
 
-        $order->loadMissing('user');
-        $user    = $order->user;
-        $billing = (array) $order->billing_details;
+            // SÉCURITÉ (C2) — le montant (= solde encaissable de la carte) ne doit
+            // JAMAIS être hors des règles de la carte. On tolère is_active=false ici
+            // (la commande a déjà été payée quand la carte était en vente), mais on
+            // refuse tout montant hors denominations / hors plage libre.
+            if (!$card->isValidAmount($amount, false)) {
+                throw new RuntimeException("Montant marchand invalide pour la carte #{$cardId} : {$amount}");
+            }
 
-        return DB::transaction(function () use ($card, $amount, $item, $order, $user, $billing) {
+            // Carte orphelinée entre l'achat et la livraison (la contrainte est
+            // `ON DELETE SET NULL`). On ne refuse PAS : la commande est déjà
+            // payée, échouer laisserait le client sans code ET sans carte. On
+            // alerte pour qu'un administrateur réattribue la carte — sans quoi
+            // aucun commerçant ne pourra la valider.
+            if ($card->card_owner_id === null) {
+                Log::critical('MerchantCardCode: carte sans propriétaire livrée à un client', [
+                    'merchant_card_id' => $cardId,
+                    'order_id'         => $order->id,
+                    'amount'           => $amount,
+                ]);
+            }
+
+            $order->loadMissing('user');
+            $user    = $order->user;
+            $billing = (array) $order->billing_details;
+
             // 1. Crée la purchase avec un qr_payload PROVISOIRE — qr_payload est
             //    NOT NULL/UNIQUE en BDD, et buildQrPayload() a besoin de l'ID
             //    réel (qu'on n'a pas encore). On finalise juste après.
@@ -242,11 +420,12 @@ class MerchantCardCode
             $expiresAt  = now()->addMonths((int) ($card->validity_months ?? 12));
 
             // Snapshot commissions au moment de la vente (taux figés sur la purchase)
-            $adminRate     = (float) ($card->admin_commission_rate ?? 0);
+            $adminRate     = self::adminRate($card);
             $vendorRate    = (float) ($card->vendor_commission_rate ?? 0);
             $adminAmount   = round($amount * $adminRate / 100, 2);
             $vendorAmount  = round($amount * $vendorRate / 100, 2);
-            $ownerNet      = round($amount - $adminAmount - $vendorAmount, 2);
+            // 85 % au commerçant, invariablement (cf. DEFAULT_ADMIN_RATE).
+            $ownerNet      = round($amount - $adminAmount, 2);
 
             $purchase = MerchantCardPurchase::create([
                 'merchant_card_id'         => $card->id,
@@ -254,6 +433,7 @@ class MerchantCardCode
                 'order_item_id'            => $item->id,
                 'unique_code'              => $uniqueCode,
                 'pin_code'                 => $pinCode,
+                'pin_hash'                 => Hash::make($pinCode),
                 'qr_payload'               => 'pending-' . uniqid('', true),
                 'buyer_name'               => $billing['name']  ?? $user->name  ?? 'Client KardAfrica',
                 'buyer_phone'              => $billing['phone'] ?? $user->phone ?? '',

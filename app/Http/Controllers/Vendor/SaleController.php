@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Vendor;
 use App\Http\Controllers\Controller;
 use App\Models\ResellerCard;
 use App\Models\ResellerOrder;
+use App\Support\VendorStats;
+use App\Support\VendorSalesFeed;
 use App\Models\ResellerOrderItem;
 use App\Services\PaymentRefundService;
 use App\Services\ProductApiService;
@@ -23,38 +25,18 @@ class SaleController extends Controller
     {
         $reseller = Auth::guard('vendor')->user();
 
-        $page    = (int) $request->get('page', 1);
-        $perPage = 24;
+        // MÊME traitement de filtres que la boutique publique : marques,
+        // régions, pays produit, curseur de prix, « Top Afrique », groupement
+        // par cardType et compteurs facetés. Le revendeur vend le même
+        // catalogue, il doit pouvoir le filtrer de la même façon.
+        // Grille paginée (pas de lignes thématiques) : ici on vend, on ne
+        // navigue pas par univers.
+        $payload = app(\App\Support\CatalogQuery::class)
+            ->payload($request, perPage: 24, withRows: false);
 
-        $allowedSorts = ['popular', 'price_asc', 'price_desc', 'newest'];
-        $sort = in_array($request->get('sort'), $allowedSorts, true) ? $request->get('sort') : 'popular';
-
-        $filters = [
-            'search'      => $request->get('search'),
-            'category'    => $request->get('category'),
-            'price_range' => $request->get('price_range'),
-            'country'     => $request->get('country'),
-            'sort'        => $sort,
-        ];
-
-        $result = $service->getFilteredProducts($filters, $page, $perPage);
-
-        return view('vendor.sale.shop', [
-            'reseller'          => $reseller,
-            'products'          => $result['items'],
-            'pagination'        => [
-                'total'        => $result['total'],
-                'current_page' => $result['current_page'],
-                'last_page'    => $result['last_page'],
-                'per_page'     => $result['per_page'],
-            ],
-            'categories'        => $service->getCategories(),
-            'search'            => $filters['search'],
-            'categoryId'        => $filters['category'],
-            'priceRange'        => $filters['price_range'] ?? [],
-            'selectedCountries' => $filters['country'] ?? [],
-            'sort'              => $sort,
-        ]);
+        return view('vendor.sale.shop', array_merge($payload, [
+            'reseller' => $reseller,
+        ]));
     }
 
     /**
@@ -162,7 +144,7 @@ class SaleController extends Controller
         }
 
         $commission  = round($subtotal * ((float) $reseller->commission_rate / 100), 2);
-        $externalRef = 'KAV_' . time() . '_' . rand(1000, 9999);
+        $externalRef = 'KAV_' . time() . '_' . strtoupper(bin2hex(random_bytes(4)));
 
         try {
             $order = DB::transaction(function () use ($reseller, $items, $subtotal, $commission, $request, $externalRef) {
@@ -315,7 +297,7 @@ class SaleController extends Controller
         }
 
         $commission  = round($subtotal * ((float) $reseller->commission_rate / 100), 2);
-        $externalRef = 'SIM_' . time() . '_' . rand(1000, 9999);
+        $externalRef = 'SIM_' . time() . '_' . strtoupper(bin2hex(random_bytes(4)));
 
         try {
             $order = DB::transaction(function () use ($reseller, $items, $subtotal, $commission, $request, $externalRef) {
@@ -442,7 +424,7 @@ class SaleController extends Controller
         }
 
         $commission  = round($subtotal * ((float) $reseller->commission_rate / 100), 2);
-        $externalRef = 'CASH_' . time() . '_' . rand(1000, 9999);
+        $externalRef = 'CASH_' . time() . '_' . strtoupper(bin2hex(random_bytes(4)));
 
         try {
             $order = DB::transaction(function () use ($reseller, $items, $subtotal, $commission, $request, $externalRef) {
@@ -674,27 +656,55 @@ class SaleController extends Controller
                 ]);
             }
 
-            // 2. Re-vérifie le solde au cas où
-            if ((float) $reseller->wallet_balance < (float) $order->subtotal) {
-                $order->update(['status' => ResellerOrder::STATUS_FAILED, 'notes' => 'Solde wallet insuffisant au moment de la finalisation']);
+            // 2. Transaction courte : verrou de la commande + re-test du statut
+            //    À L'INTÉRIEUR (idempotence). Un double polling AJAX qui passe la
+            //    garde du haut pendant le check PSP se sérialise ici : le second
+            //    voit PAYMENT_COMPLETED et sort sans re-débiter.
+            $outcome = DB::transaction(function () use ($reseller, $order) {
+                $lockedOrder = ResellerOrder::where('id', $order->id)->lockForUpdate()->first();
+
+                if ($lockedOrder->payment_status === ResellerOrder::PAYMENT_COMPLETED) {
+                    return 'already_completed';
+                }
+
+                // Re-vérifie le solde sur la ligne Reseller verrouillée (autoritaire)
+                $freshReseller = \App\Models\Reseller::where('id', $reseller->id)->lockForUpdate()->first();
+                if ((float) $freshReseller->wallet_balance < (float) $lockedOrder->subtotal) {
+                    $lockedOrder->update(['status' => ResellerOrder::STATUS_FAILED, 'notes' => 'Solde wallet insuffisant au moment de la finalisation']);
+                    return 'insufficient_balance';
+                }
+
+                // Débit + commission + état (le re-lock dans debit()/commission()
+                // est un savepoint sur la même ligne déjà verrouillée : sain)
+                $reseller->debit((float) $lockedOrder->subtotal, "Vente #{$lockedOrder->order_number}", $lockedOrder->order_number);
+                $reseller->commission((float) $lockedOrder->commission_earned, "Commission vente #{$lockedOrder->order_number}", $lockedOrder->order_number);
+                $reseller->increment('total_volume', $lockedOrder->subtotal);
+                $lockedOrder->update([
+                    'status'          => ResellerOrder::STATUS_PROCESSING,
+                    'payment_status'  => ResellerOrder::PAYMENT_COMPLETED,
+                ]);
+                return 'finalized';
+            });
+
+            if ($outcome === 'already_completed') {
+                // Réponse idempotente : même shape JSON que le succès
+                return response()->json([
+                    'success'      => true,
+                    'message'      => 'Paiement déjà confirmé.',
+                    'redirect_url' => route('vendor.orders.show', $order),
+                    'order_id'     => $order->id,
+                ]);
+            }
+
+            if ($outcome === 'insufficient_balance') {
                 return response()->json([
                     'success' => false,
                     'message' => 'Solde wallet insuffisant. Demande une recharge à ton gérant.',
                 ], 422);
             }
 
-            // 3. Débit + commission + état (atomic)
-            DB::transaction(function () use ($reseller, $order) {
-                $reseller->debit((float) $order->subtotal, "Vente #{$order->order_number}", $order->order_number);
-                $reseller->commission((float) $order->commission_earned, "Commission vente #{$order->order_number}", $order->order_number);
-                $reseller->increment('total_volume', $order->subtotal);
-                $order->update([
-                    'status'          => ResellerOrder::STATUS_PROCESSING,
-                    'payment_status'  => ResellerOrder::PAYMENT_COMPLETED,
-                ]);
-            });
-
-            // 4. Livraison via afrikard
+            // 3. Livraison via afrikard — HORS transaction (appel HTTP externe)
+            $order->refresh();
             $order->load('items');
             $this->tryDeliver($order);
 
@@ -946,7 +956,43 @@ class SaleController extends Controller
             return back()->with('error', 'Coche la case de confirmation : tu dois avoir rendu l\'argent au client.');
         }
 
-        // E-Billing : on appelle l'API transfer
+        // ============================================================
+        // Machine à états anti double-virement (H5) :
+        // 1. transaction {verrou + re-test des gardes + état 'refunding'}
+        // 2. virement E-Billing HORS transaction
+        // 3. transaction {verrou + crédits wallet + statut REFUNDED}
+        // ============================================================
+
+        // Transaction 1 : réserve le remboursement. Un double-clic concurrent
+        // trouve la commande en 'refunding' (ou 'refunded') et sort proprement.
+        $previousStatus = null;
+        try {
+            $claimed = DB::transaction(function () use ($order, &$previousStatus) {
+                $locked = ResellerOrder::where('id', $order->id)->lockForUpdate()->first();
+
+                // Re-test des gardes DANS le verrou
+                if ($locked->payment_status !== ResellerOrder::PAYMENT_COMPLETED
+                    || in_array($locked->status, [ResellerOrder::STATUS_REFUNDING, ResellerOrder::STATUS_REFUNDED], true)
+                    || $locked->cards()->count() > 0) {
+                    return false;
+                }
+
+                $previousStatus = $locked->status;
+                $locked->update(['status' => ResellerOrder::STATUS_REFUNDING]);
+                return true;
+            });
+        } catch (\Throwable $e) {
+            Log::error('Vendor refund claim exception', ['order_id' => $order->id, 'error' => $e->getMessage()]);
+            return back()->with('error', 'Erreur : ' . $e->getMessage());
+        }
+
+        if (!$claimed) {
+            return back()->with('error', 'Cette commande est déjà remboursée ou un remboursement est en cours.');
+        }
+
+        // E-Billing : on appelle l'API transfer — HORS transaction (appel HTTP).
+        // La référence de transfert est déterministe (REFUND_<ref d'origine>),
+        // le PSP peut donc dédupliquer un éventuel double appel.
         if ($order->payment_method === 'ebilling') {
             $result = $refundSvc->refund(
                 originalReference: $order->external_reference,
@@ -958,43 +1004,56 @@ class SaleController extends Controller
                 ],
             );
             if (!$result['ok']) {
+                // Échec du virement → retour à l'état antérieur pour permettre un retry
+                ResellerOrder::where('id', $order->id)->update(['status' => $previousStatus]);
                 return back()->with('error', 'Remboursement E-Billing refusé : ' . $result['message']);
             }
         }
 
+        // Transaction 2 : crédits wallet + clôture, sous verrou
         try {
             DB::transaction(function () use ($reseller, $order) {
-                $subtotal   = (float) $order->subtotal;
-                $commission = (float) $order->commission_earned;
+                $locked = ResellerOrder::where('id', $order->id)->lockForUpdate()->first();
+
+                $subtotal   = (float) $locked->subtotal;
+                $commission = (float) $locked->commission_earned;
 
                 // 1. Restaure le wallet du vendeur (les cartes n'ont pas été livrées
-                //    donc le float est restitué)
-                $reseller->credit($subtotal, null, "Remboursement vente #{$order->order_number}", $order->order_number);
+                //    donc le float est restitué). `refundCredit` et non `credit` :
+                //    une restitution ne doit JAMAIS buter sur le plafond, sinon
+                //    le client est remboursé et le vendeur perd son float.
+                $reseller->refundCredit($subtotal, "Remboursement vente #{$locked->order_number}", $locked->order_number);
 
                 // 2. Retire la commission précédemment créditée
                 if ($commission > 0) {
-                    $reseller->commission(-$commission, "Annulation commission vente #{$order->order_number}", $order->order_number);
+                    $reseller->commission(-$commission, "Annulation commission vente #{$locked->order_number}", $locked->order_number);
                 }
 
                 // 3. Si vente cash, le vendeur a rendu l'argent au client →
-                //    décrémente cash_to_remit (l'argent n'est plus à reverser)
-                if ($order->payment_method === 'cash') {
-                    $fresh = $reseller->refresh();
-                    $newCash = max(0, (float) $fresh->cash_to_remit - $subtotal);
-                    $fresh->cash_to_remit = $newCash;
-                    $fresh->save();
+                //    décrémente cash_to_remit (l'argent n'est plus à reverser).
+                //    Read-modify-write sous verrou (race-safe).
+                if ($locked->payment_method === 'cash') {
+                    $freshReseller = \App\Models\Reseller::where('id', $reseller->id)->lockForUpdate()->first();
+                    $freshReseller->cash_to_remit = max(0, (float) $freshReseller->cash_to_remit - $subtotal);
+                    $freshReseller->save();
                 }
 
-                $order->update([
+                $locked->update([
                     'status'         => ResellerOrder::STATUS_REFUNDED,
                     'payment_status' => ResellerOrder::PAYMENT_REFUNDED,
-                    'notes'          => 'Remboursée ' . ($order->payment_method === 'cash' ? '(cash rendu au client)' : '(E-Billing transfer)'),
+                    'notes'          => 'Remboursée ' . ($locked->payment_method === 'cash' ? '(cash rendu au client)' : '(E-Billing transfer)'),
                 ]);
             });
 
             return back()->with('success', 'Commande remboursée — ton wallet a été restauré.');
         } catch (\Throwable $e) {
             Log::error('Vendor refund exception', ['order_id' => $order->id, 'error' => $e->getMessage()]);
+            // Retour à l'état antérieur : le retry est sûr même côté E-Billing
+            // grâce à la référence de transfert déterministe (déduplication PSP).
+            ResellerOrder::where('id', $order->id)->update([
+                'status' => $previousStatus,
+                'notes'  => 'Échec finalisation remboursement — à réessayer : ' . $e->getMessage(),
+            ]);
             return back()->with('error', 'Erreur : ' . $e->getMessage());
         }
     }
@@ -1009,11 +1068,14 @@ class SaleController extends Controller
                 ?? $order->items->firstWhere('product_id', $productId);
 
             foreach ($cards as $card) {
-                ResellerCard::create([
+                // H4 : idempotence sur checkout_card_id — un rejeu (tryDeliver
+                // relancé) ne duplique pas la carte et n'entre pas en conflit
+                // avec la nouvelle contrainte unique reseller_cards.checkout_card_id.
+                $ccid  = $card['id'] ?? null;
+                $attrs = [
                     'reseller_order_id'      => $order->id,
                     'reseller_order_item_id' => $orderItem?->id,
                     'product_id'             => (string) $productId,
-                    'checkout_card_id'       => $card['id'] ?? null,
                     'name'                   => $orderItem?->name ?? 'Carte cadeau',
                     'brand'                  => $orderItem?->brand ?? null,
                     'serial_number'          => $card['serialNumber'] ?? null,
@@ -1024,7 +1086,10 @@ class SaleController extends Controller
                     'currency'               => $checkoutData['currency'] ?? 'XAF',
                     'image_url'              => $orderItem?->image_url,
                     'metadata'               => ['source' => 'vendor_sale'],
-                ]);
+                ];
+                $ccid !== null
+                    ? ResellerCard::firstOrCreate(['checkout_card_id' => $ccid], $attrs)
+                    : ResellerCard::create($attrs + ['checkout_card_id' => null]);
             }
         }
     }
@@ -1042,36 +1107,146 @@ class SaleController extends Controller
     /**
      * Liste des commandes du vendeur — avec filtres recherche / statut + stats.
      */
+    /**
+     * Envoie au client le lien vers ses cartes digitales.
+     *
+     * Même dispositif que pour les Cartes Gabon, et pour la même raison : le
+     * revendeur ne doit jamais détenir les codes. Il ne voit plus le QR — un QR
+     * affiché sur SON écran ne prouve rien et se scanne aussi bien par lui.
+     */
+    public function sendCards(Request $request, ResellerOrder $order)
+    {
+        $reseller = Auth::guard('vendor')->user();
+        abort_if($order->reseller_id !== $reseller->id, 403);
+
+        if ($order->claimed_at !== null) {
+            return back()->withErrors(['claim' => 'Le client a déjà récupéré ses cartes.']);
+        }
+
+        if ($order->claim_sends >= ResellerOrder::CLAIM_MAX_SENDS) {
+            return back()->withErrors(['claim' => 'Limite d\'envois atteinte. Contacte le support.']);
+        }
+
+        $request->validate([
+            'customer_phone_country'  => ['nullable', 'string', 'size:2'],
+            'customer_phone_national' => ['required_without:customer_phone', 'nullable', 'string', 'max:30'],
+            'customer_phone'          => ['required_without:customer_phone_national', 'nullable', 'string', 'max:30'],
+        ]);
+
+        $phone = \App\Support\PhoneInput::fromRequest($request, 'customer_phone');
+
+        if ($phone === null) {
+            return back()->withErrors(['claim' => 'Numéro incomplet : vérifie l\'indicatif et le numéro.']);
+        }
+
+        // Contournement évident du dispositif : saisir son propre numéro.
+        if (\App\Support\Phone::sameLine($phone, $reseller->phone)) {
+            Log::warning('Claim: tentative d\'envoi des cartes au revendeur lui-même', [
+                'order_id' => $order->id, 'reseller_id' => $reseller->id,
+            ]);
+
+            return back()->withErrors([
+                'claim' => 'Ce numéro est le tien. Les cartes doivent partir sur le téléphone du client.',
+            ]);
+        }
+
+        // Le compte du client est ouvert maintenant : les cartes doivent déjà y
+        // être quand il arrive.
+        $client = \App\Support\ClientAccount::findOrCreate(
+            $phone, $order->customer_name, \App\Support\ClientAccount::VIA_COUNTER,
+        );
+
+        if ($client) {
+            $order->forceFill(['user_id' => $client->id])->save();
+        }
+
+        $token = $order->issueClaimToken();
+        $lien  = route('claim.show', ['order' => $order->id, 'token' => $token]);
+
+        $message = app(\App\Services\WhatsAppNotifier::class)->text(
+            $phone,
+            "🎁 *KardAfrica* — tes cartes sont prêtes\n\n"
+            . 'Commande ' . $order->order_number . "\n"
+            . 'Montant : *' . number_format((float) $order->total_amount, 0, ',', ' ') . " FCFA*\n\n"
+            . "Ouvre ce lien pour voir tes codes :\n{$lien}\n\n"
+            . '⚠️ Le lien expire dans ' . ResellerOrder::CLAIM_TTL_MINUTES
+            . " minutes et ne s'ouvre qu'*une seule fois*.",
+            [
+                'category'  => \App\Models\WhatsAppMessage::CAT_TRANSACTIONAL,
+                'dedup_key' => "claim-{$order->id}-{$order->claim_sends}",
+                'context'   => ['reseller_order_claim', $order->id],
+            ],
+        );
+
+        if ($message === null) {
+            return back()->withErrors([
+                'claim' => "L'envoi WhatsApp a échoué. Vérifie le numéro, ou utilise l'affichage au comptoir.",
+            ]);
+        }
+
+        $order->forceFill([
+            'customer_phone' => $order->customer_phone ?: $phone,
+            'claim_sent_at'  => now(),
+            'claim_sent_to'  => $phone,
+            'claim_sends'    => $order->claim_sends + 1,
+        ])->save();
+
+        return back()->with('success', 'Lien envoyé sur le WhatsApp du client. Il expire dans '
+            . ResellerOrder::CLAIM_TTL_MINUTES . ' minutes.');
+    }
+
+    /**
+     * Repli : le client n'a pas WhatsApp. Les codes s'affichent une seule fois
+     * sur l'appareil du revendeur, tourné vers le client.
+     *
+     * Ce chemin réintroduit sciemment le risque que le dispositif écarte. Il
+     * existe parce que sans lui, un client sans WhatsApp ne peut pas être servi.
+     * Il est donc journalisé et distingué du canal normal.
+     */
+    public function revealCards(Request $request, ResellerOrder $order)
+    {
+        $reseller = Auth::guard('vendor')->user();
+        abort_if($order->reseller_id !== $reseller->id, 403);
+
+        if (! $order->consumeClaimLink('comptoir', $request->ip())) {
+            return back()->withErrors(['claim' => 'Ces cartes ont déjà été remises.']);
+        }
+
+        Log::warning('Claim: cartes affichées au comptoir (canal de repli)', [
+            'order_id' => $order->id, 'reseller_id' => $reseller->id,
+            'amount'   => (float) $order->total_amount,
+        ]);
+
+        // Les codes ne transitent qu'en session flash : jamais réécrits en base.
+        return back()->with('cards_once', $order->cards->map(fn ($c) => [
+            'name' => $c->name, 'code' => $c->card_code, 'pin' => $c->pin,
+        ])->all());
+    }
+
     public function orders(Request $request)
     {
         $reseller = Auth::guard('vendor')->user();
 
-        $query = $reseller->orders()->with('items');
+        // Un seul historique pour les deux natures de vente : les cartes
+        // digitales et les Cartes Gabon vivaient dans deux écrans distincts,
+        // impossible de savoir ce qui avait été vendu dans la journée sans
+        // additionner de tête. Le filtre `type` permet de les re-séparer.
+        $feed = app(VendorSalesFeed::class)->payload($request, $reseller, perPage: 15);
 
-        if ($request->filled('search')) {
-            $s = trim($request->search);
-            $query->where(function ($q) use ($s) {
-                $q->where('order_number', 'like', "%{$s}%")
-                  ->orWhere('customer_name', 'like', "%{$s}%")
-                  ->orWhere('customer_phone', 'like', "%{$s}%");
-            });
-        }
-
-        if ($request->filled('status') && in_array($request->status, ['pending', 'processing', 'completed', 'cancelled', 'failed'], true)) {
-            $query->where('status', $request->status);
-        }
-
-        $orders = $query->latest()->paginate(15)->withQueryString();
-
-        // Stats globales (sur toutes les commandes du vendeur, indépendantes des filtres)
+        // Chiffres globaux, indépendants des filtres. Ils viennent de
+        // VendorStats : seul le livré compte, et les deux commissions restent
+        // séparées (l'une est créditée au portefeuille, l'autre encaissée
+        // en espèces au comptoir).
+        $vendorStats = VendorStats::for($reseller);
         $stats = [
-            'total'      => $reseller->orders()->count(),
-            'completed'  => $reseller->orders()->where('status', 'completed')->count(),
-            'pending'    => $reseller->orders()->where('status', ResellerOrder::STATUS_PROCESSING)->count(),
-            'volume'     => (float) $reseller->orders()->where('status', 'completed')->sum('total_amount'),
-            'commission' => (float) $reseller->orders()->sum('commission_earned'),
+            'total'            => $feed['typeCounts']['digital'] + $feed['typeCounts']['local'],
+            'completed'        => $vendorStats->salesCount(),
+            'pending'          => $vendorStats->awaitingPayment() + $vendorStats->delivering(),
+            'volume'           => $vendorStats->volume(),
+            'commission'       => $vendorStats->digitalCommission(),
+            'local_commission' => $vendorStats->localCommission(),
         ];
 
-        return view('vendor.sale.orders', compact('orders', 'stats'));
+        return view('vendor.sale.orders', array_merge($feed, compact('stats')));
     }
 }

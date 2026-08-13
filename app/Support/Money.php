@@ -83,6 +83,37 @@ class Money
     }
 
     /**
+     * Symbole d'affichage par devise (convention française : symbole après le
+     * montant, ex. "5 €"). Les devises sans symbole propre gardent leur code.
+     */
+    public const CURRENCY_SYMBOLS = [
+        'EUR' => '€', 'USD' => '$', 'GBP' => '£', 'AED' => 'AED', 'CAD' => 'CA$',
+        'AUD' => 'A$', 'ARS' => 'ARS', 'BRL' => 'R$', 'TRY' => '₺', 'MXN' => 'MX$',
+        'INR' => '₹', 'ZAR' => 'R', 'NGN' => '₦',
+    ];
+
+    /**
+     * Formate la valeur FACIALE dans sa devise d'origine, ex. "5 €", "100 $".
+     *
+     * Renvoie null pour XAF/XOF : le montant d'origine y est déjà le FCFA
+     * affiché, l'afficher deux fois serait redondant.
+     */
+    public static function formatOriginal(int|float $amount, ?string $currency = 'XAF'): ?string
+    {
+        $code = strtoupper($currency ?: 'XAF');
+        if ($code === 'XAF' || $code === 'XOF' || $amount <= 0) {
+            return null;
+        }
+
+        // Décimales : entier si le montant est rond (5 → "5"), sinon 2 (4,99).
+        $decimals = (fmod((float) $amount, 1.0) === 0.0) ? 0 : 2;
+        $value    = number_format((float) $amount, $decimals, ',', ' ');
+        $symbol   = self::CURRENCY_SYMBOLS[$code] ?? $code;
+
+        return $value . ' ' . $symbol;
+    }
+
+    /**
      * Map [code => rate] courant — pour synchroniser le frontend (JS web et
      * mobile). Lit la BDD pour les devises admin-editable, fallback sinon.
      * Memo par process : ne ré-interroge la BDD qu'une fois.
@@ -125,10 +156,41 @@ class Money
     /**
      * Résout le taux d'une devise : memo en mémoire (lui-même alimenté par BDD).
      */
+    /**
+     * La devise a-t-elle un taux RÉEL ? `resolveRate` retombe silencieusement
+     * sur 1 pour les devises inconnues (IQD, RUB, NZD…), ce qui produit des
+     * conversions absurdes. Tout calcul comparatif doit s'en prémunir.
+     */
+    public static function hasRate(?string $currency): bool
+    {
+        $code = strtoupper($currency ?: '');
+        return $code !== '' && array_key_exists($code, self::currentRates());
+    }
+
     private static function resolveRate(string $code): float
     {
         $rates = self::currentRates();
-        return (float) ($rates[$code] ?? 1);
+
+        // Une devise sans taux valait 1 EN SILENCE : 20, 50 et 75 PLN
+        // affichaient tous « 100 FCFA » après l'arrondi. La visibilité est
+        // désormais tranchée en amont par `catalog.market_currencies`, mais si
+        // un produit hors marché atteint quand même la conversion, il faut le
+        // savoir — c'est le signe qu'un chemin d'affichage a échappé au filtre.
+        if (! array_key_exists($code, $rates)) {
+            // `Money` est volontairement utilisable hors framework (MoneyTest
+            // tourne sans Laravel) : journaliser inconditionnellement cassait
+            // « A facade root has not been set ».
+            if (function_exists('app') && app()->bound('log')) {
+                \Illuminate\Support\Facades\Log::warning(
+                    'Money: devise sans taux de change, conversion au taux 1',
+                    ['devise' => $code],
+                );
+            }
+
+            return 1.0;
+        }
+
+        return (float) $rates[$code];
     }
 
     /**

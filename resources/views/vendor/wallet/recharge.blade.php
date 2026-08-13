@@ -298,7 +298,7 @@
         <div class="rch-row">
             <div class="rch-field">
                 <label class="rch-label">Téléphone</label>
-                <input type="tel" x-model="phone" class="rch-input" placeholder="+241 06 87 13 09" value="{{ $reseller->phone }}">
+                <input type="tel" x-model="phone" class="rch-input" placeholder="+241 06 12 34 56" value="{{ $reseller->phone }}">
             </div>
             <div class="rch-field">
                 <label class="rch-label">Email</label>
@@ -344,6 +344,8 @@
                 </div>
             @endforeach
         </div>
+
+        <div style="margin-top:14px;">{{ $history->links() }}</div>
     @endif
 </div>
 

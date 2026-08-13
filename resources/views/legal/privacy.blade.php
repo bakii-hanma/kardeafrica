@@ -22,7 +22,7 @@
 
                 <h2>1. Responsable du traitement</h2>
                 <p>KardAfrica — Libreville, Gabon.<br>
-                   Contact : <a href="mailto:hello@kardafrica.com">hello@kardafrica.com</a> · +241 06 87 13 09</p>
+                   Contact : <a href="mailto:hello@kardafrica.com">hello@kardafrica.com</a> · +241 00 00 00 00</p>
 
                 <h2>2. Données que nous collectons</h2>
                 <ul>

@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\MerchantCard;
 use App\Models\MerchantCardPurchase;
 use App\Models\MerchantCardRedemption;
+use App\Models\MerchantSettlement;
+use App\Support\OwnerEarnings;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -19,50 +21,29 @@ class DashboardController extends Controller
     {
         $owner = Auth::guard('card_owner')->user();
 
-        $cardIds = $owner->cards()->pluck('id');
-
-        $stats = [
-            'cards_total'        => $cardIds->count(),
-            'cards_active'       => $owner->cards()->where('is_active', true)->count(),
-            'purchases_total'    => MerchantCardPurchase::whereIn('merchant_card_id', $cardIds)
-                                        ->where('payment_status', MerchantCardPurchase::PAYMENT_PAID)
-                                        ->count(),
-            'revenue_total'      => (float) MerchantCardPurchase::whereIn('merchant_card_id', $cardIds)
-                                        ->where('payment_status', MerchantCardPurchase::PAYMENT_PAID)
-                                        ->sum('amount'),
-            'net_total'          => (float) MerchantCardPurchase::whereIn('merchant_card_id', $cardIds)
-                                        ->where('payment_status', MerchantCardPurchase::PAYMENT_PAID)
-                                        ->sum('owner_net_amount'),
-            'redemptions_total'  => MerchantCardRedemption::whereHas('purchase', fn ($q) =>
-                                        $q->whereIn('merchant_card_id', $cardIds))->count(),
-            'balance_outstanding'=> (float) MerchantCardPurchase::whereIn('merchant_card_id', $cardIds)
-                                        ->where('payment_status', MerchantCardPurchase::PAYMENT_PAID)
-                                        ->whereIn('status', [
-                                            MerchantCardPurchase::STATUS_ACTIVE,
-                                            MerchantCardPurchase::STATUS_PARTIALLY_USED,
-                                        ])
-                                        ->sum('remaining_balance'),
-        ];
-
-        $recentPurchases = MerchantCardPurchase::whereIn('merchant_card_id', $cardIds)
-            ->where('payment_status', MerchantCardPurchase::PAYMENT_PAID)
-            ->with('merchantCard:id,name,visual_url')
-            ->latest('paid_at')
-            ->take(8)
-            ->get();
+        // Tous les chiffres viennent d'OwnerEarnings, qui sépare enfin trois
+        // choses que l'écran confondait : ce que les CLIENTS ont payé, ce que
+        // KardAfrica DOIT au commerçant (au prorata de ce qu'il a réellement
+        // servi), et la marchandise qu'il doit ENCORE servir.
+        $stats = OwnerEarnings::for($owner)->dashboard();
 
         $recentRedemptions = MerchantCardRedemption::whereHas('purchase', fn ($q) =>
-                $q->whereIn('merchant_card_id', $cardIds))
+                $q->whereIn('merchant_card_id', $owner->cards()->pluck('id')))
             ->with(['purchase.merchantCard:id,name'])
             ->latest('redeemed_at')
             ->take(6)
             ->get();
 
+        $settlements = MerchantSettlement::where('card_owner_id', $owner->id)
+            ->latest('settled_at')
+            ->take(5)
+            ->get();
+
         return view('owner.dashboard', [
             'owner'             => $owner,
             'stats'             => $stats,
-            'recentPurchases'   => $recentPurchases,
             'recentRedemptions' => $recentRedemptions,
+            'settlements'       => $settlements,
         ]);
     }
 

@@ -64,6 +64,51 @@ class MerchantCardController extends Controller
         ]);
     }
 
+    /**
+     * Suivi des VENTES REVENDEURS de cartes locales (activation gated).
+     * États : à récupérer (inactive) / récupérées (débit + code actif) / annulées.
+     */
+    public function resellerSales(Request $request)
+    {
+        $status = $request->query('status', '');
+
+        $query = \App\Models\MerchantCardPurchase::whereNotNull('reseller_id')
+            ->with([
+                'merchantCard:id,name,card_owner_id',
+                'merchantCard.owner:id,business_name',
+                'reseller:id,name,vendor_code',
+            ]);
+
+        if ($status === 'pending') {
+            $query->where('status', \App\Models\MerchantCardPurchase::STATUS_INACTIVE)
+                  ->where('payment_status', \App\Models\MerchantCardPurchase::PAYMENT_PENDING);
+        } elseif ($status === 'claimed') {
+            $query->whereNotNull('sold_by_reseller_at');
+        } elseif ($status === 'cancelled') {
+            $query->where('status', \App\Models\MerchantCardPurchase::STATUS_CANCELLED);
+        }
+
+        $sales = $query->latest()->paginate(30)->withQueryString();
+
+        $base = \App\Models\MerchantCardPurchase::whereNotNull('reseller_id');
+        $stats = [
+            'total'     => (clone $base)->count(),
+            'pending'   => (clone $base)->where('status', \App\Models\MerchantCardPurchase::STATUS_INACTIVE)
+                               ->where('payment_status', \App\Models\MerchantCardPurchase::PAYMENT_PENDING)->count(),
+            'claimed'   => (clone $base)->whereNotNull('sold_by_reseller_at')->count(),
+            'cancelled' => (clone $base)->where('status', \App\Models\MerchantCardPurchase::STATUS_CANCELLED)->count(),
+            // Volume encaissé (ventes récupérées) + commissions revendeurs associées
+            'volume'     => (float) (clone $base)->whereNotNull('sold_by_reseller_at')->sum('amount'),
+            'commission' => (float) (clone $base)->whereNotNull('sold_by_reseller_at')->sum('vendor_commission_amount'),
+        ];
+
+        return view('admin.merchant-cards.reseller-sales', [
+            'sales'  => $sales,
+            'stats'  => $stats,
+            'status' => $status,
+        ]);
+    }
+
     /** Formulaire création — par défaut la carte est active immédiatement */
     public function create(Request $request)
     {
@@ -159,6 +204,10 @@ class MerchantCardController extends Controller
             'rejection_reason' => null,
         ]);
 
+        $this->notifyOwner($merchantCard,
+            "🎉 KardAfrica : votre carte « {$merchantCard->name} » est approuvée et publiée ! "
+            . "Elle est maintenant en vente sur " . route('gabon.card', $merchantCard));
+
         return back()->with('success', "« {$merchantCard->name} » approuvée et publiée sur Kardafrica.");
     }
 
@@ -175,9 +224,27 @@ class MerchantCardController extends Controller
             'rejection_reason' => $data['rejection_reason'],
         ]);
 
+        $this->notifyOwner($merchantCard,
+            "KardAfrica : votre carte « {$merchantCard->name} » n'a pas été publiée.\n"
+            . "Motif : {$data['rejection_reason']}\n"
+            . "Vous pouvez la modifier et la re-soumettre depuis votre espace propriétaire.");
+
         return redirect()
             ->route('admin.merchant-cards.index', ['status' => 'rejected'])
             ->with('success', "« {$merchantCard->name} » refusée. Le marchand recevra le motif.");
+    }
+
+    /**
+     * Notifie le propriétaire de la carte par WhatsApp (WHAPI) si son numéro
+     * est renseigné. Tolérant : ne bloque jamais la décision admin.
+     */
+    private function notifyOwner(MerchantCard $merchantCard, string $message): void
+    {
+        $owner = $merchantCard->owner;
+        $number = $owner?->whatsapp_number ?: $owner?->phone;
+        if ($number) {
+            app(\App\Services\WhapiService::class)->sendText($number, $message);
+        }
     }
 
     /** Supprime la carte (soft si purchases existantes) */

@@ -505,7 +505,7 @@
                     <input type="checkbox" name="remember" value="1">
                     Se souvenir de moi
                 </label>
-                <a href="{{ route('home') }}" class="ka-link">← Retour au site</a>
+                <a href="{{ route('pro.password.request') }}" class="ka-link">Mot de passe oublié ?</a>
             </div>
 
             <button type="submit" class="ka-submit">
@@ -514,8 +514,10 @@
             </button>
 
             <div class="ka-foot">
-                Tu n'as pas encore d'accès propriétaire ?<br>
-                Contacte un administrateur via <a href="mailto:hello@kardafrica.com">hello@kardafrica.com</a>
+                Pas encore partenaire ?<br>
+                <a href="{{ route('pro.landing') }}"><strong>Créez votre compte pro</strong></a>
+                — inscription en 3 étapes, validation rapide.<br>
+                <a href="{{ route('home') }}" style="opacity:0.7;">← Retour au site</a>
             </div>
         </form>
     </div>

@@ -61,14 +61,16 @@ class UserController extends Controller
 
         // Note: Le model User a 'password' => 'hashed' dans les casts
         // Laravel hash automatiquement, pas besoin de Hash::make()
-        $user = User::create([
+        // M21 : role/is_active en affectation explicite (hors mass assignment)
+        $user = new User([
             'name' => $request->name,
             'email' => $request->email,
             'phone' => $request->phone,
             'password' => $request->password,
-            'role' => $request->role,
-            'is_active' => true,
         ]);
+        $user->role = $request->role;
+        $user->is_active = true;
+        $user->save();
 
         return redirect()->route('admin.users.show', $user)
             ->with('success', "L'utilisateur {$user->name} a ete cree avec succes.");
@@ -102,7 +104,8 @@ class UserController extends Controller
      */
     public function toggleActive(User $user)
     {
-        $user->update(['is_active' => !$user->is_active]);
+        $user->is_active = !$user->is_active;
+        $user->save();
 
         $status = $user->is_active ? 'active' : 'desactive';
         return back()->with('success', "L'utilisateur {$user->name} a ete {$status}.");
@@ -117,7 +120,9 @@ class UserController extends Controller
             'role' => 'required|in:user,moderator,admin',
         ]);
 
-        $user->update(['role' => $request->role]);
+        // M21 : role hors mass assignment (affectation directe)
+        $user->role = $request->role;
+        $user->save();
 
         return back()->with('success', "Le role de {$user->name} a ete mis a jour en '{$request->role}'.");
     }

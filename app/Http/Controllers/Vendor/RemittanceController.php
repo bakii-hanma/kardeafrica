@@ -35,6 +35,7 @@ class RemittanceController extends Controller
             ->take(5)
             ->get();
 
+        // Paginé : l'historique était coupé à 20 sans aucun moyen de voir plus loin.
         $history = ResellerCashRemittance::where('reseller_id', $reseller->id)
             ->whereIn('status', [
                 ResellerCashRemittance::STATUS_COMPLETED,
@@ -42,8 +43,8 @@ class RemittanceController extends Controller
                 ResellerCashRemittance::STATUS_CANCELLED,
             ])
             ->latest()
-            ->take(20)
-            ->get();
+            ->paginate(20)
+            ->withQueryString();
 
         return view('vendor.remittance.index', [
             'reseller' => $reseller,
@@ -90,7 +91,7 @@ class RemittanceController extends Controller
 
         $amount = $cashToRemit;
 
-        $externalRef = 'REMIT_' . time() . '_' . rand(1000, 9999);
+        $externalRef = 'REMIT_' . time() . '_' . strtoupper(bin2hex(random_bytes(4)));
 
         try {
             $remittance = DB::transaction(function () use ($reseller, $amount, $externalRef) {
@@ -210,12 +211,13 @@ class RemittanceController extends Controller
         }
 
         try {
-            // Vérifier statut E-Billing
+            // 1. Vérifier statut E-Billing — HORS transaction (appel HTTP externe)
             $check = Http::timeout(10)->get(config('services.payment_backend.check_url'), [
                 'external_reference' => $ref,
             ]);
 
             $status = 'pending';
+            $body   = null;
             if ($check->successful()) {
                 $body = $check->json();
                 $status = $body['status'] ?? ($body['data']['status'] ?? 'pending');
@@ -231,20 +233,46 @@ class RemittanceController extends Controller
                 ]);
             }
 
-            // Atomique : confirmer la remise + reconstituer le wallet
-            DB::transaction(function () use ($reseller, $remittance) {
-                $reseller->refresh();
-                $reseller->confirmCashRemittance((float) $remittance->amount, $remittance->external_reference);
-                $remittance->update([
+            // M19 — Réconciliation du montant : si le PSP renvoie le montant
+            // réellement payé, il doit correspondre au montant attendu. Défensif :
+            // check_status.php ne documente pas ce champ de façon garantie, on ne
+            // bloque donc que s'il est PRÉSENT et DIFFÉRENT.
+            $paidAmount = $body['data']['amount'] ?? $body['amount'] ?? null;
+            if ($paidAmount !== null && (int) round((float) $paidAmount) !== (int) round((float) $remittance->amount)) {
+                Log::warning('Remittance finalize: montant PSP différent du montant attendu', [
+                    'ref'      => $ref,
+                    'expected' => (float) $remittance->amount,
+                    'paid'     => (float) $paidAmount,
+                ]);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Le montant payé ne correspond pas au montant de la remise. Contacte le support.',
+                ], 422);
+            }
+
+            // 2. Transaction courte : verrou de la remise + re-test du statut
+            //    À L'INTÉRIEUR (idempotence anti double-polling), puis validation.
+            $already = DB::transaction(function () use ($reseller, $remittance) {
+                $locked = ResellerCashRemittance::where('id', $remittance->id)->lockForUpdate()->first();
+
+                if ($locked->status === ResellerCashRemittance::STATUS_COMPLETED) {
+                    return true; // déjà finalisée par un poll concurrent
+                }
+
+                $reseller->confirmCashRemittance((float) $locked->amount, $locked->external_reference);
+                $locked->update([
                     'status'       => ResellerCashRemittance::STATUS_COMPLETED,
                     'processed_at' => now(),
                 ]);
+                return false;
             });
 
             return response()->json([
                 'success'      => true,
                 'redirect_url' => route('vendor.remittance.index'),
-                'message'      => 'Remise confirmée — ton wallet a été reconstitué.',
+                'message'      => $already
+                    ? 'Remise déjà confirmée.'
+                    : 'Remise confirmée — ton wallet a été reconstitué.',
             ]);
         } catch (\Throwable $e) {
             Log::error('Remittance finalize exception', ['ref' => $ref, 'error' => $e->getMessage()]);

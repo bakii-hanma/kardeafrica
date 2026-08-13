@@ -34,6 +34,10 @@ class UserCard extends Model
         'face_value' => 'decimal:2',
         'expiration_date' => 'date',
         'metadata' => 'array',
+        // Le code et le PIN SONT la carte : les lire, c'est pouvoir la dépenser.
+        // Chiffrés au repos, la clé vivant dans l'environnement et jamais en base.
+        'card_code' => 'encrypted',
+        'pin' => 'encrypted',
     ];
 
     // Hidden fields for API - code/pin only shown on detail view

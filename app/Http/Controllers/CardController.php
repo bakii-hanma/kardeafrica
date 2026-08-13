@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Card;
 use App\Models\Order;
+use App\Models\MerchantCardPurchase;
 use App\Models\UserCard;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -60,7 +61,22 @@ class CardController extends Controller
             ->latest()
             ->get();
 
-        return view('cards.index', compact('cards', 'stats', 'pendingOrders'));
+        // Cartes Gabon achetées au comptoir. Elles ne passent pas par `UserCard` :
+        // ce miroir exige un `order_id`, qu'une vente de comptoir n'a pas. Les
+        // achats en ligne, eux, sont déjà dans `$cards` — les reprendre ici les
+        // afficherait deux fois, d'où le filtre sur l'absence de ligne de commande.
+        $localCards = MerchantCardPurchase::where('user_id', Auth::id())
+            ->whereNull('order_item_id')
+            ->whereIn('status', [
+                MerchantCardPurchase::STATUS_ACTIVE,
+                MerchantCardPurchase::STATUS_PARTIALLY_USED,
+                MerchantCardPurchase::STATUS_FULLY_USED,
+            ])
+            ->with('merchantCard:id,name,visual_url,category')
+            ->latest()
+            ->get();
+
+        return view('cards.index', compact('cards', 'stats', 'pendingOrders', 'localCards'));
     }
 
     /**

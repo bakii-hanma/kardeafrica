@@ -136,7 +136,9 @@ class OrderController extends Controller
 
     public function index(Request $request)
     {
-        $query = Order::with('user')->latest();
+        // `withCount` : la liste affiche le nombre d'articles par commande.
+        // Le charger par ligne coûtait une requête chacune — 20 par page.
+        $query = Order::with('user')->withCount('orderItems')->latest();
 
         // Filtre par statut
         if ($request->filled('status')) {
@@ -170,7 +172,15 @@ class OrderController extends Controller
 
         $orders = $query->paginate(20)->withQueryString();
 
-        return view('admin.orders.index', compact('orders'));
+        // Compteurs d'onglets : une requête groupée, pas une par statut.
+        // Ils comptent TOUTES les commandes, pas la page courante — un onglet
+        // qui n'annoncerait que sa page ne servirait à rien.
+        $statusCounts = Order::query()
+            ->select('status', \DB::raw('COUNT(*) as n'))
+            ->groupBy('status')
+            ->pluck('n', 'status');
+
+        return view('admin.orders.index', compact('orders', 'statusCounts'));
     }
 
     public function show(Order $order)
@@ -279,7 +289,7 @@ class OrderController extends Controller
                 DB::transaction(function () use ($order) {
                     $reseller = Reseller::lockForUpdate()->find($order->cash_reseller_id);
                     if ($reseller) {
-                        $reseller->credit((float) $order->total_amount, null, "Remboursement #{$order->order_number}", $order->order_number);
+                        $reseller->refundCredit((float) $order->total_amount, "Remboursement #{$order->order_number}", $order->order_number);
                     }
                     $order->update([
                         'status'         => Order::STATUS_REFUNDED,
@@ -333,12 +343,13 @@ class OrderController extends Controller
                 ?? $order->orderItems->firstWhere('product_id', $productId);
 
             foreach ($cards as $card) {
-                UserCard::create([
+                // H4 : idempotence sur checkout_card_id (rejeu livraison admin).
+                $ccid  = $card['id'] ?? null;
+                $attrs = [
                     'user_id'          => $order->user_id,
                     'order_id'         => $order->id,
                     'order_item_id'    => $orderItem?->id,
                     'product_id'       => (string) $productId,
-                    'checkout_card_id' => $card['id'] ?? null,
                     'name'             => $orderItem?->name ?? 'Carte cadeau',
                     'brand'            => $orderItem?->name ? explode(' ', $orderItem->name)[0] : null,
                     'serial_number'    => $card['serialNumber'] ?? null,
@@ -354,7 +365,10 @@ class OrderController extends Controller
                     'currency'         => $checkoutData['currency'] ?? 'XAF',
                     'image_url'        => $orderItem?->image_url,
                     'metadata'         => ['retry_admin' => true, 'checkout_order_id' => $checkoutData['orderId'] ?? null],
-                ]);
+                ];
+                $ccid !== null
+                    ? UserCard::firstOrCreate(['checkout_card_id' => $ccid], $attrs)
+                    : UserCard::create($attrs + ['checkout_card_id' => null]);
             }
         }
     }

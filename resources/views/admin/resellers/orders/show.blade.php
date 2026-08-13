@@ -212,14 +212,19 @@
             @endif
 
             {{-- Lien vers la commande côté vendeur (claim_token public) --}}
-            <a href="{{ route('claim.show', $order->claim_token) }}" target="_blank"
-               style="display:flex;align-items:center;gap:8px;padding:12px 14px;background:white;border:1px solid #E2E8F0;border-radius:12px;text-decoration:none;color:inherit;">
-                <svg style="width:14px;height:14px;color:#44A08D;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
-                <div style="flex:1;min-width:0;">
-                    <div style="font-size:12px;font-weight:700;color:#0F172A;">Lien client (claim)</div>
-                    <div style="font-size:10px;color:#94A3B8;font-family:monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ $order->claim_token }}</div>
-                </div>
-            </a>
+            {{-- Le lien de récupération n'est plus ouvrable depuis l'admin : c'est
+                 le même secret que celui du client, et personne d'autre que lui
+                 n'a à y accéder. Son état suffit au diagnostic. --}}
+            <span style="font-size:12px;color:#64748B;">
+                @if($order->claimed_at)
+                    Cartes récupérées le {{ $order->claimed_at->format('d/m/Y à H:i') }}
+                    @if($order->claim_channel) ({{ $order->claim_channel }}) @endif
+                @elseif($order->claim_sent_at)
+                    Lien envoyé au {{ $order->claim_sent_to }} le {{ $order->claim_sent_at->format('d/m/Y à H:i') }}
+                @else
+                    Cartes pas encore remises au client
+                @endif
+            </span>
 
             {{-- Lien retour --}}
             <a href="{{ route('admin.resellers.show', $reseller) }}"

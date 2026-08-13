@@ -22,6 +22,39 @@ Schedule::command('catalog:warm')->everyThirtyMinutes()->withoutOverlapping();
 // n'obtenaient JAMAIS leurs codes. --stop-when-empty : le worker s'arrête dès la
 // file vidée (pas de démon). La garde d'idempotence de ProcessCheckoutJob évite
 // tout double appel Bamboo si un job est rejoué.
-Schedule::command('queue:work --stop-when-empty --max-time=55 --tries=3 --backoff=30')
+// H15 : le worker DOIT consommer aussi la file `catalog` (WarmCatalogJob y est
+// dispatché en config Redis). Sans --queue=default,catalog, ces jobs
+// s'accumulaient indéfiniment et le stale-while-revalidate du catalogue était mort.
+$queueEvent = Schedule::command('queue:work --queue=default,catalog --stop-when-empty --max-time=55 --tries=3 --backoff=30')
     ->everyMinute()
     ->withoutOverlapping();
+
+// H6 : dead-man's switch — ping un moniteur externe (healthchecks.io ou
+// équivalent) à chaque passage réussi. Si le cron meurt sur l'hébergement
+// mutualisé, l'absence de ping déclenche une alerte au lieu d'un silence total.
+// Activé uniquement si HEALTHCHECK_QUEUE_URL est défini.
+if (config('services.healthcheck.queue_url')) {
+    $queueEvent->thenPing(config('services.healthcheck.queue_url'));
+}
+
+// Phase 3 — relances WhatsApp programmées (enfilent des jobs SendWhatsAppMessage,
+// drainés par le queue:work ci-dessus). Dédoublonnées → sûres à rejouer.
+// Panier abandonné : toutes les heures. Onboarding pro (KYC) : une fois par jour.
+Schedule::command('whatsapp:cart-reminders')->hourly()->withoutOverlapping();
+Schedule::command('whatsapp:kyc-reminders')->dailyAt('09:00')->withoutOverlapping();
+
+// Phase 4 — diffusion des nouvelles cartes Gabon sur le channel WhatsApp
+// (no-op si aucun channel configuré). Dédoublonnée par carte.
+Schedule::command('whatsapp:announce-new-cards')->hourly()->withoutOverlapping();
+
+// Catalogue WhatsApp Business : cartes populaires (prix réels, réévalués à
+// chaque passage) + cartes Gabon actives. `retailer_id` rend l'opération
+// idempotente — un rejeu met à jour au lieu de dupliquer. No-op tant que
+// WHAPI_CATALOG_SYNC_ENABLED=false (compte Business requis).
+Schedule::command('whatsapp:catalog-sync')->dailyAt('05:30')->withoutOverlapping();
+
+// Formules Daywatch : leur API publie les prix et les remises, qui bougent au
+// gré des promotions. Une passe quotidienne suffit — c'est un catalogue de six
+// lignes, pas un flux temps réel. La commande refuse un catalogue vide, donc
+// une panne côté Daywatch ne vide pas le rayon.
+Schedule::command('daywatch:sync')->dailyAt('04:20')->withoutOverlapping();

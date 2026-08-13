@@ -96,7 +96,8 @@ class VendorOrderController extends Controller
                 $commission = (float) $order->commission_earned;
 
                 // Restaure le wallet (les cartes n'ont pas été livrées)
-                $reseller->credit($subtotal, auth()->id(), "Remboursement admin #{$order->order_number}", $order->order_number);
+                // refundCredit : une restitution ne doit pas buter sur le plafond wallet.
+                $reseller->refundCredit($subtotal, "Remboursement admin #{$order->order_number}", $order->order_number);
                 if ($commission > 0) {
                     $reseller->commission(-$commission, "Annulation commission admin #{$order->order_number}", $order->order_number);
                 }

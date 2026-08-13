@@ -42,7 +42,7 @@
         $hash = 0;
         $str = $brandName;
         for ($i = 0; $i < strlen($str); $i++) {
-            $hash = ord($str[$i]) + (($hash << 5) - $hash);
+            $hash = (ord($str[$i]) + (($hash << 5) - $hash)) & 0x7FFFFFFF;
         }
         $brandColor = $colors[abs($hash % count($colors))];
     }

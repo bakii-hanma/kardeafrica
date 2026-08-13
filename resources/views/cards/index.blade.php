@@ -16,7 +16,7 @@
         }
         $palette = ['#0F172A', '#44A08D', '#0EA5E9', '#7C3AED', '#DC2626', '#EA580C', '#059669'];
         $hash = 0;
-        for ($i = 0; $i < strlen($name); $i++) $hash = ord($name[$i]) + (($hash << 5) - $hash);
+        for ($i = 0; $i < strlen($name); $i++) $hash = (ord($name[$i]) + (($hash << 5) - $hash)) & 0x7FFFFFFF;
         $idx = (($hash % count($palette)) + count($palette)) % count($palette);
         return $palette[$idx];
     };
@@ -96,6 +96,135 @@
                         </form>
                     </div>
                 @endforeach
+            </div>
+        @endif
+
+        {{-- ================================================================
+             CARTES GABON — achetées au comptoir chez un revendeur
+             ================================================================
+             Elles ne passent pas par `UserCard` (qui exige un `order_id`) : le
+             lien se fait directement par `merchant_card_purchases.user_id`. Le
+             code n'est révélé qu'à la demande, jamais affiché d'emblée — un
+             écran de téléphone se lit par-dessus l'épaule.
+        --}}
+        @if (session('success'))
+            <div class="mb-4 rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-3 text-sm font-semibold text-emerald-800">
+                {{ session('success') }}
+            </div>
+        @endif
+        @error('gift')
+            <div class="mb-4 rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm font-semibold text-red-700" role="alert">
+                {{ $message }}
+            </div>
+        @enderror
+
+        @if(isset($localCards) && $localCards->count() > 0)
+            <div class="mb-8" x-data="{ ouverte: null }">
+                <div class="flex items-center gap-2 mb-3">
+                    <h2 class="font-display text-lg font-bold text-slate-900">Mes Cartes Gabon</h2>
+                    <span class="text-[11px] font-bold text-amber-700 bg-amber-100 rounded-full px-2 py-0.5">
+                        {{ $localCards->count() }}
+                    </span>
+                </div>
+                <p class="text-xs text-slate-500 mb-4">
+                    Achetées au comptoir chez un revendeur. À présenter directement chez le commerçant.
+                </p>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    @foreach($localCards as $lc)
+                        @php
+                            $solde   = (float) $lc->remaining_balance;
+                            $epuisee = $lc->status === \App\Models\MerchantCardPurchase::STATUS_FULLY_USED;
+                            $expiree = $lc->expires_at?->isPast() ?? false;
+                        @endphp
+                        <div class="bg-white rounded-2xl border border-slate-200 shadow-card overflow-hidden {{ $epuisee || $expiree ? 'opacity-60' : '' }}">
+                            <div class="p-4">
+                                <div class="flex items-start justify-between gap-3 mb-3">
+                                    <div class="min-w-0">
+                                        <div class="font-bold text-slate-900 truncate">{{ $lc->merchantCard?->name ?? 'Carte Gabon' }}</div>
+                                        <div class="text-[11px] text-slate-500 mt-0.5">
+                                            Achetée le {{ $lc->created_at->format('d/m/Y') }}
+                                        </div>
+                                    </div>
+                                    @if($epuisee)
+                                        <span class="shrink-0 text-[10px] font-bold uppercase tracking-wide bg-slate-100 text-slate-500 rounded-full px-2 py-1">Épuisée</span>
+                                    @elseif($expiree)
+                                        <span class="shrink-0 text-[10px] font-bold uppercase tracking-wide bg-slate-100 text-slate-500 rounded-full px-2 py-1">Expirée</span>
+                                    @else
+                                        <span class="shrink-0 text-[10px] font-bold uppercase tracking-wide bg-emerald-100 text-emerald-700 rounded-full px-2 py-1">Active</span>
+                                    @endif
+                                </div>
+
+                                <div class="flex items-end justify-between gap-3 pb-3 border-b border-dashed border-slate-200">
+                                    <div>
+                                        <div class="text-[10px] uppercase tracking-wider font-bold text-slate-400">Solde restant</div>
+                                        <div class="font-display text-2xl font-bold text-slate-900 tabular-nums">
+                                            {{ number_format($solde, 0, ',', ' ') }}
+                                            <span class="text-xs font-semibold text-slate-400">FCFA</span>
+                                        </div>
+                                    </div>
+                                    @if($lc->expires_at)
+                                        <div class="text-[11px] text-slate-500 text-right">
+                                            Valable jusqu'au<br>
+                                            <strong class="text-slate-700">{{ $lc->expires_at->format('d/m/Y') }}</strong>
+                                        </div>
+                                    @endif
+                                </div>
+
+                                @if($lc->secretIsReadable() && ! $epuisee && ! $expiree)
+                                    <div class="pt-3">
+                                        <button type="button"
+                                                @click="ouverte = (ouverte === {{ $lc->id }} ? null : {{ $lc->id }})"
+                                                class="w-full min-h-[44px] rounded-xl bg-slate-900 text-white text-sm font-bold">
+                                            <span x-show="ouverte !== {{ $lc->id }}">Afficher mon code</span>
+                                            <span x-show="ouverte === {{ $lc->id }}" x-cloak>Masquer</span>
+                                        </button>
+
+                                        <div x-show="ouverte === {{ $lc->id }}" x-cloak class="mt-3 text-center">
+                                            @php $secret = $lc->secretForOwner(); @endphp
+                                            <div class="text-[10px] uppercase tracking-wider font-bold text-slate-400">Code</div>
+                                            <div class="font-mono text-2xl font-bold tracking-[0.14em] text-slate-900">{{ $secret['code'] }}</div>
+                                            <div class="mt-2 text-[10px] uppercase tracking-wider font-bold text-slate-400">PIN</div>
+                                            <div class="font-mono text-xl font-bold tracking-[0.22em] text-slate-900">{{ $secret['pin'] }}</div>
+                                            <p class="text-[11px] text-slate-500 mt-3 leading-relaxed">
+                                                Ne communique ton PIN qu'au commerçant, au moment de payer.
+                                            </p>
+                                        </div>
+                                    </div>
+                                    {{-- Offrir : la carte CHANGE de titulaire, elle n'est pas
+                                         copiée. Sinon deux personnes croiraient détenir le même
+                                         solde et l'une se présenterait pour rien chez le commerçant. --}}
+                                    <div class="mt-2" x-data="{ offrir: false }">
+                                        <button type="button" @click="offrir = !offrir"
+                                                class="w-full min-h-[44px] rounded-xl border border-slate-200 text-slate-600 text-sm font-bold">
+                                            🎁 Offrir cette carte
+                                        </button>
+
+                                        <form x-show="offrir" x-cloak method="POST"
+                                              action="{{ route('cards.gift', $lc) }}" class="mt-3"
+                                              onsubmit="return confirm('Cette carte quittera définitivement ton compte pour celui du destinataire. Continuer ?');">
+                                            @csrf
+                                            <x-phone-input name="recipient_phone" required
+                                                           label="WhatsApp du destinataire"
+                                                           hint="Il recevra le code sur son téléphone. La carte quittera ton compte." />
+                                            <input type="text" name="recipient_name" placeholder="Son prénom (facultatif)"
+                                                   class="w-full mt-2 px-3 py-3 border border-slate-300 rounded-xl text-sm">
+                                            <button type="submit"
+                                                    class="w-full mt-2 min-h-[46px] rounded-xl bg-[#44A08D] text-white text-sm font-bold">
+                                                Envoyer le cadeau
+                                            </button>
+                                        </form>
+                                    </div>
+                                @elseif(! $lc->secretIsReadable())
+                                    <p class="pt-3 text-[11px] text-slate-500 leading-relaxed">
+                                        Code remis avant la mise en place de ton compte : conserve la capture
+                                        que tu avais reçue. Le commerçant peut aussi te dépanner.
+                                    </p>
+                                @endif
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
             </div>
         @endif
 
@@ -203,8 +332,8 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 @foreach($cards as $i => $card)
                     @php
-                        $cardCode   = $card->card_code ?? $card->getRawOriginal('card_code') ?? '';
-                        $cardPin    = $card->pin ?? $card->getRawOriginal('pin') ?? null;
+                        $cardCode   = $card->card_code ?? '';
+                        $cardPin    = $card->pin;
                         $brandColor = $brandColorFor($card->brand ?? $card->name ?? '');
                         $statusBadge = match($card->status) {
                             'active'  => ['label' => 'Active',   'cls' => 'bg-emerald-500/30 border-emerald-300/40 text-white'],

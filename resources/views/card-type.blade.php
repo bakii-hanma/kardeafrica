@@ -1,6 +1,57 @@
 @extends('layouts.app')
 
-@section('title', $cardType['name'] . ' - KardAfrica')
+@section('title', $cardType['name'] . ' — Carte cadeau | KardAfrica')
+
+@php
+    // OG / partage WhatsApp : titre + prix + visuel de la carte.
+    $ogMin = collect($cardType['products'] ?? [])
+        ->map(fn ($p) => $p['price']['min'] ?? null)->filter(fn ($v) => $v && $v > 0)->min();
+    $ogCur = $cardType['products'][0]['price']['currencyCode'] ?? 'XAF';
+    $ogPrice = $ogMin ? \App\Support\Money::formatFcfa($ogMin, $ogCur) : null; // inclut déjà « FCFA »
+@endphp
+@section('meta_description', 'Carte cadeau ' . $cardType['name'] . ($ogPrice ? ' dès ' . $ogPrice : '') . ' — paiement Airtel Money, Moov Money ou carte bancaire, code reçu en 30 secondes sur KardAfrica.')
+@section('og_type', 'product')
+@section('og_title', 'Carte ' . $cardType['name'] . ($ogPrice ? ' — dès ' . $ogPrice : ''))
+@section('og_description', 'Payez par Airtel Money, Moov Money ou carte bancaire. Code reçu en 30 secondes.')
+@section('og_image', route('og.card', $cardType['internalId'] ?? $cardType['id'] ?? ''))
+@section('twitter_card', 'summary_large_image')
+{{-- P1 §1 — les URLs de variantes (/card-type/{id}/{montant}) canonicalisent vers
+     la fiche racine (décision SEO 10/08 : partageables, non indexées séparément). --}}
+@section('canonical', route('card-type.show', $cardType['internalId'] ?? $cardType['id'] ?? ''))
+
+@push('head')
+{{-- Schema.org Product + Offer + Breadcrumb (audit SEO/GEO) --}}
+<script type="application/ld+json">
+{!! json_encode([
+    '@context'    => 'https://schema.org',
+    '@type'       => 'Product',
+    'name'        => 'Carte cadeau ' . $cardType['name'],
+    'description' => \App\Support\ProductText::frenchOnly($cardType['description'] ?? '')
+        ?: ('Carte cadeau ' . $cardType['name'] . ' payable en Mobile Money (Airtel Money, Moov Money) — code reçu en 30 secondes.'),
+    'image'       => route('og.card', $cardType['internalId'] ?? $cardType['id'] ?? ''),
+    'brand'       => ['@type' => 'Brand', 'name' => $cardType['name']],
+    'offers'      => [
+        '@type'         => 'AggregateOffer',
+        'priceCurrency' => 'XAF',
+        'lowPrice'      => $ogMin ? \App\Support\Money::toFcfa($ogMin, $ogCur) : 0,
+        'offerCount'    => count($cardType['products'] ?? []),
+        'availability'  => 'https://schema.org/InStock',
+        'url'           => url()->current(),
+    ],
+], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) !!}
+</script>
+<script type="application/ld+json">
+{!! json_encode([
+    '@context'        => 'https://schema.org',
+    '@type'           => 'BreadcrumbList',
+    'itemListElement' => [
+        ['@type' => 'ListItem', 'position' => 1, 'name' => 'Accueil',  'item' => route('home')],
+        ['@type' => 'ListItem', 'position' => 2, 'name' => 'Boutique', 'item' => route('boutique')],
+        ['@type' => 'ListItem', 'position' => 3, 'name' => $cardType['name'], 'item' => url()->current()],
+    ],
+], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) !!}
+</script>
+@endpush
 
 @section('content')
 @php
@@ -22,7 +73,7 @@
     if ($brandColor === '#1F2937') {
         $palette = ['#0F172A', '#44A08D', '#0EA5E9', '#7C3AED', '#DC2626', '#EA580C', '#059669'];
         $hash = 0;
-        for ($i = 0; $i < strlen($name); $i++) $hash = ord($name[$i]) + (($hash << 5) - $hash);
+        for ($i = 0; $i < strlen($name); $i++) $hash = (ord($name[$i]) + (($hash << 5) - $hash)) & 0x7FFFFFFF;
         $idx = (($hash % count($palette)) + count($palette)) % count($palette);
         $brandColor = $palette[$idx];
     }
@@ -145,18 +196,64 @@
                     </h1>
 
                     @if(!empty($cardType['description']))
+                        {{-- frenchOnly : coupe la partie EN des descriptions bilingues afrikard --}}
                         <p class="text-sm text-slate-600 mt-3 leading-relaxed line-clamp-3">
-                            {{ $cardType['description'] }}
+                            {{ \App\Support\ProductText::frenchOnly($cardType['description']) }}
                         </p>
                     @endif
                 </div>
 
-                {{-- Montant sélectionné : juste le prix (pas de titre ni de compteur) --}}
-                <div class="mb-6">
+                {{-- P1 §1 — SÉLECTEUR DE VARIANTES : une pill par montant, chaque
+                     pill est un VRAI lien vers /card-type/{id}/{montant} (partageable,
+                     historique navigateur, indexable via la fiche racine). --}}
+                @php
+                    $ctIdForUrl = $cardType['internalId'] ?? $cardType['id'] ?? '';
+                    $faceToPath = function ($face) {
+                        $f = (float) $face;
+                        return fmod($f, 1.0) === 0.0 ? (string) (int) $f : rtrim(rtrim(number_format($f, 2, '.', ''), '0'), '.');
+                    };
+                    $variantList = collect($cardType['products'] ?? [])
+                        ->filter(fn ($p) => ($p['price']['min'] ?? 0) > 0)
+                        ->sortBy(fn ($p) => (float) ($p['price']['min'] ?? 0))
+                        ->values();
+                @endphp
+                @if($variantList->count() > 1)
+                    <div class="mb-5">
+                        <div class="text-[11px] font-bold uppercase tracking-wide text-slate-400 mb-2">Choisissez un montant</div>
+                        <div class="flex flex-wrap gap-2">
+                            @foreach($variantList as $v)
+                                @php
+                                    $isActive = ($v['id'] ?? null) == ($selectedVariantId ?? null);
+                                    $faceLbl  = \App\Support\Money::formatOriginal($v['minFaceValue'] ?? ($v['price']['min'] ?? 0), $v['price']['currencyCode'] ?? 'XAF')
+                                        ?? number_format((float) ($v['minFaceValue'] ?? 0), 0, ',', ' ');
+                                @endphp
+                                <a href="{{ route('card-type.variant', [$ctIdForUrl, $faceToPath($v['minFaceValue'] ?? ($v['price']['min'] ?? 0))]) }}"
+                                   class="flex flex-col items-center rounded-xl border-2 px-4 py-2.5 transition
+                                          {{ $isActive
+                                              ? 'border-[#44A08D] bg-teal-50 text-[#44A08D]'
+                                              : 'border-slate-200 bg-white text-slate-700 hover:border-[#44A08D]/50' }}">
+                                    <span class="text-base font-black tabular-nums leading-none">{{ $faceLbl }}</span>
+                                    <span class="mt-1 text-[11px] font-semibold tabular-nums {{ $isActive ? 'text-[#44A08D]' : 'text-slate-400' }}">
+                                        {{ \App\Support\Money::formatFcfa($v['price']['min'], $v['price']['currencyCode'] ?? 'XAF') }}
+                                    </span>
+                                </a>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
+
+                {{-- Montant sélectionné : prix FCFA + valeur faciale d'origine (ex. 100 €) --}}
+                <div class="mb-6 flex items-center gap-3 flex-wrap">
                     <div class="inline-flex items-center px-6 py-3 rounded-xl border-2 border-[#44A08D] bg-teal-50">
                         <span class="font-black text-xl text-[#44A08D] tabular-nums"
                               x-text="selectedProduct ? formatPrice(selectedProduct.price.min, selectedProduct.price.currencyCode) : '—'"></span>
                     </div>
+                    <span x-show="selectedProduct && formatOriginal(selectedProduct.minFaceValue ?? selectedProduct.price.min, selectedProduct.price.currencyCode)"
+                          class="inline-flex items-center gap-1.5 rounded-xl bg-slate-100 px-4 py-3 text-sm font-bold text-slate-600 tabular-nums"
+                          x-cloak>
+                        <span class="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Valeur</span>
+                        <span x-text="formatOriginal(selectedProduct.minFaceValue ?? selectedProduct.price.min, selectedProduct.price.currencyCode)"></span>
+                    </span>
                 </div>
 
                 {{-- Trust strip --}}
@@ -234,36 +331,63 @@
     </div>
 
     {{-- ================================================================
-         CARTES SIMILAIRES : les autres montants de la même carte (même type),
-         qui étaient auparavant dans la grille de sélection. Cliquer sélectionne
-         le montant et remonte en haut de la fiche.
+         P1 §9 — DANS LA MÊME CATÉGORIE : autres MARQUES uniquement (jamais la
+         même carte à d'autres montants — c'est le rôle du sélecteur en haut).
+         Même région priorisée côté contrôleur (sameCategorySuggestions).
          ================================================================ --}}
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-32" x-show="products.length > 1" x-cloak>
-        <div class="border-t border-slate-100 pt-8">
-            <h2 class="text-lg font-bold text-slate-900 mb-1">Cartes similaires</h2>
-            <p class="text-sm text-slate-500 mb-5">Autres montants disponibles pour cette carte.</p>
-            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                {{-- Même design que la boutique (composant x-product-card). Cliquer
-                     sélectionne le montant + remonte en haut ; le montant courant
-                     est masqué (x-show) puisqu'il est déjà affiché en haut. --}}
-                @foreach($cardType['products'] as $denom)
-                    <x-product-card
-                        :name="$denom['name']"
-                        :brand-label="$cardType['name']"
-                        :brand-color="$brandColor"
-                        :logo-url="$cardType['logoUrl'] ?? null"
-                        :price="$denom['price']['min'] ?? 0"
-                        :currency="$denom['price']['currencyCode'] ?? 'XAF'"
-                        :country-code="$cardType['countryCode'] ?? null"
-                        :discount="2"
-                        href="#"
-                        x-show="!selectedProduct || selectedProduct.id !== {{ (int) $denom['id'] }}"
-                        x-on:click.prevent="selectProduct({{ \Illuminate\Support\Js::from(['id' => $denom['id'], 'name' => $denom['name'], 'price' => $denom['price']]) }}); window.scrollTo({ top: 0, behavior: 'smooth' })"
-                    />
-                @endforeach
+    {{-- P1 §9 secondaire — LA MÊME CARTE DANS D'AUTRES RÉGIONS (Xbox EU, US…),
+         section clairement séparée des suggestions par catégorie. --}}
+    @if(!empty($otherRegions ?? []))
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4">
+            <div class="border-t border-slate-100 pt-8">
+                <h2 class="text-lg font-bold text-slate-900 mb-1">La même carte dans d'autres régions</h2>
+                <p class="text-sm text-slate-500 mb-5">Votre compte est enregistré ailleurs ? Choisissez la région correspondante.</p>
+                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                    @foreach($otherRegions as $reg)
+                        @php $regCtId = $reg['cardType']['internalId'] ?? $reg['cardType']['id'] ?? null; @endphp
+                        <x-product-card
+                            :name="$reg['cardType']['name'] ?? $reg['name']"
+                            :brand-label="$reg['cardType']['name'] ?? null"
+                            :logo-url="$reg['cardType']['logoUrl'] ?? null"
+                            :price="$reg['price']['min'] ?? 0"
+                            :face-value="$reg['minFaceValue'] ?? ($reg['price']['min'] ?? 0)"
+                            :currency="$reg['price']['currencyCode'] ?? 'XAF'"
+                            :country-code="$reg['cardType']['countryCode'] ?? null"
+                            :products-count="$reg['variants_count'] ?? null"
+                            :href="$regCtId ? route('card-type.show', $regCtId) : route('boutique')"
+                        />
+                    @endforeach
+                </div>
             </div>
         </div>
-    </div>
+    @endif
+
+    @if(!empty($suggestions))
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-32">
+            <div class="border-t border-slate-100 pt-8">
+                <h2 class="text-lg font-bold text-slate-900 mb-1">Dans la même catégorie</h2>
+                <p class="text-sm text-slate-500 mb-5">D'autres cartes qui pourraient vous plaire.</p>
+                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                    @foreach($suggestions as $sug)
+                        @php
+                            $sugCtId = $sug['cardType']['internalId'] ?? $sug['cardType']['id'] ?? null;
+                        @endphp
+                        <x-product-card
+                            :name="$sug['cardType']['name'] ?? $sug['name']"
+                            :brand-label="$sug['cardType']['name'] ?? null"
+                            :logo-url="$sug['cardType']['logoUrl'] ?? null"
+                            :price="$sug['price']['min'] ?? 0"
+                            :face-value="$sug['minFaceValue'] ?? ($sug['price']['min'] ?? 0)"
+                            :currency="$sug['price']['currencyCode'] ?? 'XAF'"
+                            :country-code="$sug['cardType']['countryCode'] ?? null"
+                            :products-count="$sug['variants_count'] ?? null"
+                            :href="$sugCtId ? route('card-type.show', $sugCtId) : route('boutique')"
+                        />
+                    @endforeach
+                </div>
+            </div>
+        </div>
+    @endif
 
     {{-- ================================================================
          BOTTOM ACTION BAR (sticky)
@@ -274,6 +398,11 @@
                 <span class="text-xs uppercase tracking-wider text-slate-400 font-bold block leading-none">Total à payer</span>
                 <span class="font-display text-2xl md:text-3xl font-black text-slate-900 mt-1 block leading-none tabular-nums"
                       x-text="selectedProduct ? formatPrice(selectedProduct.price.min, selectedProduct.price.currencyCode) : '—'"></span>
+                <span x-show="selectedProduct && formatOriginal(selectedProduct.minFaceValue ?? selectedProduct.price.min, selectedProduct.price.currencyCode)"
+                      class="text-xs font-semibold text-slate-400 mt-0.5 block leading-none tabular-nums"
+                      x-cloak>
+                    Valeur <span x-text="formatOriginal(selectedProduct.minFaceValue ?? selectedProduct.price.min, selectedProduct.price.currencyCode)"></span>
+                </span>
             </div>
 
             <div class="flex gap-2 sm:gap-3 flex-1 sm:max-w-md">
@@ -357,7 +486,12 @@
             },
 
             init() {
-                if (this.products.length > 0) this.selectedProduct = this.products[0];
+                // P1 §1 — la variante vient de l'URL (résolue serveur) ; à défaut,
+                // la moins chère (« à partir de »), jamais products[0] arbitraire.
+                const selectedId = @json($selectedVariantId ?? null);
+                this.selectedProduct = this.products.find(p => p.id == selectedId)
+                    || [...this.products].sort((a, b) => (a.price?.min ?? 1e15) - (b.price?.min ?? 1e15))[0]
+                    || null;
             },
 
             selectProduct(product) {

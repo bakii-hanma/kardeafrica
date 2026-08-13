@@ -7,8 +7,56 @@
 
     @include('partials._meta-pixel')
 
-    <title>@yield('title', 'Kardafrica - Cartes numériques en un clic !')</title>
+    <title>@yield('title', 'KardAfrica — Cartes cadeaux Netflix, Apple, Steam | Mobile Money Gabon')</title>
+    <meta name="description" content="@yield('meta_description', 'Achetez vos cartes cadeaux Netflix, Apple, Steam, PlayStation et plus de 300 marques. Paiement Airtel Money, Moov Money ou carte bancaire — code reçu en 30 secondes.')">
+    {{-- Canonical (audit SEO) : par défaut l'URL courante SANS query string —
+         /boutique?category=1 canonicalise vers /boutique. Surcharger via @@section('canonical'). --}}
+    <link rel="canonical" href="@yield('canonical', url()->current())">
     <link rel="icon" type="image/png" href="{{ asset('assets/logo/FAVCON-KARDAFRICA-.png') }}">
+
+    {{-- Open Graph / Twitter — aperçus riches lors du partage (WhatsApp = canal n°1).
+         Chaque page peut surcharger via @@section('og_title' / 'og_description' / 'og_image'). --}}
+    <meta property="og:site_name" content="KardAfrica">
+    <meta property="og:type" content="@yield('og_type', 'website')">
+    <meta property="og:locale" content="fr_FR">
+    <meta property="og:url" content="{{ url()->current() }}">
+    <meta property="og:title" content="@yield('og_title', 'KardAfrica — Cartes cadeaux en Mobile Money')">
+    <meta property="og:description" content="@yield('og_description', 'Netflix, Apple, Steam, PlayStation et +300 marques. Payez par Airtel Money, Moov Money ou carte bancaire — code reçu en 30 secondes.')">
+    <meta property="og:image" content="@yield('og_image', route('og.default'))">
+    <meta name="twitter:card" content="@yield('twitter_card', 'summary_large_image')">
+    <meta name="twitter:title" content="@yield('og_title', 'KardAfrica — Cartes cadeaux en Mobile Money')">
+    <meta name="twitter:description" content="@yield('og_description', 'Netflix, Apple, Steam, PlayStation et +300 marques. Paiement Mobile Money, code reçu en 30 secondes.')">
+    <meta name="twitter:image" content="@yield('og_image', route('og.default'))">
+
+    {{-- Schema.org Organization (audit SEO/GEO) — identité d'entité, distingue
+         KardAfrica de tout homonyme pour Google ET les moteurs génératifs.
+         ⚠️ Via json_encode : « @context » écrit en Blade brut serait compilé
+         comme la directive @@context de Laravel 12 (casse tout le layout). --}}
+    <script type="application/ld+json">
+    {!! json_encode([
+        '@context'     => 'https://schema.org',
+        '@type'        => 'Organization',
+        'name'         => 'KardAfrica',
+        'url'          => url('/'),
+        'logo'         => asset('assets/logo/FAVCON-KARDAFRICA-.png'),
+        'description'  => 'Marketplace africaine de cartes cadeaux numériques : plus de 300 marques internationales et cartes de commerçants gabonais, payables en Mobile Money (Airtel Money, Moov Money) — code reçu en 30 secondes.',
+        'email'        => 'hello@kardafrica.com',
+        'telephone'    => '+24100000000',
+        'areaServed'   => ['@type' => 'Country', 'name' => 'Gabon'],
+        'sameAs'       => [
+            'https://www.instagram.com/kardafrica',
+            'https://www.facebook.com/kardafrica',
+        ],
+        'contactPoint' => [
+            '@type'             => 'ContactPoint',
+            'telephone'         => '+24100000000',
+            'contactType'       => 'customer service',
+            'availableLanguage' => 'French',
+            'areaServed'        => 'GA',
+        ],
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) !!}
+    </script>
+    @stack('head')
     
     {{-- Preconnect au host des images de marques (S3) — accélère le chargement
          des visuels de cartes (handshake DNS/TLS anticipé). --}}
@@ -34,6 +82,25 @@
 
     <!-- Custom CSS -->
     <link rel="stylesheet" href="{{ asset('css/kardafrica-inline.css') }}?v=1">
+    <style>
+        /* Pastille panier : « pop » à CHAQUE ajout.
+           Une règle d'ID existante (#cartCount { animation: bounceIn }) ne se
+           rejoue qu'au passage de display:none à visible — donc au 1er article
+           seulement. Sélecteurs ID+classe pour passer devant elle. */
+        @keyframes ka-cart-pop { 0% { transform: scale(1); } 45% { transform: scale(1.3); } 100% { transform: scale(1); } }
+        #cartCount.ka-cart-pop,
+        #cartCountMobile.ka-cart-pop,
+        #cartCountMobileHeader.ka-cart-pop {
+            animation: ka-cart-pop 280ms cubic-bezier(.34,1.56,.64,1);
+        }
+        /* Mode calme : aucune animation de pastille, y compris celle d'origine. */
+        @media (prefers-reduced-motion: reduce) {
+            #cartCount, #cartCountMobile, #cartCountMobileHeader,
+            #cartCount.ka-cart-pop, #cartCountMobile.ka-cart-pop, #cartCountMobileHeader.ka-cart-pop {
+                animation: none !important;
+            }
+        }
+    </style>
 </head>
 <body x-data class="bg-gray-50 font-sans antialiased">
     <!-- Page Loader -->
@@ -50,7 +117,7 @@
             <div class="flex items-center gap-2">
                 <button id="cartBtnMobile" class="relative w-10 h-10 rounded-xl flex items-center justify-center text-white hover:bg-white/10 active:scale-95 transition" aria-label="Panier">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>
-                    <span id="cartCountMobileHeader" class="absolute top-1 right-1 min-w-[16px] h-4 px-1 rounded-full bg-[#44A08D] text-white text-[9px] font-bold flex items-center justify-center ring-2 ring-[#1F2937]">0</span>
+                    <span id="cartCountMobileHeader" style="display:none;" class="absolute top-1 right-1 min-w-[16px] h-4 px-1 rounded-full bg-[#44A08D] text-white text-[9px] font-bold flex items-center justify-center ring-2 ring-[#1F2937]">0</span>
                 </button>
                 <button id="mobileMenuBtn" class="w-10 h-10 rounded-xl flex items-center justify-center text-white hover:bg-white/10 active:scale-95 transition" aria-label="Menu">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
@@ -78,9 +145,9 @@
                         <span>hello@kardafrica.com</span>
                     </a>
                     <span class="text-white/10">·</span>
-                    <a href="tel:+241XXXXXXXX" class="flex items-center gap-1.5 hover:text-[#4ECDC4] transition">
+                    <a href="tel:+24100000000" class="flex items-center gap-1.5 hover:text-[#4ECDC4] transition">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
-                        <span>+241 06 87 13 09</span>
+                        <span>+241 00 00 00 00</span>
                     </a>
                     <span class="text-white/10">·</span>
                     <span class="flex items-center gap-1.5">
@@ -134,7 +201,7 @@
                 <!-- Logo -->
                 <a href="{{ route('home') }}" class="flex items-center gap-2.5 group">
                     <img src="{{ asset('assets/logo/FAVCON-KARDAFRICA-.png') }}"
-                         alt="Kardafrica"
+                         alt="KardAfrica"
                          class="h-9 w-9 transition-transform duration-300 group-hover:scale-105">
                     <span class="font-display text-xl font-bold text-white tracking-tight">KardAfrica</span>
                 </a>
@@ -212,15 +279,15 @@
                         </div>
                     </div>
 
-                    <a href="{{ url('/#how-it-works') }}"
-                       class="px-3.5 py-2 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-white/[0.06] transition">
-                        Comment ça marche
-                    </a>
-
                     <a href="{{ route('gabon.index') }}"
                        class="px-3.5 py-2 rounded-lg text-sm font-bold text-white bg-gradient-to-r from-[#44A08D] to-[#4ECDC4] hover:from-[#0F4F44] hover:to-[#44A08D] transition flex items-center gap-1.5 shadow-lg shadow-teal-500/20">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
                         Carte Gabon
+                    </a>
+
+                    <a href="{{ route('how-it-works') }}"
+                       class="px-3.5 py-2 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-white/[0.06] transition">
+                        Comment ça marche
                     </a>
                 </div>
 
@@ -243,7 +310,7 @@
                     <div class="relative" x-data="{ open: false }" @open-cart-dropdown.window="open = true" @toggle-cart-dropdown.window="open = !open" @click.away="open = false">
                         <button id="cartBtn" class="relative w-10 h-10 rounded-xl flex items-center justify-center text-slate-300 hover:text-white hover:bg-white/[0.06] active:scale-95 transition" aria-label="Panier">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>
-                            <span id="cartCount" class="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-[#44A08D] text-white text-[10px] font-bold flex items-center justify-center ring-2 ring-[#1F2937]">0</span>
+                            <span id="cartCount" style="display:none;" class="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-[#44A08D] text-white text-[10px] font-bold flex items-center justify-center ring-2 ring-[#1F2937]">0</span>
                         </button>
                         
                         <!-- Dropdown du panier -->
@@ -373,8 +440,12 @@
                     </div>
                     @else
                     <button @click="$dispatch('open-auth-modal'); $dispatch('set-auth-view', { view: 'login' })"
-                            class="px-4 py-2 rounded-xl bg-[#44A08D] hover:bg-[#3d9180] text-white text-sm font-semibold shadow-lg shadow-[#44A08D]/25 active:scale-95 transition">
+                            class="px-4 py-2 rounded-xl text-slate-200 hover:text-white hover:bg-white/[0.06] text-sm font-semibold active:scale-95 transition">
                         Connexion
+                    </button>
+                    <button @click="$dispatch('open-auth-modal'); $dispatch('set-auth-view', { view: 'register' })"
+                            class="px-4 py-2 rounded-xl bg-[#44A08D] hover:bg-[#3d9180] text-white text-sm font-semibold shadow-lg shadow-[#44A08D]/25 active:scale-95 transition">
+                        Créer un compte
                     </button>
                     @endauth
                 </div>
@@ -400,13 +471,23 @@
 
 
 
-    <!-- Chatbot — Assistant Kardafrica (Kara) -->
-    {{-- Backdrop mobile (sibling, pas enfant — évite les soucis de stacking) --}}
-    <div id="kaBotBackdrop" class="ka-bot-backdrop" aria-hidden="true"></div>
+    {{-- Assistante Kara MASQUÉE : remplacée par le bouton WhatsApp flottant
+         ci-dessous (support WhatsApp-first). Le markup reste en place (display:none)
+         pour réactivation facile si besoin. --}}
+    {{-- Bouton flottant WhatsApp (à la place de Kara, bas-droite) → conversation directe --}}
+    <a href="https://wa.me/24100000000?text={{ rawurlencode('Bonjour KardAfrica, j\'ai besoin d\'aide 🙂') }}"
+       target="_blank" rel="noopener" aria-label="Discuter sur WhatsApp"
+       class="fixed right-5 bottom-5 z-[997] flex items-center justify-center w-14 h-14 rounded-full bg-[#25D366] text-white shadow-xl shadow-[#25D366]/40 hover:bg-[#1ebe5b] active:scale-95 transition">
+        <svg class="w-7 h-7" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+    </a>
 
-    <div class="ka-bot-container" id="kaBot">
+    <!-- Chatbot — Assistant KardAfrica (Kara) — MASQUÉ -->
+    {{-- Backdrop mobile (sibling, pas enfant — évite les soucis de stacking) --}}
+    <div id="kaBotBackdrop" class="ka-bot-backdrop" aria-hidden="true" style="display:none;"></div>
+
+    <div class="ka-bot-container" id="kaBot" style="display:none;">
         {{-- Window --}}
-        <div id="chatbotWindow" class="ka-bot-window" role="dialog" aria-label="Assistant Kardafrica">
+        <div id="chatbotWindow" class="ka-bot-window" role="dialog" aria-label="Assistant KardAfrica">
 
             {{-- Header --}}
             <div class="ka-bot-header">
@@ -554,7 +635,7 @@
                     <span class="font-bold text-sm">Carte Gabon</span>
                 </a>
 
-                <a href="{{ url('/#how-it-works') }}" class="sidebar-item flex items-center gap-3 px-3 py-3 rounded-xl text-slate-700 hover:bg-slate-50 hover:text-[#44A08D] transition group">
+                <a href="{{ route('how-it-works') }}" class="sidebar-item flex items-center gap-3 px-3 py-3 rounded-xl text-slate-700 hover:bg-slate-50 hover:text-[#44A08D] transition group">
                     <div class="w-9 h-9 rounded-lg bg-slate-100 group-hover:bg-teal-50 flex items-center justify-center text-slate-600 group-hover:text-[#44A08D] transition">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                     </div>
@@ -585,9 +666,9 @@
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                             hello@kardafrica.com
                         </a>
-                        <a href="tel:+241000000" class="flex items-center gap-2 text-xs text-slate-600 hover:text-[#44A08D] transition">
+                        <a href="tel:+24100000000" class="flex items-center gap-2 text-xs text-slate-600 hover:text-[#44A08D] transition">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
-                            +241 06 87 13 09
+                            +241 00 00 00 00
                         </a>
                     </div>
                 </div>
@@ -736,8 +817,8 @@
                 <div class="grid md:grid-cols-2 gap-6 items-center">
                     <div>
                         <h3 class="font-display text-2xl md:text-3xl font-bold text-white tracking-tight">
-                            Promos & nouvelles cartes
-                            <span class="block text-[#4ECDC4]">droit dans ta boîte mail.</span>
+                            Promos et nouvelles cartes,
+                            <span class="block text-[#4ECDC4]">directement dans votre boîte mail.</span>
                         </h3>
                         <p class="text-sm text-slate-400 mt-2">Une newsletter par semaine. Pas de spam, désinscription en un clic.</p>
                     </div>
@@ -747,7 +828,7 @@
                             <div class="flex-1 flex items-center bg-white/[0.06] rounded-xl border border-white/10 focus-within:border-[#4ECDC4]/50 transition px-3.5"
                                  :class="{ 'border-rose-400/60': error, 'border-emerald-400/60': success }">
                                 <svg class="w-4 h-4 text-slate-400 mr-2 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-                                <input type="email" x-model="email" :disabled="loading || success" required placeholder="ton.email@exemple.com"
+                                <input type="email" x-model="email" :disabled="loading || success" required placeholder="votre.email@exemple.com"
                                        class="bg-transparent border-0 text-white placeholder-slate-500 focus:ring-0 w-full text-sm py-3 focus:outline-none disabled:opacity-50">
                             </div>
                             <button type="submit" :disabled="loading || success || !email"
@@ -757,9 +838,9 @@
                                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
                                 </svg>
                                 <svg x-show="success" x-cloak class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-                                <span x-show="!loading && !success">S'inscrire</span>
-                                <span x-show="loading" x-cloak>Inscription...</span>
-                                <span x-show="success" x-cloak>Inscrit !</span>
+                                <span x-show="!loading && !success">Je m'abonne</span>
+                                <span x-show="loading" x-cloak>Abonnement...</span>
+                                <span x-show="success" x-cloak>Abonné !</span>
                             </button>
                         </form>
                         <p x-show="message" x-cloak x-transition.opacity class="mt-2 text-xs"
@@ -781,7 +862,7 @@
                         <span class="font-display text-2xl font-bold text-white tracking-tight">KardAfrica</span>
                     </a>
                     <p class="mt-4 text-sm text-slate-400 leading-relaxed max-w-sm">
-                        La marketplace n°1 de cartes cadeaux numériques en Afrique. Plus de 300 marques, paiement Mobile Money, livraison instantanée.
+                        La marketplace africaine des cartes cadeaux numériques. Plus de 300 marques, paiement Mobile Money, livraison instantanée.
                     </p>
 
                     {{-- Social links --}}
@@ -821,11 +902,11 @@
                 <div>
                     <h4 class="text-white text-sm font-bold uppercase tracking-wider mb-4">Aide</h4>
                     <ul class="space-y-2.5 text-sm">
-                        <li><a href="{{ url('/#how-it-works') }}" class="hover:text-[#4ECDC4] transition">Comment ça marche</a></li>
+                        <li><a href="{{ route('how-it-works') }}" class="hover:text-[#4ECDC4] transition">Comment ça marche</a></li>
+                        <li><a href="{{ route('guides.index') }}" class="hover:text-[#4ECDC4] transition">Guides pratiques</a></li>
                         <li><a href="{{ route('support') }}" class="hover:text-[#4ECDC4] transition">Support 24/7</a></li>
                         <li><a href="{{ route('contact') }}" class="hover:text-[#4ECDC4] transition">Nous contacter</a></li>
-                        <li><a href="#" class="hover:text-[#4ECDC4] transition">FAQ</a></li>
-                        <li><a href="#" class="hover:text-[#4ECDC4] transition">Suivi de commande</a></li>
+                        <li><a href="{{ route('orders.index') }}" class="hover:text-[#4ECDC4] transition">Suivi de commande</a></li>
                     </ul>
                 </div>
 
@@ -851,13 +932,13 @@
                         <div class="text-sm text-white font-medium">hello@kardafrica.com</div>
                     </div>
                 </a>
-                <a href="tel:+241000000" class="flex items-center gap-3 group">
+                <a href="tel:+24100000000" class="flex items-center gap-3 group">
                     <div class="w-10 h-10 rounded-xl bg-white/[0.06] border border-white/10 flex items-center justify-center text-[#4ECDC4] group-hover:bg-[#44A08D] group-hover:text-white group-hover:border-[#44A08D] transition">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
                     </div>
                     <div>
                         <div class="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Téléphone</div>
-                        <div class="text-sm text-white font-medium">+241 06 87 13 09</div>
+                        <div class="text-sm text-white font-medium">+241 00 00 00 00</div>
                     </div>
                 </a>
                 <div class="flex items-center gap-3">
@@ -881,18 +962,11 @@
                     en Afrique.
                 </p>
 
-                {{-- Moyens de paiement --}}
-                <div class="flex items-center gap-3">
-                    <span class="text-[10px] uppercase tracking-wider text-slate-500 font-bold mr-2">Paiement</span>
-                    @foreach ([
-                        ['name' => 'Airtel Money',   'bg' => 'bg-rose-600'],
-                        ['name' => 'Moov Money',     'bg' => 'bg-blue-600'],
-                        ['name' => 'Visa',           'bg' => 'bg-indigo-700'],
-                    ] as $pay)
-                        <div class="px-2.5 py-1.5 rounded-md {{ $pay['bg'] }} text-white text-[10px] font-bold tracking-tight" title="{{ $pay['name'] }}">
-                            {{ strtoupper(substr($pay['name'], 0, 4)) }}
-                        </div>
-                    @endforeach
+                {{-- Moyens de paiement — logos couleur d'origine sur pastilles
+                     blanches (lisibles sur fond sombre). --}}
+                <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
+                    <span class="text-[10px] uppercase tracking-wider text-slate-500 font-bold mr-1">Paiement</span>
+                    @include('partials._payment-logos', ['h' => 'h-5', 'chip' => true])
                 </div>
             </div>
         </div>
@@ -906,7 +980,7 @@
             'Préparation de votre expérience...',
             'Connexion à la marketplace...',
             'Chargement des cartes numériques...',
-            'Initialisation de Kardafrica...',
+            'Initialisation de KardAfrica...',
             'Presque prêt...'
         ];
         
@@ -1267,9 +1341,28 @@
             }).format(amount).replace('XAF', 'FCFA');
         }
 
+        // Valeur faciale dans la devise d'origine (ex. "5 €", "100 $").
+        // Renvoie '' pour XAF/XOF (déjà affiché en FCFA).
+        const CURRENCY_SYMBOLS = {
+            EUR: '€', USD: '$', GBP: '£', AED: 'AED', CAD: 'CA$', AUD: 'A$',
+            ARS: 'ARS', BRL: 'R$', TRY: '₺', MXN: 'MX$', INR: '₹', ZAR: 'R', NGN: '₦',
+        };
+        function formatOriginal(amount, currencyCode) {
+            if (!currencyCode) return '';
+            const code = currencyCode.toUpperCase();
+            if (code === 'XAF' || code === 'XOF' || !(amount > 0)) return '';
+            const decimals = Number.isInteger(amount) ? 0 : 2;
+            const value = new Intl.NumberFormat('fr-FR', {
+                minimumFractionDigits: decimals,
+                maximumFractionDigits: decimals,
+            }).format(amount);
+            return value + ' ' + (CURRENCY_SYMBOLS[code] || code);
+        }
+
         // Expose globally
         window.convertToFCFA = convertToFCFA;
         window.formatFCFA = formatFCFA;
+        window.formatOriginal = formatOriginal;
         
         // Auto-convert prices
         function updatePrices() {
@@ -1575,9 +1668,23 @@
 
             const count = cartData ? (cartData.count || 0) : cart.length;
 
-            if (cartCount) cartCount.textContent = count;
-            if (cartCountMobile) cartCountMobile.textContent = count;
-            if (cartCountMobileHeader) cartCountMobileHeader.textContent = count;
+            // 1.4 — le badge n'apparaît que si le panier contient au moins 1 article.
+            // Au-delà de 9 on affiche « 9+ » : trois chiffres feraient éclater la
+            // pastille ronde du header.
+            var libelle = count > 9 ? '9+' : String(count);
+            [cartCount, cartCountMobile, cartCountMobileHeader].forEach(function (el) {
+                if (!el) return;
+                var avant = el.textContent;
+                el.textContent = libelle;
+                el.style.display = count > 0 ? '' : 'none';
+                // Micro-animation à l'ajout uniquement (pas au premier rendu ni
+                // à la suppression), et jamais en mode « moins d'animations ».
+                if (count > 0 && avant && avant !== libelle && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                    el.classList.remove('ka-cart-pop');
+                    void el.offsetWidth;            // force le redémarrage de l'animation
+                    el.classList.add('ka-cart-pop');
+                }
+            });
             
             const emptyCartHtml = `
                         <div class="text-center py-8">
@@ -1849,12 +1956,12 @@
                 const KB = [
                     {
                         keywords: ['bonjour', 'salut', 'hello', 'hi', 'coucou', 'bonsoir', 'hey'],
-                        reply: () => `Bonjour 👋 Je suis Kara, l'assistante de KardAfrica. Comment puis-je t'aider aujourd'hui ?`,
+                        reply: () => `Bonjour 👋 Je suis Kara, l'assistante de KardAfrica. Comment puis-je vous aider aujourd'hui ?`,
                         suggestions: ['Voir le catalogue', 'Comment payer ?', 'Délai de livraison'],
                     },
                     {
                         keywords: ['merci', 'thanks', 'thank you', 'super', 'parfait', 'génial'],
-                        reply: () => `Avec plaisir ! N'hésite pas si tu as d'autres questions 😊`,
+                        reply: () => `Avec plaisir ! N'hésitez pas si vous avez d'autres questions 😊`,
                         suggestions: ['Voir mes cartes', 'Contacter le support'],
                     },
                     {
@@ -1877,28 +1984,28 @@
                         links: [{ label: 'Voir Netflix →', href: routes.netflix }],
                     },
                     {
-                        keywords: ['spotify'], reply: () => `Cartes Spotify Premium pour profiter de ta musique en illimité.`,
+                        keywords: ['spotify'], reply: () => `Cartes Spotify Premium pour profiter de votre musique en illimité.`,
                         links: [{ label: 'Voir Spotify →', href: routes.spotify }],
                     },
                     {
                         keywords: ['playstation', 'psn', 'ps5', 'ps4'],
-                        reply: () => `Cartes PlayStation Store pour recharger ton compte PSN.`,
+                        reply: () => `Cartes PlayStation Store pour recharger votre compte PSN.`,
                         links: [{ label: 'Voir PlayStation →', href: routes.playstation }],
                     },
                     {
                         keywords: ['paiement', 'payer', 'paie', 'mobile money', 'airtel', 'moov', 'visa', 'mastercard', 'carte bancaire', 'comment paye'],
-                        reply: () => `Tu peux payer en :\n• Airtel Money 🟧\n• Moov Money 🟦\n• Visa 💳\n\nTout est sécurisé via notre partenaire Futursowax.`,
+                        reply: () => `Vous pouvez payer en :\n• Airtel Money 🟧\n• Moov Money 🟦\n• Visa 💳\n\nTout est sécurisé via notre partenaire Futursowax.`,
                         suggestions: ['Délai de livraison', 'Mon paiement a échoué'],
                     },
                     {
                         keywords: ['livraison', 'delai', 'délai', 'reçu', 'recu', 'recevoir', 'rapide', 'temps'],
-                        reply: () => `Livraison instantanée ! Le code arrive dans ta boîte mail en moins de 60 secondes après confirmation du paiement, et il est aussi visible dans « Mes cartes ».`,
+                        reply: () => `Livraison instantanée ! Le code arrive dans votre boîte mail en moins de 60 secondes après confirmation du paiement, et il est aussi visible dans « Mes cartes ».`,
                         links: isAuth ? [{ label: 'Voir mes cartes →', href: routes.cards }] : [{ label: 'Se connecter', href: '#', auth: true }],
                         suggestions: ['Je n\'ai pas reçu mon code', 'Contacter le support'],
                     },
                     {
                         keywords: ['pas reçu', 'pas recu', 'jamais reçu', 'rien reçu', 'manque', 'manquant', 'reçu', 'echoué', 'echouer', 'échec', 'echec'],
-                        reply: () => `Pas de panique 🙂 Vérifie d'abord ton dossier spam. Si rien dans 5 minutes, va dans « Mes commandes » et clique sur « Relancer la livraison ».`,
+                        reply: () => `Pas de panique 🙂 Vérifiez d'abord votre dossier spam. Si rien dans 5 minutes, allez dans « Mes commandes » et cliquez sur « Relancer la livraison ».`,
                         links: isAuth
                             ? [{ label: 'Mes commandes →', href: routes.orders }]
                             : [{ label: 'Centre d\'aide', href: routes.support }],
@@ -1906,14 +2013,14 @@
                     },
                     {
                         keywords: ['remboursement', 'rembourser', 'refund', 'annuler', 'annulation'],
-                        reply: () => `Si le débit a eu lieu sans validation de la commande, le montant est remboursé automatiquement sous 24h. Pour toute autre demande, contacte-nous.`,
+                        reply: () => `Si le débit a eu lieu sans validation de la commande, le montant est remboursé automatiquement sous 24h. Pour toute autre demande, contactez-nous.`,
                         links: [{ label: 'Contacter le support', href: routes.contact }],
                     },
                     {
                         keywords: ['compte', 'inscription', 'inscrire', 'créer', 'creer', 'register'],
                         reply: () => isAuth
-                            ? `Tu es déjà connecté ! Tu peux gérer ton compte depuis ton profil.`
-                            : `Crée ton compte en 30 secondes : juste un email + un mot de passe.`,
+                            ? `Vous êtes déjà connecté ! Vous pouvez gérer votre compte depuis votre profil.`
+                            : `Créez votre compte en 30 secondes : juste un email + un mot de passe.`,
                         links: isAuth
                             ? [{ label: 'Mon profil →', href: routes.profile }]
                             : [{ label: 'Créer un compte', href: '#', authRegister: true }],
@@ -1921,13 +2028,13 @@
                     {
                         keywords: ['connexion', 'se connecter', 'login', 'connecter', 'mot de passe', 'oublié'],
                         reply: () => isAuth
-                            ? `Tu es déjà connecté.`
-                            : `Connecte-toi avec ton email + mot de passe. Mot de passe oublié ? Clique sur « Mot de passe oublié » dans la page de connexion.`,
+                            ? `Vous êtes déjà connecté.`
+                            : `Connectez-vous avec votre email + mot de passe. Mot de passe oublié ? Cliquez sur « Mot de passe oublié » dans la page de connexion.`,
                         links: isAuth ? [] : [{ label: 'Se connecter', href: '#', auth: true }],
                     },
                     {
                         keywords: ['panier', 'cart'],
-                        reply: () => `Voici ton panier !`,
+                        reply: () => `Voici votre panier !`,
                         links: [{ label: 'Voir le panier →', href: routes.cart }],
                     },
                     {
@@ -1946,7 +2053,7 @@
                 ];
 
                 const FALLBACK = {
-                    reply: () => `Je ne suis pas sûre d'avoir bien compris 🤔. Tu peux essayer une question sur les cartes, le paiement ou la livraison — sinon notre équipe support est dispo en moins d'1h !`,
+                    reply: () => `Je ne suis pas sûre d'avoir bien compris 🤔. Vous pouvez essayer une question sur les cartes, le paiement ou la livraison — sinon notre équipe support est dispo en moins d'1h !`,
                     links: [{ label: 'Contacter le support', href: routes.contact }],
                     suggestions: ['Voir le catalogue', 'Comment payer ?', 'Délai de livraison'],
                 };
@@ -2161,7 +2268,7 @@
 
                 if (!restored) {
                     setTimeout(() => {
-                        renderMessage(`Bonjour 👋 Je suis Kara, l'assistante KardAfrica. Comment puis-je t'aider aujourd'hui ?`, false);
+                        renderMessage(`Bonjour 👋 Je suis Kara, l'assistante KardAfrica. Comment puis-je vous aider aujourd'hui ?`, false);
                     }, 100);
                 }
                 renderChips(DEFAULT_CHIPS);
@@ -2397,7 +2504,12 @@
                             <svg style="width: 22px; height: 22px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                         </div>
                         <div style="font-size: 14px; font-weight: 600; color: #334155;">Aucun résultat</div>
-                        <div style="font-size: 12px; color: #94A3B8; margin-top: 4px;">Essayez avec un autre nom de marque.</div>
+                        <div id="searchEmptyHint" style="font-size: 12px; color: #94A3B8; margin-top: 4px;">Essayez avec un autre nom de marque.</div>
+                        {{-- « Vous cherchez peut-être » — rempli par JS (did-you-mean) --}}
+                        <button type="button" id="searchDidYouMean" data-search-suggestion=""
+                                style="display: none; margin: 12px auto 0; padding: 8px 16px; border-radius: 9999px;
+                                       background: #E6F4F1; border: 1px solid #44A08D; color: #0F4F44;
+                                       font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit;"></button>
                     </div>
                 </div>
 
@@ -2438,6 +2550,76 @@
             let currentResults = [];
             let debounceTimer = null;
             let abortCtrl = null;
+            let lastQuery = '';
+
+            // §4 — Marques connues (pour synonymes + "vous cherchez peut-être").
+            const KNOWN_BRANDS = ['Netflix', 'Spotify', 'Apple', 'iTunes', 'App Store', 'PlayStation',
+                'Xbox', 'Steam', 'Amazon', 'Google Play', 'Nintendo', 'Roblox', 'Disney+',
+                'Deezer', 'Uber', 'Airbnb', 'Prime Video', 'Fortnite'];
+
+            // Synonymes / alias → terme de recherche canonique.
+            const SYNONYMS = {
+                'psn': 'PlayStation', 'ps': 'PlayStation', 'ps4': 'PlayStation', 'ps5': 'PlayStation',
+                'play station': 'PlayStation', 'itunes': 'Apple', 'app store': 'Apple', 'appstore': 'Apple',
+                'ios': 'Apple', 'play store': 'Google Play', 'playstore': 'Google Play', 'google': 'Google Play',
+                'xbox live': 'Xbox', 'game pass': 'Xbox', 'gamepass': 'Xbox', 'switch': 'Nintendo',
+                'eshop': 'Nintendo', 'prime': 'Amazon', 'disney': 'Disney+', 'disney plus': 'Disney+',
+            };
+
+            // Distance de Levenshtein (tolérance aux fautes : "netfix", "playsation").
+            function levenshtein(a, b) {
+                a = a.toLowerCase(); b = b.toLowerCase();
+                const m = a.length, n = b.length;
+                if (!m) return n; if (!n) return m;
+                const d = Array.from({ length: m + 1 }, (_, i) => [i, ...Array(n).fill(0)]);
+                for (let j = 0; j <= n; j++) d[0][j] = j;
+                for (let i = 1; i <= m; i++)
+                    for (let j = 1; j <= n; j++)
+                        d[i][j] = Math.min(d[i-1][j] + 1, d[i][j-1] + 1, d[i-1][j-1] + (a[i-1] === b[j-1] ? 0 : 1));
+                return d[m][n];
+            }
+
+            // Mappe une requête vers un terme canonique (synonyme exact, sinon requête).
+            function canonicalize(q) {
+                const key = q.trim().toLowerCase();
+                return SYNONYMS[key] || q;
+            }
+
+            // Marque la plus proche (pour "vous cherchez peut-être : X ?").
+            function closestBrand(q) {
+                const key = q.trim().toLowerCase();
+                if (key.length < 3) return null;
+                if (SYNONYMS[key]) return SYNONYMS[key];
+                let best = null, bestD = Infinity;
+                KNOWN_BRANDS.forEach(b => {
+                    const d = levenshtein(key, b);
+                    // tolère ~1 faute pour 3 lettres
+                    if (d < bestD && d <= Math.max(2, Math.floor(b.length / 3))) { bestD = d; best = b; }
+                });
+                return best;
+            }
+
+            const didYouMeanBtn = document.getElementById('searchDidYouMean');
+            const emptyHint = document.getElementById('searchEmptyHint');
+
+            // Affiche l'état "aucun résultat" avec une suggestion si possible.
+            function showEmpty(query) {
+                defaultState.style.display = 'none';
+                list.style.display = 'none';
+                emptyState.style.display = 'block';
+                const guess = closestBrand(query || '');
+                if (didYouMeanBtn) {
+                    if (guess && guess.toLowerCase() !== (query || '').trim().toLowerCase()) {
+                        didYouMeanBtn.textContent = 'Vous cherchez peut-être : ' + guess + ' ?';
+                        didYouMeanBtn.dataset.searchSuggestion = guess;
+                        didYouMeanBtn.style.display = 'inline-block';
+                        if (emptyHint) emptyHint.style.display = 'none';
+                    } else {
+                        didYouMeanBtn.style.display = 'none';
+                        if (emptyHint) emptyHint.style.display = '';
+                    }
+                }
+            }
 
             function open() {
                 modal.style.display = 'block';
@@ -2501,8 +2683,7 @@
                 defaultState.style.display = 'none';
 
                 if (!items.length) {
-                    list.style.display = 'none';
-                    emptyState.style.display = 'block';
+                    showEmpty(lastQuery);
                     return;
                 }
                 emptyState.style.display = 'none';
@@ -2559,6 +2740,7 @@
             }
 
             async function runSearch(q) {
+                lastQuery = q || '';
                 if (!q || q.trim().length < 2) {
                     showDefault();
                     hideLoading();
@@ -2567,19 +2749,31 @@
                 if (abortCtrl) abortCtrl.abort();
                 abortCtrl = new AbortController();
                 showLoading();
+                // §4 — synonymes/alias (PSN → PlayStation, iTunes → Apple…) avant requête.
+                const term = canonicalize(q);
                 try {
-                    const url = `${apiProductsRoute}?search=${encodeURIComponent(q)}&size=12`;
+                    const url = `${apiProductsRoute}?search=${encodeURIComponent(term)}&size=12`;
                     const res = await fetch(url, { signal: abortCtrl.signal, headers: { Accept: 'application/json' } });
                     if (!res.ok) throw new Error('http_' + res.status);
                     const data = await res.json();
-                    const items = (data && data.success && Array.isArray(data.data)) ? data.data : [];
+                    let items = (data && data.success && Array.isArray(data.data)) ? data.data : [];
+
+                    // Tolérance aux fautes : si 0 résultat, on retente avec la marque
+                    // la plus proche (netfix → Netflix) avant d'afficher l'état vide.
+                    if (!items.length) {
+                        const guess = closestBrand(q);
+                        if (guess && guess.toLowerCase() !== term.trim().toLowerCase()) {
+                            const res2 = await fetch(`${apiProductsRoute}?search=${encodeURIComponent(guess)}&size=12`,
+                                { signal: abortCtrl.signal, headers: { Accept: 'application/json' } });
+                            if (res2.ok) {
+                                const d2 = await res2.json();
+                                items = (d2 && d2.success && Array.isArray(d2.data)) ? d2.data : [];
+                            }
+                        }
+                    }
                     renderResults(items);
                 } catch (e) {
-                    if (e.name !== 'AbortError') {
-                        list.style.display = 'none';
-                        defaultState.style.display = 'none';
-                        emptyState.style.display = 'block';
-                    }
+                    if (e.name !== 'AbortError') showEmpty(q);
                 } finally {
                     hideLoading();
                 }

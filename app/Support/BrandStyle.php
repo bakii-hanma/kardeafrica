@@ -38,6 +38,8 @@ class BrandStyle
         if (str_contains($n, 'spotify'))                                                               return 'spotify';
         if (str_contains($n, 'steam'))                                                                 return 'steam';
         if (str_contains($n, 'amazon'))                                                                return 'amazon';
+        if (str_contains($n, 'binance'))                                                               return 'binance';
+        if (str_contains($n, 'deezer'))                                                                return 'deezer';
 
         return null;
     }
@@ -167,6 +169,24 @@ class BrandStyle
                 'chip_gold'  => true,
                 // Logo Roblox stylisé (carré incliné avec carré blanc au centre)
                 'logo'       => '<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><rect x="15" y="15" width="70" height="70" rx="6" fill="#ffffff" transform="rotate(8 50 50)"/><rect x="38" y="38" width="24" height="24" rx="2" fill="#232527" transform="rotate(8 50 50)"/></svg>',
+            ],
+            'deezer' => [
+                // Violet Deezer (#A238FF) sur fond sombre
+                'background' => 'linear-gradient(150deg, #2A1445 0%, #1A0B2E 55%, #3D1A6E 100%)',
+                'text'       => '#ffffff',
+                'glow'       => 'radial-gradient(circle at 75% 25%, rgba(162,56,255,0.32), transparent 55%)',
+                'chip_gold'  => true,
+                // Barres d'égaliseur (évoque l'identité Deezer sans le logo déposé)
+                'logo'       => '<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" fill="#A238FF"><rect x="14" y="52" width="16" height="34" rx="4"/><rect x="42" y="30" width="16" height="56" rx="4"/><rect x="70" y="14" width="16" height="72" rx="4"/></svg>',
+            ],
+            'binance' => [
+                // Noir Binance + halo jaune officiel (#F0B90B)
+                'background' => 'linear-gradient(160deg, #1E2026 0%, #12141A 60%, #2A2210 100%)',
+                'text'       => '#ffffff',
+                'glow'       => 'radial-gradient(circle at 78% 22%, rgba(240,185,11,0.28), transparent 55%)',
+                'chip_gold'  => true,
+                // Marque BNB : 4 losanges cardinaux + losange central
+                'logo'       => '<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><g transform="rotate(45 50 50)" fill="#F0B90B"><rect x="15.4" y="15.4" width="20.6" height="20.6" rx="2.5"/><rect x="64" y="15.4" width="20.6" height="20.6" rx="2.5"/><rect x="15.4" y="64" width="20.6" height="20.6" rx="2.5"/><rect x="64" y="64" width="20.6" height="20.6" rx="2.5"/><rect x="36.6" y="36.6" width="26.8" height="26.8" rx="3"/></g></svg>',
             ],
             'google' => [
                 'background' => 'linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%)',

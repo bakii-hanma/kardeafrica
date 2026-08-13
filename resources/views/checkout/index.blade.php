@@ -235,7 +235,7 @@
                             <div class="min-w-0 flex-1">
                                 <div class="text-sm font-bold text-emerald-900" x-text="vendor.name"></div>
                                 <div class="text-[11px] text-emerald-700 mt-0.5">
-                                    Vendeur Kardafrica — solde dispo : <span class="font-bold tabular-nums" x-text="fmt(vendor.available_balance) + ' FCFA'"></span>
+                                    Vendeur Kardafrica vérifié
                                 </div>
                                 <div x-show="!enoughBalance" x-cloak class="text-[11px] text-rose-700 font-semibold mt-1">
                                     Solde insuffisant pour cette commande. Choisis un autre vendeur.
@@ -503,7 +503,7 @@ window.cashPay = function () {
         open: false,
         code: '',
         phone: '',
-        vendor: { name: null, vendor_code: null, available_balance: 0 },
+        vendor: { name: null, vendor_code: null, can_cover: false },
         lookupStatus: 'idle', // idle | loading | found | notfound
         lookupTimer: null,
         cartTotal: 0,
@@ -523,7 +523,8 @@ window.cashPay = function () {
         },
 
         get enoughBalance() {
-            return this.vendor.available_balance >= this.cartTotal && this.cartTotal > 0;
+            // M23 : le serveur calcule la couverture — le solde n'est plus exposé.
+            return this.vendor.can_cover === true && this.cartTotal > 0;
         },
         get canSubmit() {
             return this.lookupStatus === 'found'
@@ -555,7 +556,7 @@ window.cashPay = function () {
                     this.vendor = {
                         name: data.name,
                         vendor_code: data.vendor_code,
-                        available_balance: Number(data.available_balance || 0),
+                        can_cover: data.can_cover === true,
                     };
                     this.lookupStatus = 'found';
                 } else {

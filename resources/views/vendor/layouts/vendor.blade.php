@@ -52,6 +52,7 @@
             display: flex; align-items: center; gap: 10px;
             color: white; text-decoration: none;
             flex-shrink: 0;
+            min-height: 44px;   /* cible tactile : c'est un lien vers le tableau */
         }
         .v-brand img { width: 32px; height: 32px; }
         .v-brand-text { display: none; }
@@ -81,12 +82,20 @@
             margin-left: auto;
         }
         .v-wallet-pill svg { width: 13px; height: 13px; color: white; }
-        .v-wallet-pill > span { color: rgba(255,255,255,0.80) !important; }
+        .v-wallet-pill > span { color: rgba(255,255,255,0.80) !important; font-size: 10px; }
+        /* 44px : cible tactile minimale, la pastille est cliquable (recharge). */
+        .v-wallet-pill { text-decoration: none; min-height: 44px; }
+        .v-wallet-pill:hover { filter: brightness(1.06); }
+        /* Sous 380px, le montant seul suffit — l'unité passerait à la ligne. */
+        @media (max-width: 379px) {
+            .v-wallet-pill { padding: 6px 10px; font-size: 12px; }
+            .v-wallet-pill > span { display: none; }
+        }
 
         /* User menu */
         .v-user-btn {
             display: inline-flex; align-items: center; justify-content: center;
-            width: 36px; height: 36px; border-radius: 50%;
+            width: 44px; height: 44px; border-radius: 50%;
             background: linear-gradient(135deg, #44A08D, #4ECDC4);
             color: white;
             border: 0; cursor: pointer;
@@ -143,7 +152,10 @@
             display: none;
             gap: 4px; align-items: center;
         }
-        @media (min-width: 768px) {
+        /* 1024px et non 768 : à 768 les 7 liens de la nav réclament ~950px
+           et débordaient horizontalement. En dessous, c'est la barre d'onglets
+           du bas qui assure la navigation. */
+        @media (min-width: 1024px) {
             .v-nav-desktop { display: inline-flex; }
         }
         .v-nav-link {
@@ -172,7 +184,7 @@
             padding: 16px 16px;
             padding-bottom: calc(96px + env(safe-area-inset-bottom)); /* room for bottom tab */
         }
-        @media (min-width: 768px) {
+        @media (min-width: 1024px) {
             .v-main { padding-bottom: 24px; }
         }
 
@@ -190,13 +202,18 @@
             padding-bottom: max(8px, env(safe-area-inset-bottom));
             box-shadow: 0 -8px 24px -8px rgba(15,23,42,0.10);
         }
-        @media (min-width: 768px) {
+        /* Aligné sur le point de bascule de la nav desktop : tant que la nav
+           du haut est masquée, la barre d'onglets doit rester présente. */
+        @media (min-width: 1024px) {
             .v-tabbar { display: none; }
         }
         .v-tabbar-inner {
             display: grid;
-            grid-template-columns: 1fr 1fr 1fr 1fr;
-            gap: 4px;
+            /* 5 onglets : Tableau, Encaisser, Vendre, Ventes, Compte. Avec 4
+               colonnes le dernier passait à la ligne et doublait la hauteur de
+               la barre (140px au lieu de 72), masquant le bas des pages. */
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            gap: 2px;
             position: relative;
             max-width: 480px; margin: 0 auto;
         }
@@ -327,10 +344,13 @@
                     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
                     Tableau
                 </a>
-                <a href="{{ route('vendor.sell') }}" class="v-nav-link {{ request()->routeIs('vendor.sell') ? 'active' : '' }}">
+                <a href="{{ route('vendor.sell') }}" class="v-nav-link {{ request()->routeIs('vendor.sell') || request()->routeIs('vendor.local-cards*') ? 'active' : '' }}">
                     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
                     Vendre
                 </a>
+                {{-- « Cartes locales » n'a plus d'onglet : le choix entre cartes
+                     digitales et Carte Gabon se fait par la bascule en tête de
+                     l'écran de vente (partials/_sell-mode-switch). --}}
                 <a href="{{ route('vendor.orders') }}" class="v-nav-link {{ request()->routeIs('vendor.orders*') ? 'active' : '' }}">
                     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
                     Mes ventes
@@ -355,8 +375,20 @@
                 </a>
             </nav>
 
+            {{-- Solde de vente utilisable, visible sur TOUTES les pages.
+                 Le style `.v-wallet-pill` existait sans être utilisé : le
+                 vendeur devait revenir au tableau de bord pour connaître son
+                 solde. On affiche le disponible (hors fonds réservés par les
+                 ventes cash en attente), c'est ce qu'il peut réellement engager. --}}
+            <a href="{{ route('vendor.wallet.recharge') }}" class="v-wallet-pill"
+               aria-label="Solde utilisable : {{ number_format($reseller->available_balance, 0, ',', ' ') }} FCFA. Recharger.">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
+                {{ number_format($reseller->available_balance, 0, ',', ' ') }}
+                <span>FCFA</span>
+            </a>
+
             {{-- User avatar (toggles panel) --}}
-            <button type="button" class="v-user-btn" @click="menuOpen = !menuOpen" :aria-expanded="menuOpen.toString()" style="margin-left:auto;">
+            <button type="button" class="v-user-btn" @click="menuOpen = !menuOpen" :aria-expanded="menuOpen.toString()" style="margin-left:10px;">
                 {{ strtoupper(substr($reseller->name, 0, 1)) }}
             </button>
 
@@ -448,7 +480,7 @@
                 @endif
             </a>
 
-            <a href="{{ route('vendor.sell') }}" class="v-tab v-tab-sell {{ request()->routeIs('vendor.sell') ? 'active' : '' }}">
+            <a href="{{ route('vendor.sell') }}" class="v-tab v-tab-sell {{ request()->routeIs('vendor.sell') || request()->routeIs('vendor.local-cards*') ? 'active' : '' }}">
                 <span class="v-tab-icon-wrap">
                     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
                 </span>

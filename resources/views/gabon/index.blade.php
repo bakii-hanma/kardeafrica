@@ -1,6 +1,7 @@
 @extends('layouts.app')
 
 @section('title', 'Carte Gabon — Cartes-cadeau des marchands gabonais')
+@section('meta_description', 'Offrez une carte cadeau d\'un commerçant gabonais : restaurants, boutiques, services. Payable par Airtel Money ou Moov Money, utilisable sur place — une exclusivité KardAfrica.')
 
 @php
     // Helper : reconstruit l'URL avec des params modifiés (mirror /boutique)
@@ -368,7 +369,7 @@
                                     @endif
 
                                     <div class="mt-2.5 sm:mt-3 pt-2.5 sm:pt-3 border-t border-slate-100 flex items-end justify-between gap-2">
-                                        <span class="text-[10px] text-slate-400 font-medium">Dès</span>
+                                        <span class="text-[10px] text-slate-400 font-medium">À partir de</span>
                                         <span class="text-sm sm:text-base font-black tabular-nums text-slate-900 whitespace-nowrap">
                                             {{ number_format($min, 0, ',', ' ') }} <span class="text-[10px] font-bold text-slate-500">FCFA</span>
                                         </span>
@@ -415,7 +416,7 @@
                                         </div>
                                     </div>
                                     <div class="shrink-0 text-right">
-                                        <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Dès</div>
+                                        <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400">À partir de</div>
                                         <div class="font-display text-lg font-bold text-slate-900 tabular-nums">{{ number_format($min ?? 0, 0, ',', ' ') }}<span class="text-xs text-slate-500 font-semibold ml-0.5">F</span></div>
                                         <span class="inline-flex items-center gap-1 mt-1 text-xs font-bold text-[#44A08D]">
                                             Voir

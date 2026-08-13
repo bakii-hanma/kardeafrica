@@ -51,7 +51,7 @@ class OrderController extends Controller
 
         $items       = collect($validated['items']);
         $subtotal    = $items->sum(fn($i) => $i['price'] * $i['quantity']);
-        $externalRef = 'SIM_' . time() . '_' . rand(1000, 9999);
+        $externalRef = 'SIM_' . time() . '_' . strtoupper(bin2hex(random_bytes(6)));
 
         try {
             $order = DB::transaction(function () use ($items, $subtotal, $externalRef, $user) {
@@ -143,7 +143,7 @@ class OrderController extends Controller
             ]);
         } catch (\Throwable $e) {
             Log::error('API Simulate: exception fatale', ['error' => $e->getMessage()]);
-            return response()->json(['success' => false, 'message' => 'Erreur simulation : ' . $e->getMessage()], 500);
+            return response()->json(['success' => false, 'message' => 'Erreur simulation.'], 500);
         }
     }
 
@@ -155,17 +155,24 @@ class OrderController extends Controller
         foreach ($checkoutData['items'] ?? [] as $apiItem) {
             $productId = $apiItem['productId'] ?? null;
             $cards     = $apiItem['cards'] ?? [];
+            $faceValue = $apiItem['productFaceValue'] ?? null;
             $orderItem = $order->orderItems
                 ->firstWhere('product_id', (string) $productId)
-                ?? $order->orderItems->firstWhere('product_id', $productId);
+                ?? $order->orderItems->firstWhere('product_id', $productId)
+                // Montants virtuels ("1571149v25") : afrikard renvoie l'id RÉEL
+                // → match par id réel + valeur native quand elle est connue.
+                ?? $order->orderItems->first(fn ($oi) => (int) $oi->product_id === (int) $productId
+                    && ($faceValue === null || $oi->native_value === null
+                        || (float) $oi->native_value == (float) $faceValue));
 
             foreach ($cards as $card) {
-                UserCard::create([
+                // H4 : idempotence sur checkout_card_id (rejeu simulation).
+                $ccid  = $card['id'] ?? null;
+                $attrs = [
                     'user_id'          => $order->user_id,
                     'order_id'         => $order->id,
                     'order_item_id'    => $orderItem?->id,
                     'product_id'       => (string) $productId,
-                    'checkout_card_id' => $card['id'] ?? null,
                     'name'             => $orderItem?->name ?? 'Carte cadeau',
                     'brand'            => $orderItem?->name ? explode(' ', $orderItem->name)[0] : null,
                     'serial_number'    => $card['serialNumber'] ?? null,
@@ -181,7 +188,10 @@ class OrderController extends Controller
                     'currency'         => $checkoutData['currency'] ?? 'XAF',
                     'image_url'        => $orderItem?->image_url,
                     'metadata'         => ['simulated_mobile' => true, 'checkout_order_id' => $checkoutData['orderId'] ?? null],
-                ]);
+                ];
+                $ccid !== null
+                    ? UserCard::firstOrCreate(['checkout_card_id' => $ccid], $attrs)
+                    : UserCard::create($attrs + ['checkout_card_id' => null]);
             }
         }
     }
@@ -225,13 +235,19 @@ class OrderController extends Controller
         // C1 (Palier 3) — ENFORCEMENT. Ce endpoint accepte items[].price du client
         // (bypass possible du panier). Le prix facturé est donc recalculé côté
         // serveur depuis le catalogue ; le prix client n'est jamais cru.
-        $items = $items->map(function ($i) use ($productService) {
-            $i['price'] = $productService->authoritativeUnitPrice($i['product_id'], $i['price'] ?? 0);
-            return $i;
-        });
+        // Fail-closed : prix non résolvable → 422, jamais le prix client.
+        try {
+            $items = $items->map(function ($i) use ($productService) {
+                $i['price'] = $productService->authoritativeUnitPrice($i['product_id'], $i['price'] ?? 0);
+                return $i;
+            });
+        } catch (\RuntimeException $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        }
 
         $subtotal = $items->sum(fn($i) => $i['price'] * $i['quantity']);
-        $externalRef = 'KARD_' . time() . '_' . rand(1000, 9999);
+        // C3 : référence non prédictible (rand(1000,9999) était énumérable)
+        $externalRef = 'KARD_' . time() . '_' . strtoupper(bin2hex(random_bytes(6)));
 
         $order = DB::transaction(function () use ($items, $subtotal, $externalRef, $user, $productService) {
             $order = Order::create([
@@ -331,12 +347,40 @@ class OrderController extends Controller
             ], 402);
         }
 
-        // Marquer Payment + Order comme paye
-        Payment::where('transaction_id', $order->external_reference)->update([
-            'status'       => Payment::STATUS_COMPLETED,
-            'processed_at' => now(),
-        ]);
-        $order->update(['payment_status' => Order::PAYMENT_STATUS_COMPLETED]);
+        // C9 — bascule "payé" sous verrou : deux appels simultanés à checkout ne
+        // doivent déclencher qu'UNE seule livraison afrikard. Seule la requête
+        // qui effectue la transition payment_status → COMPLETED continue.
+        // NB : le marqueur d'idempotence delivery_requested_at (H4) est posé et
+        // géré exclusivement par ProcessCheckoutJob (propriétaire de l'appel
+        // afrikard) — on ne le touche pas ici pour ne pas neutraliser le
+        // fallback async ci-dessous. L'idempotence du chemin sync est assurée
+        // par ce verrou + le firstOrCreate(checkout_card_id) dans saveCards.
+        $didFlip = DB::transaction(function () use ($order) {
+            $fresh = Order::whereKey($order->id)->lockForUpdate()->first();
+            if ($fresh->payment_status === Order::PAYMENT_STATUS_COMPLETED) {
+                return false;
+            }
+            Payment::where('transaction_id', $fresh->external_reference)->update([
+                'status'       => Payment::STATUS_COMPLETED,
+                'processed_at' => now(),
+            ]);
+            $fresh->payment_status = Order::PAYMENT_STATUS_COMPLETED;
+            $fresh->save();
+            return true;
+        });
+
+        if (!$didFlip) {
+            // Une requête concurrente (ou finalize) a déjà déclenché la livraison.
+            $order->refresh()->load('orderItems');
+            $cards = UserCard::where('order_id', $order->id)->get();
+            return response()->json([
+                'success'       => true,
+                'cards_pending' => $order->status !== Order::STATUS_COMPLETED,
+                'message'       => 'Traitement du paiement deja en cours.',
+                'order'         => $order,
+                'cards'         => $cards->makeVisible(['card_code', 'pin']),
+            ], 202);
+        }
 
         // Construire le payload pour l'API externe.
         // afrikard /orders/checkout attend la valeur NATIVE (10 EUR), pas le prix
@@ -384,10 +428,13 @@ class OrderController extends Controller
         }
 
         if (!($response->status() === 202 || $response->successful())) {
+            // C7 : ne jamais logger le corps brut — une réponse d'erreur du
+            // fournisseur peut contenir des codes de cartes.
+            $errBody = $response->json();
             Log::error('Sync checkout: API externe a echoue, fallback job async', [
                 'order_id' => $order->id,
                 'status'   => $response->status(),
-                'body'     => $response->body(),
+                'error'    => is_array($errBody) ? ($errBody['error'] ?? $errBody['message'] ?? null) : null,
             ]);
             ProcessCheckoutJob::dispatch($order);
 
@@ -481,7 +528,7 @@ class OrderController extends Controller
         $missing  = [];
         $payload  = [];
         foreach ($order->orderItems as $item) {
-            $productId = (int) $item->product_id;
+            $productId = (int) $item->product_id;   // id RÉEL afrikard ("1571149v25" → 1571149)
             $qty       = (int) $item->quantity;
 
             // 1. Native value stocké sur l'OrderItem
@@ -490,14 +537,17 @@ class OrderController extends Controller
                 continue;
             }
 
-            // 2. Lookup rapide
-            $resolved = $service->resolveNativeValue($productId, deepScan: false);
+            // 2. Lookup rapide — sur l'id ORIGINAL (un id virtuel encode
+            // lui-même sa valeur ; l'id réel retomberait sur le bas de plage).
+            $resolved = $service->resolveNativeValue($item->product_id, deepScan: false);
             if ($resolved && $resolved['value'] > 0) {
                 $payload[] = ['ProductId' => $productId, 'Quantity' => $qty, 'Value' => $resolved['value']];
                 continue;
             }
 
-            $missing[] = $productId;
+            // On garde l'id ORIGINAL (string) : un id virtuel doit être résolu
+            // tel quel au deepScan, et le cast (int) du payload suffit ensuite.
+            $missing[] = (string) $item->product_id;
         }
 
         // Deuxième passage : si manquants, on warm-cache (deepScan) et on retry
@@ -599,18 +649,23 @@ class OrderController extends Controller
         foreach ($items as $item) {
             $productId = $item['productId'] ?? null;
             $cards     = $item['cards'] ?? [];
+            $faceValue = $item['productFaceValue'] ?? null;
 
             $orderItem = $order->orderItems
                 ->firstWhere('product_id', (string) $productId)
-                ?? $order->orderItems->firstWhere('product_id', $productId);
+                ?? $order->orderItems->firstWhere('product_id', $productId)
+                // Montants virtuels ("1571149v25") : afrikard renvoie l'id RÉEL
+                // → match par id réel + valeur native quand elle est connue.
+                ?? $order->orderItems->first(fn ($oi) => (int) $oi->product_id === (int) $productId
+                    && ($faceValue === null || $oi->native_value === null
+                        || (float) $oi->native_value == (float) $faceValue));
 
             foreach ($cards as $card) {
-                $saved->push(UserCard::create([
+                $attrs = [
                     'user_id'           => $order->user_id,
                     'order_id'          => $order->id,
                     'order_item_id'     => $orderItem?->id,
                     'product_id'        => (string) $productId,
-                    'checkout_card_id'  => $card['id'] ?? null,
                     'name'              => $orderItem?->name ?? 'Carte cadeau',
                     'brand'             => $orderItem?->name ? explode(' ', $orderItem->name)[0] : null,
                     'serial_number'     => $card['serialNumber'] ?? null,
@@ -621,12 +676,20 @@ class OrderController extends Controller
                     'face_value'        => $item['productFaceValue'] ?? $orderItem?->unit_price ?? 0,
                     'currency'          => $checkoutData['currency'] ?? 'XAF',
                     'image_url'         => $orderItem?->image_url,
+                    // C7 : plus de duplication du code/PIN en clair dans metadata
+                    // (original_card_data supprimé — les champs dédiés suffisent).
                     'metadata'          => [
                         'checkout_order_id'   => $checkoutData['orderId'] ?? null,
                         'checkout_status'     => $checkoutData['status'] ?? null,
-                        'original_card_data'  => $card,
                     ],
-                ]));
+                ];
+
+                // H4 : idempotence — un rejeu avec le même checkout_card_id ne
+                // recrée pas la carte.
+                $checkoutCardId = $card['id'] ?? null;
+                $saved->push($checkoutCardId !== null
+                    ? UserCard::firstOrCreate(['checkout_card_id' => $checkoutCardId], $attrs)
+                    : UserCard::create($attrs + ['checkout_card_id' => null]));
             }
         }
 
