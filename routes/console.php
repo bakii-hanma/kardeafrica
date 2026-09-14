@@ -11,6 +11,10 @@ Artisan::command('inspire', function () {
 // Libère les fonds bloqués des commandes cash expirées (toutes les 5 minutes)
 Schedule::command('cash:expire-orders')->everyFiveMinutes()->withoutOverlapping();
 
+// Récupère les cartes afrikard/Bamboo générées en asynchrone (202 sans cartes) :
+// poll GET /orders/{requestId} uniquement — jamais de re-POST (anti double débit).
+Schedule::command('orders:recover')->everyFiveMinutes()->withoutOverlapping();
+
 // Garde le cache catalogue afrikard chaud (refresh toutes les 50 min, juste
 // avant l'expiration du cache de 1h). Évite que le premier visiteur paie le
 // fetch complet de ~70s qui dépasse max_execution_time PHP.

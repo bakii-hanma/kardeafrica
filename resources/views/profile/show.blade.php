@@ -184,7 +184,7 @@
                        style="display:inline-flex;align-items:center;gap:8px;
                               padding:12px 22px;border-radius:12px;
                               background:linear-gradient(135deg, #44A08D 0%, #4ECDC4 100%);
-                              color:#0F172A;font-weight:700;font-size:14px;text-decoration:none;
+                              color:#ffffff;font-weight:700;font-size:14px;text-decoration:none;
                               box-shadow:0 14px 30px -10px rgba(78,205,196,0.55), inset 0 1px 0 rgba(255,255,255,0.45);">
                         <svg style="width:14px;height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                         Modifier le profil

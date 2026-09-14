@@ -86,16 +86,21 @@ class SyncDaywatchCatalog extends Command
             }
         }
 
-        // Retrait de l'API = désactivation, pas suppression.
-        $obsoletes = DaywatchProduct::whereNotNull('plan_id')
-            ->whereNotIn('plan_id', $vus)
-            ->where('is_active', true);
+        // Retrait de l'API = désactivation, pas suppression. On désactive aussi
+        // les produits SANS plan_id : ils ne viennent pas de l'API partenaire
+        // (anciens seeds), n'ont pas de plan réel côté Daywatch, donc ne
+        // peuvent pas émettre de vrai code — ils ne doivent plus être vendables.
+        $obsoletes = DaywatchProduct::where('is_active', true)
+            ->where(function ($q) use ($vus) {
+                $q->whereNull('plan_id')
+                  ->orWhere(fn ($q2) => $q2->whereNotNull('plan_id')->whereNotIn('plan_id', $vus));
+            });
 
         $nbObsoletes = $obsoletes->count();
 
         if ($nbObsoletes > 0 && ! $sec) {
             $obsoletes->update(['is_active' => false]);
-            Log::info('daywatch:sync — formules désactivées', ['n' => $nbObsoletes]);
+            Log::info('daywatch:sync — formules désactivées (obsolètes ou sans plan_id)', ['n' => $nbObsoletes]);
         }
 
         $this->table(['Formule', 'Durée', 'Prix FCFA', 'Remise', 'Action'], $lignes);

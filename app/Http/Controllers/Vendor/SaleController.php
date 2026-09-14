@@ -752,28 +752,74 @@ class SaleController extends Controller
         $daywatchItems = $order->items->filter(fn($i) => str_starts_with((string) $i->product_id, 'daywatch_'));
         $apiItems      = $order->items->filter(fn($i) => !str_starts_with((string) $i->product_id, 'daywatch_'));
 
-        // 1. Cartes Daywatch (génération locale)
-        foreach ($daywatchItems as $item) {
-            for ($i = 0; $i < (int) $item->quantity; $i++) {
-                ResellerCard::create([
-                    'reseller_order_id'      => $order->id,
-                    'reseller_order_item_id' => $item->id,
-                    'product_id'             => (string) $item->product_id,
-                    'name'                   => $item->name,
-                    'brand'                  => $item->brand ?? 'Daywatch',
-                    'card_code'              => 'DW-' . strtoupper(\Illuminate\Support\Str::random(10)),
-                    'pin'                    => str_pad((string) random_int(1000, 9999), 4, '0', STR_PAD_LEFT),
-                    'face_value'             => $item->unit_price,
-                    'currency'               => 'XAF',
-                    'status'                 => ResellerCard::STATUS_ACTIVE,
-                    'image_url'              => $item->image_url,
-                    'metadata'               => ['source' => 'daywatch_local'],
-                ]);
+        // 1. Cartes Daywatch : VRAIS codes via l'API partenaire (plus de code
+        //    local bidon). En cas d'échec (stock épuisé/API), on ne fabrique
+        //    rien et la commande ne se clôt pas (réémission requise).
+        $daywatchFailed = false;
+        if ($daywatchItems->isNotEmpty()) {
+            $partner = app(\App\Services\DaywatchPartnerService::class);
+
+            foreach ($daywatchItems as $item) {
+                $qty = max(1, (int) $item->quantity);
+
+                // Idempotence : item déjà livré → on saute.
+                $already = ResellerCard::where('reseller_order_item_id', $item->id)->count();
+                if ($already >= $qty) {
+                    continue;
+                }
+
+                $localId = (int) substr((string) $item->product_id, strlen('daywatch_'));
+                $dw = \App\Models\DaywatchProduct::find($localId);
+
+                if (! $dw || ! $dw->is_active || empty($dw->plan_id)) {
+                    $daywatchFailed = true;
+                    Log::error('Vendor delivery: produit Daywatch introuvable/invalide', [
+                        'order_id' => $order->id, 'product_id' => $item->product_id,
+                    ]);
+                    continue;
+                }
+
+                $ref    = 'kardafrica-reseller-' . $order->id . '-item-' . $item->id;
+                $result = $partner->allocate($dw->name, $qty - $already, $ref);
+
+                if (! $result['success'] || count($result['codes']) < 1) {
+                    $daywatchFailed = true; // service a loggé la cause
+                    continue;
+                }
+
+                foreach ($result['codes'] as $code) {
+                    $design = \App\Services\DaywatchPartnerService::designFor($result['designs'], $code);
+                    ResellerCard::firstOrCreate(
+                        ['card_code' => $code],
+                        [
+                            'reseller_order_id'      => $order->id,
+                            'reseller_order_item_id' => $item->id,
+                            'product_id'             => (string) $item->product_id,
+                            'name'                   => $item->name ?? $dw->name,
+                            'brand'                  => $item->brand ?? 'Daywatch',
+                            'pin'                    => null,
+                            'face_value'             => $item->unit_price,
+                            'currency'               => 'XAF',
+                            'status'                 => ResellerCard::STATUS_ACTIVE,
+                            'image_url'              => $design['frontUrl'] ?? $item->image_url ?? $dw->image_url,
+                            'metadata'               => [
+                                'source'         => 'daywatch_partner',
+                                'plan_id'        => $dw->plan_id,
+                                'redemption_url' => $result['redemptionUrl'] ?? 'https://m.daywatch.online/cadeau',
+                                'design_back'    => $design['backUrl'] ?? $dw->image_back_url,
+                            ],
+                        ]
+                    );
+                }
             }
         }
 
         // 2. Cartes afrikard
         if ($apiItems->isEmpty()) {
+            // Daywatch dont l'émission a échoué → on ne clôt pas (réémission).
+            if ($daywatchFailed) {
+                return;
+            }
             $order->update([
                 'status'       => ResellerOrder::STATUS_COMPLETED,
                 'completed_at' => now(),
@@ -864,11 +910,15 @@ class SaleController extends Controller
 
             if ($res->status() === 202 || $res->successful()) {
                 $this->saveCards($order, $res->json());
-                $order->update([
-                    'status'       => ResellerOrder::STATUS_COMPLETED,
-                    'completed_at' => now(),
-                    'notes'        => null,
-                ]);
+                // Si un Daywatch de la même commande a échoué, on ne clôt pas :
+                // le client n'a reçu qu'une partie de son achat.
+                $order->update($daywatchFailed
+                    ? ['notes' => 'Cartes fournisseur livrées, mais code(s) Daywatch à réémettre (stock épuisé ou API indisponible).']
+                    : [
+                        'status'       => ResellerOrder::STATUS_COMPLETED,
+                        'completed_at' => now(),
+                        'notes'        => null,
+                    ]);
             } else {
                 $body = $res->body();
                 // Détails techniques UNIQUEMENT dans les logs (pour debug)

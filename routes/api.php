@@ -78,6 +78,12 @@ Route::middleware('throttle:10,1')->group(function () {
     Route::post('/login', [AuthController::class, 'login']);
 });
 
+// Auth mobile par numéro WhatsApp + OTP (login = inscription). Public.
+Route::post('/whatsapp/send',   [App\Http\Controllers\Api\WhatsAppAuthController::class, 'send'])
+    ->middleware('throttle:6,1')->name('api.whatsapp.send');
+Route::post('/whatsapp/verify', [App\Http\Controllers\Api\WhatsAppAuthController::class, 'verify'])
+    ->middleware('throttle:10,1')->name('api.whatsapp.verify');
+
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::post('/profile/update', [AuthController::class, 'updateProfile']);

@@ -1,5 +1,23 @@
-<div x-data="{ 
+@php
+    use App\Support\DialCodes;
+    $dialCountries = collect(DialCodes::COUNTRIES)
+        ->map(fn ($p, $iso) => ['iso' => $iso, 'code' => (string) $p['code'], 'name' => $p['name']])
+        ->values();
+@endphp
+<div x-data="{
     isLogin: true,
+    countryCode: '+241',
+    countryIso: 'GA',
+    countryOpen: false,
+    countrySearch: '',
+    dialCountries: @js($dialCountries),
+    get filteredDial() {
+        const q = this.countrySearch.trim().toLowerCase().replace(/^\+/, '');
+        if (!q) return this.dialCountries;
+        return this.dialCountries.filter(c => c.name.toLowerCase().includes(q) || c.code.includes(q) || c.iso.toLowerCase().includes(q));
+    },
+    dialFlag(iso) { return 'https://flagcdn.com/' + String(iso).toLowerCase() + '.svg'; },
+    chooseDial(c) { this.countryCode = '+' + c.code; this.countryIso = c.iso; this.countryOpen = false; this.countrySearch = ''; },
     isLoading: false,
     step: 1,
     errorMsg: '',
@@ -101,7 +119,9 @@
                     'X-Requested-With': 'XMLHttpRequest',
                     'X-CSRF-TOKEN': document.querySelector('meta[name=\'csrf-token\']').getAttribute('content')
                 },
-                body: JSON.stringify(this.registerData)
+                body: JSON.stringify(Object.assign({}, this.registerData, {
+                    phone: (this.countryCode + this.registerData.phone).replace(/\s+/g, '')
+                }))
             });
             
             const data = await response.json();
@@ -357,13 +377,38 @@ class="perspective w-full h-[650px] animate-float auth-modal-content">
                     <div>
                         <label class="block text-[10px] font-bold text-gray-400 mb-1 ml-1 uppercase tracking-wider">Téléphone</label>
                         <div class="flex items-center bg-gray-800/50 border border-gray-700 rounded-xl px-3 py-3 transition-colors">
-                            <div class="flex items-center border-r border-gray-600 pr-2 mr-2">
-                                <span class="text-white font-bold text-sm">+241</span>
+                            {{-- Sélecteur d'indicatif : drapeau + code, cliquable, avec recherche --}}
+                            <div class="relative border-r border-gray-600 pr-2 mr-2 shrink-0">
+                                <button type="button" @click="countryOpen = !countryOpen"
+                                        class="flex items-center gap-1.5 text-white font-bold text-sm focus:outline-none">
+                                    <img :src="dialFlag(countryIso)" :alt="countryIso" width="20" height="15"
+                                         class="rounded-sm" style="box-shadow:0 0 0 1px rgba(255,255,255,.15)">
+                                    <span x-text="countryCode"></span>
+                                    <svg class="w-3.5 h-3.5 text-gray-400 transition-transform" :class="countryOpen && 'rotate-180'"
+                                         fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                                </button>
+                                <div x-show="countryOpen" x-cloak @click.outside="countryOpen = false" @keydown.escape="countryOpen = false"
+                                     x-transition style="display:none"
+                                     class="absolute z-50 left-0 top-[calc(100%+12px)] w-72 max-w-[78vw] bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden">
+                                    <input type="text" x-model="countrySearch" placeholder="Rechercher un pays ou indicatif…"
+                                           class="w-full px-3 py-2.5 text-sm text-gray-900 border-b border-gray-100 focus:outline-none">
+                                    <ul class="max-h-60 overflow-y-auto py-1">
+                                        <template x-for="c in filteredDial" :key="c.iso">
+                                            <li @click="chooseDial(c)"
+                                                class="flex items-center gap-2.5 px-3 py-2 cursor-pointer hover:bg-gray-100"
+                                                :class="c.iso === countryIso && 'bg-teal-50'">
+                                                <img :src="dialFlag(c.iso)" :alt="c.iso" width="22" height="16" class="rounded-sm" loading="lazy">
+                                                <span class="flex-1 text-sm text-gray-800 truncate" x-text="c.name"></span>
+                                                <span class="text-xs font-bold text-gray-500 tabular-nums" x-text="'+' + c.code"></span>
+                                            </li>
+                                        </template>
+                                        <li x-show="filteredDial.length === 0" class="px-3 py-3 text-center text-sm text-gray-400">Aucun pays trouvé</li>
+                                    </ul>
+                                </div>
                             </div>
-                            <svg class="h-5 w-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                            </svg>
-                            <input type="tel" x-model="registerData.phone" class="block w-full ml-2 bg-transparent border-none text-white placeholder-gray-500 focus:ring-0 sm:text-sm" placeholder="00 00 00 00">
+                            <input type="tel" x-model="registerData.phone" inputmode="numeric"
+                                   class="block w-full bg-transparent border-none text-white placeholder-gray-500 focus:ring-0 sm:text-sm"
+                                   placeholder="066 87 65 43">
                         </div>
                         <template x-if="errors.phone">
                             <p class="mt-1 text-xs text-red-400" x-text="errors.phone[0]"></p>

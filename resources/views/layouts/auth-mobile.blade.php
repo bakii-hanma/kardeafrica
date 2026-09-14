@@ -59,5 +59,6 @@
     <div class="w-full max-w-md z-10">
         @yield('content')
     </div>
+    @stack('scripts')
 </body>
 </html>

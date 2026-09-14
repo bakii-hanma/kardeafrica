@@ -14,6 +14,22 @@
     <link rel="canonical" href="@yield('canonical', url()->current())">
     <link rel="icon" type="image/png" href="{{ asset('assets/logo/FAVCON-KARDAFRICA-.png') }}">
 
+    {{-- PWA : installable sur smartphone (manifest + icônes + service worker) --}}
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#0F172A">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="KardAfrica">
+    <link rel="apple-touch-icon" href="/icons/icon-192.png">
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function () {
+                navigator.serviceWorker.register('/sw.js').catch(function () {});
+            });
+        }
+    </script>
+
     {{-- Open Graph / Twitter — aperçus riches lors du partage (WhatsApp = canal n°1).
          Chaque page peut surcharger via @@section('og_title' / 'og_description' / 'og_image'). --}}
     <meta property="og:site_name" content="KardAfrica">
@@ -41,7 +57,7 @@
         'logo'         => asset('assets/logo/FAVCON-KARDAFRICA-.png'),
         'description'  => 'Marketplace africaine de cartes cadeaux numériques : plus de 300 marques internationales et cartes de commerçants gabonais, payables en Mobile Money (Airtel Money, Moov Money) — code reçu en 30 secondes.',
         'email'        => 'hello@kardafrica.com',
-        'telephone'    => '+24100000000',
+        'telephone'    => '+24177047861',
         'areaServed'   => ['@type' => 'Country', 'name' => 'Gabon'],
         'sameAs'       => [
             'https://www.instagram.com/kardafrica',
@@ -49,7 +65,7 @@
         ],
         'contactPoint' => [
             '@type'             => 'ContactPoint',
-            'telephone'         => '+24100000000',
+            'telephone'         => '+24177047861',
             'contactType'       => 'customer service',
             'availableLanguage' => 'French',
             'areaServed'        => 'GA',
@@ -115,6 +131,12 @@
                 <span class="font-display text-xl font-bold text-white tracking-tight">KardAfrica</span>
             </a>
             <div class="flex items-center gap-2">
+                @auth
+                <a href="{{ route('orders.index') }}" aria-label="Mes commandes" title="Mes commandes" class="relative w-10 h-10 rounded-xl flex items-center justify-center text-white hover:bg-white/10 active:scale-95 transition">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                    <span class="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#4ECDC4]"></span>
+                </a>
+                @endauth
                 <button id="cartBtnMobile" class="relative w-10 h-10 rounded-xl flex items-center justify-center text-white hover:bg-white/10 active:scale-95 transition" aria-label="Panier">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>
                     <span id="cartCountMobileHeader" style="display:none;" class="absolute top-1 right-1 min-w-[16px] h-4 px-1 rounded-full bg-[#44A08D] text-white text-[9px] font-bold flex items-center justify-center ring-2 ring-[#1F2937]">0</span>
@@ -145,9 +167,9 @@
                         <span>hello@kardafrica.com</span>
                     </a>
                     <span class="text-white/10">·</span>
-                    <a href="tel:+24100000000" class="flex items-center gap-1.5 hover:text-[#4ECDC4] transition">
+                    <a href="tel:+24177047861" class="flex items-center gap-1.5 hover:text-[#4ECDC4] transition">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
-                        <span>+241 00 00 00 00</span>
+                        <span>+241 77 04 78 61</span>
                     </a>
                     <span class="text-white/10">·</span>
                     <span class="flex items-center gap-1.5">
@@ -380,6 +402,11 @@
                     </div>
                     
                     @auth
+                    <a href="{{ route('orders.index') }}" aria-label="Mes commandes" title="Mes commandes"
+                       class="hidden lg:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-semibold text-[#4ECDC4] border border-[#4ECDC4]/40 bg-[#4ECDC4]/10 hover:bg-[#4ECDC4]/20 hover:border-[#4ECDC4]/70 active:scale-95 transition">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                        Mes commandes
+                    </a>
                     <div class="relative" x-data="{ open: false }">
                         <button @click="open = !open" @click.away="open = false"
                                 class="flex items-center gap-2 pl-1 pr-3 py-1 rounded-xl bg-white/[0.06] border border-white/10 hover:bg-white/[0.10] transition">
@@ -475,7 +502,7 @@
          ci-dessous (support WhatsApp-first). Le markup reste en place (display:none)
          pour réactivation facile si besoin. --}}
     {{-- Bouton flottant WhatsApp (à la place de Kara, bas-droite) → conversation directe --}}
-    <a href="https://wa.me/24100000000?text={{ rawurlencode('Bonjour KardAfrica, j\'ai besoin d\'aide 🙂') }}"
+    <a href="https://wa.me/24177047861?text={{ rawurlencode('Bonjour KardAfrica, j\'ai besoin d\'aide 🙂') }}"
        target="_blank" rel="noopener" aria-label="Discuter sur WhatsApp"
        class="fixed right-5 bottom-5 z-[997] flex items-center justify-center w-14 h-14 rounded-full bg-[#25D366] text-white shadow-xl shadow-[#25D366]/40 hover:bg-[#1ebe5b] active:scale-95 transition">
         <svg class="w-7 h-7" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
@@ -550,7 +577,7 @@
     <div id="mobileCartOverlay" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[998] opacity-0 invisible transition-all duration-300 md:hidden" style="display:none;"></div>
 
     <!-- Mobile Sidebar -->
-    <div id="mobileMenu" class="fixed top-0 right-0 h-full w-[85%] max-w-[360px] bg-white shadow-2xl z-[999] transform translate-x-full transition-transform duration-300 ease-out md:hidden border-l border-slate-200">
+    <div id="mobileMenu" class="fixed top-0 right-0 h-full w-[85%] max-w-[360px] bg-white shadow-2xl z-[999] transform translate-x-full transition-transform duration-300 ease-out md:hidden border-l border-slate-200 flex flex-col">
         <!-- Sidebar Header -->
         <div class="sidebar-header bg-gradient-to-br from-[#1F2937] to-[#0F172A] px-5 py-5 text-white relative overflow-hidden">
             <div class="absolute -top-12 -right-12 w-40 h-40 bg-[#44A08D]/20 rounded-full blur-3xl"></div>
@@ -566,7 +593,7 @@
         </div>
 
         <!-- Sidebar Content -->
-        <div class="sidebar-content flex-1 overflow-y-auto px-3 py-4 h-[calc(100vh-180px)] bg-white">
+        <div class="sidebar-content flex-1 min-h-0 overflow-y-auto px-3 py-4 bg-white">
 
             {{-- Nav links --}}
             <nav class="space-y-1">
@@ -666,9 +693,9 @@
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                             hello@kardafrica.com
                         </a>
-                        <a href="tel:+24100000000" class="flex items-center gap-2 text-xs text-slate-600 hover:text-[#44A08D] transition">
+                        <a href="tel:+24177047861" class="flex items-center gap-2 text-xs text-slate-600 hover:text-[#44A08D] transition">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
-                            +241 00 00 00 00
+                            +241 77 04 78 61
                         </a>
                     </div>
                 </div>
@@ -735,7 +762,7 @@
             </div>
     
     <!-- Mobile Cart Sidebar -->
-    <div id="mobileCartSidebar" class="fixed top-0 right-0 h-full w-80 bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out md:hidden border-l border-gray-200" style="background-color: #ffffff !important;">
+    <div id="mobileCartSidebar" class="fixed top-0 right-0 h-full w-80 bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out md:hidden border-l border-gray-200 flex flex-col" style="background-color: #ffffff !important;">
         <!-- Cart Sidebar Header -->
         <div class="sidebar-header bg-[#1F2937] p-6 text-white">
             <div class="flex items-center justify-between">
@@ -759,7 +786,7 @@
     </div>
 
         <!-- Cart Sidebar Content -->
-        <div class="sidebar-content flex-1 overflow-y-auto px-4 py-6 h-[calc(100vh-220px)]" style="background-color: #ffffff !important;">
+        <div class="sidebar-content flex-1 min-h-0 overflow-y-auto px-4 py-6" style="background-color: #ffffff !important;">
             <div id="mobileCartItems">
                 <div class="text-center py-8">
                     <div class="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
@@ -932,13 +959,13 @@
                         <div class="text-sm text-white font-medium">hello@kardafrica.com</div>
                     </div>
                 </a>
-                <a href="tel:+24100000000" class="flex items-center gap-3 group">
+                <a href="tel:+24177047861" class="flex items-center gap-3 group">
                     <div class="w-10 h-10 rounded-xl bg-white/[0.06] border border-white/10 flex items-center justify-center text-[#4ECDC4] group-hover:bg-[#44A08D] group-hover:text-white group-hover:border-[#44A08D] transition">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
                     </div>
                     <div>
                         <div class="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Téléphone</div>
-                        <div class="text-sm text-white font-medium">+241 00 00 00 00</div>
+                        <div class="text-sm text-white font-medium">+241 77 04 78 61</div>
                     </div>
                 </a>
                 <div class="flex items-center gap-3">
@@ -1001,12 +1028,16 @@
         
         function hideLoader() {
             const loader = document.getElementById('pageLoader');
-            // Masquage IMMÉDIAT (fondu 300ms). L'ancien délai de 2000ms faisait
-            // rester le loader ~2,5s de trop — c'était ça la lenteur perçue.
-            loader.classList.add('loader-fadeout');
+            if (!loader) return;
+            // Vrai fondu : `.loader-fadeout` n'avait AUCUNE règle CSS → le loader
+            // restait en opacity:1 (plein blanc) puis disparaissait sec = flash /
+            // barre blanche. On anime réellement l'opacité (le div a déjà
+            // transition-opacity) + pointer-events none, puis display:none.
+            loader.style.opacity = '0';
+            loader.style.pointerEvents = 'none';
             setTimeout(function() {
                 loader.style.display = 'none';
-            }, 300);
+            }, 350);
         }
         
         // Afficher le loader au début
@@ -1026,7 +1057,7 @@
             }
             // Le DOM est prêt ici → la page est affichable : on cache quasi
             // tout de suite (le contenu est déjà rendu côté serveur).
-            setTimeout(safeHide, 120);
+            safeHide();
             // Filet de sécurité absolu.
             setTimeout(safeHide, 1500);
             // Si tout charge très vite, on cache aussi sur 'load'.
@@ -3234,5 +3265,70 @@
         };
     </script>
     @endauth
+
+    {{-- PWA : bannière d'installation personnalisée (Android natif + instructions iOS) --}}
+    <div id="pwaInstallBanner" style="display:none;"
+         class="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-4 sm:max-w-sm z-[70]
+                bg-[#1F2937] text-white rounded-2xl shadow-2xl border border-white/10 p-4">
+        <div class="flex items-start gap-3">
+            <img src="/icons/icon-192.png" alt="KardAfrica" class="w-11 h-11 rounded-xl shrink-0 bg-white/10">
+            <div class="flex-1 min-w-0">
+                <p class="font-bold text-sm">Installer KardAfrica</p>
+                <p id="pwaInstallText" class="text-xs text-slate-300 mt-0.5 leading-relaxed">Accès rapide depuis ton écran d'accueil, comme une vraie app.</p>
+                <div class="flex items-center gap-2 mt-3">
+                    <button id="pwaInstallBtn" type="button" class="bg-[#44A08D] hover:bg-[#3b8e7c] text-white text-sm font-semibold px-4 py-2 rounded-xl transition">Installer</button>
+                    <button id="pwaInstallDismiss" type="button" class="text-slate-400 hover:text-white text-sm font-medium px-2 py-2">Plus tard</button>
+                </div>
+            </div>
+            <button id="pwaInstallClose" type="button" aria-label="Fermer" class="text-slate-400 hover:text-white shrink-0 text-lg leading-none">&times;</button>
+        </div>
+    </div>
+    <script>
+    (function () {
+        var banner  = document.getElementById('pwaInstallBanner');
+        var btn     = document.getElementById('pwaInstallBtn');
+        var txt     = document.getElementById('pwaInstallText');
+        var dismiss = document.getElementById('pwaInstallDismiss');
+        var closeB  = document.getElementById('pwaInstallClose');
+        if (!banner) return;
+        var deferred = null;
+        var DKEY = 'ka_pwa_dismissed';
+
+        function isStandalone() {
+            return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+        }
+        function dismissed() { try { return localStorage.getItem(DKEY) === '1'; } catch (e) { return false; } }
+        function setDismissed() { try { localStorage.setItem(DKEY, '1'); } catch (e) {} }
+        function show() { banner.style.display = 'block'; }
+        function hide() { banner.style.display = 'none'; }
+
+        if (isStandalone() || dismissed()) return;
+
+        // Android / Chromium : invite native
+        window.addEventListener('beforeinstallprompt', function (e) {
+            e.preventDefault();
+            deferred = e;
+            show();
+        });
+        btn && btn.addEventListener('click', function () {
+            if (!deferred) return;
+            deferred.prompt();
+            deferred.userChoice.finally(function () { deferred = null; hide(); setDismissed(); });
+        });
+        dismiss && dismiss.addEventListener('click', function () { hide(); setDismissed(); });
+        closeB && closeB.addEventListener('click', function () { hide(); setDismissed(); });
+        window.addEventListener('appinstalled', function () { hide(); setDismissed(); });
+
+        // iOS Safari : pas d'invite native → instructions manuelles
+        var ua = window.navigator.userAgent.toLowerCase();
+        var isIOS = /iphone|ipad|ipod/.test(ua);
+        var isSafari = isIOS && !/crios|fxios|edgios/.test(ua);
+        if (isIOS && isSafari && !isStandalone()) {
+            if (btn) btn.style.display = 'none';
+            if (txt) txt.innerHTML = "Appuie sur <strong>Partager</strong> puis «&nbsp;<strong>Sur l'écran d'accueil</strong>&nbsp;».";
+            show();
+        }
+    })();
+    </script>
 </body>
 </html> 

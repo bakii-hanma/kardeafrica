@@ -56,14 +56,23 @@ class ProfileController extends Controller
         $user = Auth::user();
 
         $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users,email,' . $user->id,
+            'first_name' => 'required|string|max:120',
+            'last_name'  => 'nullable|string|max:120',
+            'email'      => 'required|string|email|max:255|unique:users,email,' . $user->id,
         ]);
 
+        $fullName = trim($request->first_name . ' ' . (string) $request->last_name);
+
         $user->update([
-            'name' => $request->name,
+            'name'  => $fullName,
             'email' => $request->email,
         ]);
+
+        // On garde aussi prénom/nom structurés dans le profil (source des champs).
+        $user->profile()->updateOrCreate(
+            ['user_id' => $user->id],
+            ['first_name' => $request->first_name, 'last_name' => (string) $request->last_name]
+        );
 
         return redirect()->route('profile.show')->with('success', 'Profil mis à jour avec succès.');
     }
@@ -101,8 +110,20 @@ class ProfileController extends Controller
         $user = Auth::user();
 
         if ($request->hasFile('avatar')) {
-            $path = $request->file('avatar')->store('avatars', 'public');
-            $fullUrl = asset('storage/' . $path);
+            // SiteGround : la racine web = public_html (base_path), et il n'y a
+            // pas de symlink /storage exposé. On écrit donc le fichier DANS la
+            // racine doc-root (comme Admin\CardOwnerController pour les logos),
+            // sinon l'URL asset('storage/...') pointe vers un chemin non servi et
+            // l'image reste cassée.
+            $file    = $request->file('avatar');
+            $relDir  = 'avatars';
+            $absDir  = base_path($relDir);
+            if (!is_dir($absDir)) {
+                @mkdir($absDir, 0755, true);
+            }
+            $filename = \Illuminate\Support\Str::random(40) . '.' . strtolower($file->getClientOriginalExtension() ?: 'jpg');
+            $file->move($absDir, $filename);
+            $fullUrl = asset($relDir . '/' . $filename);
 
             $user->profile()->updateOrCreate(
                 ['user_id' => $user->id],

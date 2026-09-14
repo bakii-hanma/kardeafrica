@@ -55,6 +55,7 @@
                         :products-count="$product['variants_count'] ?? null"
                         :country-code="$product['cardType']['countryCode'] ?? null"
                         :variants="$rVariants"
+                        :exact-price="($product['meta']['source'] ?? null) === 'daywatch'"
                     />
                 </div>
             @endforeach

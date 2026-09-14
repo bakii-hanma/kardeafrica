@@ -58,7 +58,11 @@ return [
     | https://futursowax.com/paiement/portal-docs.php
     */
     'payment_backend' => [
+        // portal.php : crée la facture E-Billing (renvoie bill_id + portal_url)
         'init_url'     => env('PAYMENT_BACKEND_INIT_URL', 'https://futursowax.com/paiement/portal.php'),
+        // init.php : ENREGISTRE la transaction dans le MySQL du portail (sans ça,
+        // check_status.php ne retrouve jamais le paiement → « not found »).
+        'register_url' => env('PAYMENT_BACKEND_REGISTER_URL', 'https://futursowax.com/paiement/init.php'),
         'check_url'    => env('PAYMENT_BACKEND_CHECK_URL', 'https://futursowax.com/paiement/check_status.php'),
         // Endpoint de transfert/remboursement E-Billing (renvoie l'argent au payeur)
         'transfer_url' => env('PAYMENT_BACKEND_TRANSFER_URL', 'https://futursowax.com/paiement/transfer.php'),
@@ -136,6 +140,11 @@ return [
     */
     'daywatch' => [
         'catalog_url' => env('DAYWATCH_CATALOG_URL', 'https://api.daywatch.online/api/gift-cards/catalog'),
+        // Base API partenaire + clé LIVE (émission de vrais codes). La clé
+        // `dwpk_live_...` est un SECRET : uniquement côté serveur (.env), jamais
+        // dans l'APK ni le front (cf. leçon C6).
+        'base_url'    => env('DAYWATCH_BASE_URL', 'https://api.daywatch.online/api'),
+        'partner_key' => env('DAYWATCH_PARTNER_KEY'),
     ],
 
     /*

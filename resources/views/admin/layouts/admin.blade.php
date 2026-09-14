@@ -34,6 +34,20 @@
         .badge-user { background: #DBEAFE; color: #1E40AF; }
         .stat-card { transition: all 0.3s ease; }
         .stat-card:hover { transform: translateY(-2px); box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+
+        /* ===== Scrollbar de la sidebar admin — fine, discrète, thématisée ===== */
+        .adm-tree-nav { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.18) transparent; }
+        .adm-tree-nav::-webkit-scrollbar { width: 6px; }
+        .adm-tree-nav::-webkit-scrollbar-track { background: transparent; }
+        .adm-tree-nav::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,.16); border-radius: 999px;
+            border: 2px solid transparent; background-clip: padding-box;
+        }
+        .adm-tree-nav::-webkit-scrollbar-thumb:hover { background: rgba(78,205,196,.55); background-clip: padding-box; }
+        /* Idem pour d'éventuelles zones scrollables du contenu admin */
+        .adm-scroll { scrollbar-width: thin; scrollbar-color: rgba(15,23,42,.22) transparent; }
+        .adm-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
+        .adm-scroll::-webkit-scrollbar-thumb { background: rgba(15,23,42,.20); border-radius: 999px; }
     </style>
     {{-- Styles empilés par les écrans et composants (`@push('head')`). --}}
     @stack('head')

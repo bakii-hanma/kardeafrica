@@ -208,7 +208,14 @@ class CatalogRows
         $titles  = [];   // titre = première forme rencontrée
         $order   = [];
         foreach ($items as $item) {
-            $brand = self::brandKey($item['cardType']['name'] ?? ($item['name'] ?? ''));
+            // Daywatch : chaque formule (DayBreak, DayTrip…) est un « plan » du
+            // même service, pas une marque distincte. On les regroupe donc TOUS
+            // dans une seule rangée « Daywatch » au lieu d'une rangée par plan.
+            $isDaywatch = ($item['meta']['source'] ?? null) === 'daywatch'
+                || (($item['cardType']['categories'][0]['id'] ?? null) == 5);
+            $brand = $isDaywatch
+                ? 'Daywatch'
+                : self::brandKey($item['cardType']['name'] ?? ($item['name'] ?? ''));
             if ($brand === '') continue;
             $key = mb_strtolower($brand);
             if (!isset($buckets[$key])) {
@@ -220,12 +227,18 @@ class CatalogRows
 
         $rows = [];
         foreach ($order as $key) {
+            // Daywatch : « Voir tout » pointe vers la catégorie (les plans ne
+            // portent pas la marque « Daywatch » dans leur nom, le filtre
+            // marque=Daywatch ne matcherait rien).
+            $seeAll = $key === 'daywatch'
+                ? ['category' => 5, 'view' => 'all']
+                : ['marque' => [$titles[$key]], 'view' => 'all'];
+
             $rows[] = [
                 'key'     => 'brand-' . \Illuminate\Support\Str::slug($key),
                 'title'   => $titles[$key],
                 'items'   => array_slice($buckets[$key], 0, self::MAX_PER_ROW),
-                // Phase C : filtre marque dédié (plus fiable que search)
-                'see_all' => ['marque' => [$titles[$key]], 'view' => 'all'],
+                'see_all' => $seeAll,
             ];
         }
         return $rows;

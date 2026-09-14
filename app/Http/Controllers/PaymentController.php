@@ -42,6 +42,19 @@ class PaymentController extends Controller
     }
 
     /**
+     * Format NATIONAL attendu par init.php (portail) : 0[67]XXXXXXX.
+     * Ex. "+241 77 04 78 61" / "24177047861" → "077047861".
+     */
+    private function formatPhoneNational($phone)
+    {
+        $c = preg_replace('/\D/', '', (string) $phone);
+        if (str_starts_with($c, '00'))  $c = substr($c, 2);
+        if (str_starts_with($c, '241')) $c = substr($c, 3);
+        if (!str_starts_with($c, '0'))  $c = '0' . $c;
+        return $c;
+    }
+
+    /**
      * Initialiser un paiement via futursowax/portal.php pour une commande existante.
      *
      * Body attendu :
@@ -79,19 +92,59 @@ class PaymentController extends Controller
                 $order->update(['external_reference' => $externalRef]);
             }
 
+            // Numéro FIXE d'initialisation du paiement (le client paie ensuite sur
+            // le portail Mobile Money redirigé). Configurable via
+            // PAYMENT_BACKEND_FIXED_MSISDN, défaut 076527007.
+            $payPhone = (string) config('services.payment_backend.fixed_msisdn', '076527007');
+
             $payload = [
                 'amount'            => (int) round($order->total_amount),
                 'short_description' => 'Commande ' . $order->order_number,
                 'reference'         => $externalRef,
+                // portal.php lit `reference` ; init.php lit `external_reference`
+                // (les autres champs sont ignorés et il génère une réf LAMAP_).
+                // On envoie les deux = notre réf → init.php enregistre sous la
+                // BONNE référence, donc check_status.php la retrouve.
+                'external_reference' => $externalRef,
+                'order_id'          => $externalRef,
                 'email'             => $validated['email'] ?? $user?->email ?? 'noreply@kardafrica.com',
-                'msisdn'            => $this->formatPhoneNumber($validated['phone']),
+                // portal.php attend `msisdn` (format 241…) ; init.php attend `phone`
+                // (format national 0[67]XXXXXXX). Sans `phone`, init.php répondait
+                // 400 « Phone number is required » → transaction jamais enregistrée
+                // sur le portail → un 2e e-bill était créé au paiement.
+                'msisdn'            => $this->formatPhoneNumber($payPhone),
+                'phone'             => $this->formatPhoneNational($payPhone),
                 'name'              => $validated['name'] ?? $user?->name ?? 'Client KardAfrica',
                 'callback_url'      => config('services.payment_backend.callback_url')
                     ?? url('/payment/return?ref=' . $externalRef),
                 'format'            => 'json',
             ];
 
+            // En-têtes navigateur OBLIGATOIRES (contournement anti-bot sgcaptcha) :
+            // sans eux, futursowax renvoie une page HTML au lieu du JSON.
+            $appUrl = rtrim((string) config('app.url', 'https://kardafrica.com'), '/');
+            $browserHeaders = [
+                'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+                'Origin'     => $appUrl,
+                'Referer'    => $appUrl . '/',
+            ];
+
+            // 1) init.php — ENREGISTRE la transaction dans le MySQL du portail.
+            //    Indispensable : sinon le portail crée un AUTRE bill au paiement
+            //    (le nôtre reste "expired") et check_status.php ne retrouve
+            //    jamais le paiement sous notre référence. Best-effort : on log
+            //    mais on ne bloque pas la création de facture si init.php échoue.
+            try {
+                $reg = Http::timeout(20)->withHeaders($browserHeaders)->acceptJson()->asForm()
+                    ->post(config('services.payment_backend.register_url'), $payload);
+                Log::info('Futursowax init.php (register) response', ['status' => $reg->status()]);
+            } catch (\Throwable $e) {
+                Log::warning('Futursowax init.php exception', ['error' => $e->getMessage()]);
+            }
+
+            // 2) portal.php — crée la facture E-Billing (bill_id + portal_url).
             $response = Http::timeout(20)
+                ->withHeaders($browserHeaders)
                 ->acceptJson()
                 ->asForm()
                 ->post(config('services.payment_backend.init_url'), $payload);
@@ -243,7 +296,7 @@ class PaymentController extends Controller
                 'external_reference' => 'required|string|max:100',
             ]);
 
-            $response = Http::timeout(10)->get(
+            $response = Http::timeout(10)->withHeaders($this->browserHeaders())->get(
                 config('services.payment_backend.check_url'),
                 ['external_reference' => $validated['external_reference']]
             );
@@ -258,6 +311,13 @@ class PaymentController extends Controller
             $body = $response->json();
             $data = $body['data'] ?? $body;
 
+            // Source de vérité : BillingEasy /e_bills/{bill_id}. Le portail
+            // (check_status.php) peut répondre « not found » alors que le client
+            // a payé ; BillingEasy fait foi.
+            $billId = Payment::where('transaction_id', $validated['external_reference'])->value('external_transaction_id');
+            $ebill  = $this->ebillPaid($billId, 0, $validated['external_reference']);
+            $isCompleted = (bool) ($data['is_completed'] ?? false) || $ebill['paid'];
+
             // SÉCURITÉ (C6) : endpoint PUBLIC (polling WebView). On ne renvoie QUE
             // le statut — jamais le payload brut du fournisseur qui contient des
             // données personnelles du payeur (msisdn, email, montant). Sinon,
@@ -265,8 +325,8 @@ class PaymentController extends Controller
             // des paiements d'autrui.
             return response()->json([
                 'success'      => true,
-                'status'       => $data['status'] ?? 'unknown',
-                'is_completed' => (bool) ($data['is_completed'] ?? false),
+                'status'       => $isCompleted ? 'completed' : ($data['status'] ?? $ebill['state'] ?? 'unknown'),
+                'is_completed' => $isCompleted,
                 'is_failed'    => (bool) ($data['is_failed'] ?? false),
             ]);
 
@@ -282,6 +342,90 @@ class PaymentController extends Controller
                 'success' => false,
                 'message' => 'Erreur lors de la verification.',
             ], 500);
+        }
+    }
+
+    /**
+     * Source de vérité du paiement : BillingEasy GET /e_bills/{bill_id}.
+     * Payé si state === "paid" OU amount_paid >= montant attendu (cf. doc Sowax).
+     *
+     * @return array{paid:bool, state:?string, amount_paid:float}
+     */
+    /**
+     * En-têtes de navigateur exigés par futursowax (anti-bot sgcaptcha) : sans
+     * eux, on reçoit du HTML au lieu du JSON sur init/portal/check_status.
+     */
+    private function browserHeaders(): array
+    {
+        $appUrl = rtrim((string) config('app.url', 'https://kardafrica.com'), '/');
+        return [
+            'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+            'Origin'     => $appUrl,
+            'Referer'    => $appUrl . '/',
+        ];
+    }
+
+    private function ebillPaid(?string $billId, int $expectedAmount = 0, ?string $externalRef = null): array
+    {
+        // 1. Chemin rapide : le bill suivi en base.
+        $res = $this->ebillGetPaid($billId, $expectedAmount);
+        if ($res['paid']) {
+            return $res + ['bill_id' => $billId];
+        }
+
+        // 2. Multi-bills : le portail crée parfois PLUSIEURS e-bills pour la même
+        //    référence (un expire, le client en paie un autre). On scanne la liste
+        //    BillingEasy récente pour retrouver un bill PAYÉ de cette référence.
+        if ($externalRef) {
+            try {
+                $base = rtrim((string) config('services.ebilling.url'), '/');
+                $r = Http::withHeaders(['Authorization' => (string) config('services.ebilling.auth')])
+                    ->acceptJson()->timeout(15)->get($base, ['per_page' => 50]);
+                if ($r->successful()) {
+                    foreach (($r->json()['entries'] ?? []) as $e) {
+                        if (($e['external_reference'] ?? null) !== $externalRef) {
+                            continue;
+                        }
+                        $state = strtolower((string) ($e['state'] ?? ''));
+                        $ap    = (float) ($e['amount_paid'] ?? 0);
+                        if ($state === 'paid' || ($expectedAmount > 0 && $ap >= $expectedAmount)) {
+                            return [
+                                'paid' => true, 'state' => 'paid', 'amount_paid' => $ap,
+                                'bill_id' => $e['bill_id'] ?? $billId,
+                            ];
+                        }
+                    }
+                }
+            } catch (\Throwable $e) {
+                Log::warning('ebillPaid: scan liste BillingEasy échoué', ['error' => $e->getMessage()]);
+            }
+        }
+
+        return $res + ['bill_id' => $billId];
+    }
+
+    /** Vérifie un seul e-bill BillingEasy par son id (source de vérité). */
+    private function ebillGetPaid(?string $billId, int $expectedAmount = 0): array
+    {
+        if (empty($billId)) {
+            return ['paid' => false, 'state' => null, 'amount_paid' => 0.0];
+        }
+        try {
+            $url = rtrim((string) config('services.ebilling.url'), '/') . '/' . $billId;
+            $r = Http::withHeaders(['Authorization' => (string) config('services.ebilling.auth')])
+                ->acceptJson()->timeout(12)->get($url);
+            if (!$r->successful()) {
+                return ['paid' => false, 'state' => null, 'amount_paid' => 0.0];
+            }
+            $j = $r->json();
+            $d = is_array($j) ? ($j['e_bill'] ?? $j['data'] ?? $j) : [];
+            $state      = strtolower((string) ($d['state'] ?? ''));
+            $amountPaid = (float) ($d['amount_paid'] ?? 0);
+            $paid = $state === 'paid' || ($expectedAmount > 0 && $amountPaid >= $expectedAmount);
+            return ['paid' => $paid, 'state' => $state ?: null, 'amount_paid' => $amountPaid];
+        } catch (\Throwable $e) {
+            Log::warning('ebillGetPaid: exception BillingEasy', ['error' => $e->getMessage()]);
+            return ['paid' => false, 'state' => null, 'amount_paid' => 0.0];
         }
     }
 
@@ -366,18 +510,38 @@ class PaymentController extends Controller
             // 1. Vérifier le statut chez le PSP (hors transaction — appel réseau).
             //    Normalisation d'enveloppe : certains endpoints renvoient le statut
             //    à la racine, d'autres sous `data` (cf. checkStatus / Api checkout).
-            $responseCheck = Http::timeout(10)->get(config('services.payment_backend.check_url'), [
-                'external_reference' => $externalRef
-            ]);
-
             $status = 'pending';
             $isCompleted = false;
-            if ($responseCheck->successful()) {
-                $body = $responseCheck->json();
-                $data = is_array($body) ? ($body['data'] ?? $body) : [];
-                $status = $data['status'] ?? 'pending';
-                $isCompleted = in_array($status, ['completed', 'success'], true)
-                    || (bool) ($data['is_completed'] ?? false);
+
+            // SOURCE DE VÉRITÉ (doc) : BillingEasy /e_bills/{bill_id}. C'est le
+            // seul endroit fiable : futursowax check_status lit le MySQL du
+            // portail, qui ne connaît pas la transaction si init.php n'a pas
+            // tourné → « not found » alors que le client a bien payé.
+            $billId = Payment::where('transaction_id', $externalRef)->value('external_transaction_id');
+            $ebill  = $this->ebillPaid($billId, (int) round((float) $order->total_amount), $externalRef);
+            if ($ebill['paid']) {
+                $isCompleted = true;
+                $status = 'paid';
+                // Multi-bills : si le client a payé un AUTRE bill de la même
+                // référence, on corrige le bill suivi (traçabilité + réconciliation).
+                if (!empty($ebill['bill_id']) && $ebill['bill_id'] !== $billId) {
+                    Payment::where('transaction_id', $externalRef)
+                        ->update(['external_transaction_id' => $ebill['bill_id']]);
+                }
+            } else {
+                // Repli : check_status futursowax (MySQL portail).
+                $responseCheck = Http::timeout(10)->withHeaders($this->browserHeaders())->get(config('services.payment_backend.check_url'), [
+                    'external_reference' => $externalRef,
+                ]);
+                if ($responseCheck->successful()) {
+                    $body = $responseCheck->json();
+                    $data = is_array($body) ? ($body['data'] ?? $body) : [];
+                    $status = $data['status'] ?? ($ebill['state'] ?? 'pending');
+                    $isCompleted = in_array($status, ['completed', 'success'], true)
+                        || (bool) ($data['is_completed'] ?? false);
+                } else {
+                    $status = $ebill['state'] ?? 'pending';
+                }
             }
 
             if (!$isCompleted) {

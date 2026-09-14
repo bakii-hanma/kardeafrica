@@ -759,7 +759,8 @@ class ProductApiService
      */
     public function getProductsByCategory($categoryId, $pageIndex = 0, $pageSize = 50)
     {
-        // Daywatch (id=5) est servi depuis la BDD locale, pas l'API afrikard
+        // Daywatch (id=5) est servi depuis la BDD locale, pas l'API afrikard.
+        // Chaque formule = une carte individuelle.
         if ((int) $categoryId === 5) {
             return DaywatchProduct::where('is_active', true)
                 ->orderBy('sort_order')
@@ -1368,7 +1369,8 @@ class ProductApiService
             }
         }
 
-        // Inject Daywatch products (catégorie 5) — toujours présents indépendamment de l'API afrikard
+        // Inject Daywatch products (catégorie 5) — chaque formule = une carte
+        // individuelle, toujours présente indépendamment de l'API afrikard.
         $daywatchItems = DaywatchProduct::where('is_active', true)
             ->orderBy('sort_order')
             ->get()

@@ -52,9 +52,10 @@ class ClientWhatsAppLoginController extends Controller
         $phone = PhoneInput::accountKeyFromRequest($request, 'phone');
 
         if ($phone === null) {
-            return back()->withErrors([
-                'phone' => 'Numéro incomplet ou ambigu. Vérifie l\'indicatif du pays et le numéro.',
-            ])->withInput();
+            $msg = 'Numéro incomplet ou ambigu. Vérifie l\'indicatif du pays et le numéro.';
+            return $request->expectsJson()
+                ? response()->json(['ok' => false, 'message' => $msg], 422)
+                : back()->withErrors(['phone' => $msg])->withInput();
         }
 
         // Le compte est créé maintenant, pas après vérification : c'est ce qui
@@ -70,13 +71,23 @@ class ClientWhatsAppLoginController extends Controller
         if (! $user->is_active) {
             // Message neutre : un compte suspendu ne doit pas se deviner depuis
             // l'écran de connexion.
-            return back()->withErrors(['phone' => 'Connexion impossible avec ce numéro. Contacte le support.'])->withInput();
+            $msg = 'Connexion impossible avec ce numéro. Contacte le support.';
+            return $request->expectsJson()
+                ? response()->json(['ok' => false, 'message' => $msg], 403)
+                : back()->withErrors(['phone' => $msg])->withInput();
         }
 
         $envoi = $this->otp->sendOtp($phone, PhoneVerification::PURPOSE_CLIENT_LOGIN);
 
         if ($envoi['cooldown']) {
             $request->session()->put(self::SESSION_PHONE, $phone);
+
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'ok' => true, 'step' => 'code', 'cooldown' => true,
+                    'seconds' => $envoi['seconds'], 'phone_masked' => Phone::masked($phone),
+                ]);
+            }
 
             return redirect()->route('client.whatsapp.code')
                 ->with('info', "Un code vient d'être envoyé. Patiente {$envoi['seconds']} secondes avant d'en demander un autre.");
@@ -85,12 +96,17 @@ class ClientWhatsAppLoginController extends Controller
         if (! $envoi['sent']) {
             Log::warning('ClientLogin: envoi OTP WhatsApp en échec', ['phone' => Phone::masked($phone)]);
 
-            return back()->withErrors([
-                'phone' => "L'envoi WhatsApp a échoué. Vérifie que ce numéro a bien WhatsApp, ou réessaie dans un instant.",
-            ])->withInput();
+            $msg = "L'envoi WhatsApp a échoué. Vérifie que ce numéro a bien WhatsApp, ou réessaie dans un instant.";
+            return $request->expectsJson()
+                ? response()->json(['ok' => false, 'message' => $msg], 502)
+                : back()->withErrors(['phone' => $msg])->withInput();
         }
 
         $request->session()->put(self::SESSION_PHONE, $phone);
+
+        if ($request->expectsJson()) {
+            return response()->json(['ok' => true, 'step' => 'code', 'phone_masked' => Phone::masked($phone)]);
+        }
 
         return redirect()->route('client.whatsapp.code');
     }
@@ -113,7 +129,9 @@ class ClientWhatsAppLoginController extends Controller
         $phone = $request->session()->get(self::SESSION_PHONE);
 
         if (! $phone) {
-            return redirect()->route('client.whatsapp.login');
+            return $request->expectsJson()
+                ? response()->json(['ok' => false, 'reset' => true, 'message' => 'Session expirée. Resaisis ton numéro.'], 422)
+                : redirect()->route('client.whatsapp.login');
         }
 
         $data = $request->validate([
@@ -123,14 +141,18 @@ class ClientWhatsAppLoginController extends Controller
         $resultat = $this->otp->verify($phone, $data['code'], PhoneVerification::PURPOSE_CLIENT_LOGIN);
 
         if (! $resultat['ok']) {
-            return back()->withErrors(['code' => $resultat['reason']]);
+            return $request->expectsJson()
+                ? response()->json(['ok' => false, 'message' => $resultat['reason']], 422)
+                : back()->withErrors(['code' => $resultat['reason']]);
         }
 
         $user = ClientAccount::find($phone);
 
         if ($user === null || ! $user->is_active) {
-            return redirect()->route('client.whatsapp.login')
-                ->withErrors(['phone' => 'Connexion impossible avec ce numéro. Contacte le support.']);
+            $msg = 'Connexion impossible avec ce numéro. Contacte le support.';
+            return $request->expectsJson()
+                ? response()->json(['ok' => false, 'reset' => true, 'message' => $msg], 403)
+                : redirect()->route('client.whatsapp.login')->withErrors(['phone' => $msg]);
         }
 
         // Le code consommé ne doit pas pouvoir resservir à une autre session.
@@ -147,6 +169,10 @@ class ClientWhatsAppLoginController extends Controller
         $request->session()->regenerate();
         $request->session()->forget(self::SESSION_PHONE);
 
+        if ($request->expectsJson()) {
+            return response()->json(['ok' => true, 'redirect' => route('home')]);
+        }
+
         return redirect()->intended(route('home'))
             ->with('success', 'Te voilà connecté. Tes cartes sont dans ton compte.');
     }
@@ -156,10 +182,21 @@ class ClientWhatsAppLoginController extends Controller
         $phone = $request->session()->get(self::SESSION_PHONE);
 
         if (! $phone) {
-            return redirect()->route('client.whatsapp.login');
+            return $request->expectsJson()
+                ? response()->json(['ok' => false, 'reset' => true, 'message' => 'Session expirée.'], 422)
+                : redirect()->route('client.whatsapp.login');
         }
 
         $envoi = $this->otp->sendOtp($phone, PhoneVerification::PURPOSE_CLIENT_LOGIN);
+
+        if ($request->expectsJson()) {
+            if ($envoi['cooldown']) {
+                return response()->json(['ok' => true, 'cooldown' => true, 'seconds' => $envoi['seconds']]);
+            }
+            return $envoi['sent']
+                ? response()->json(['ok' => true])
+                : response()->json(['ok' => false, 'message' => "L'envoi WhatsApp a échoué. Réessaie dans un instant."], 502);
+        }
 
         if ($envoi['cooldown']) {
             return back()->with('info', "Patiente encore {$envoi['seconds']} secondes.");

@@ -5,13 +5,11 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\Reseller;
-use App\Models\UserCard;
-use App\Jobs\ProcessCheckoutJob;
+use App\Services\OrderDeliveryService;
 use App\Services\PaymentRefundService;
 use App\Services\ProductApiService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 class OrderController extends Controller
@@ -64,74 +62,55 @@ class OrderController extends Controller
             ->whereIn('id', $request->order_ids)
             ->get();
 
-        $allProducts = collect($service->getAllProducts(0, 99999))->keyBy('id');
-
-        $results = ['success' => 0, 'skipped' => 0, 'failed' => 0, 'errors' => []];
+        $delivery = app(OrderDeliveryService::class);
+        $results = [
+            'delivered' => 0, 'pending' => 0, 'skipped' => 0, 'failed' => 0,
+            'errors' => [],
+        ];
 
         foreach ($orders as $order) {
-            // Skip si pas éligible
-            if ($order->userCards->isNotEmpty()
-                || $order->payment_status !== Order::PAYMENT_STATUS_COMPLETED) {
-                $results['skipped']++;
-                continue;
-            }
+            $r = $delivery->attempt($order);
 
-            $bulkMissing = [];
-            $payload = $order->orderItems->map(function ($item) use ($allProducts, $service, &$bulkMissing) {
-                $productId = (int) $item->product_id;
-                if ($item->native_value && (float) $item->native_value > 0) {
-                    return ['ProductId' => $productId, 'Quantity' => (int) $item->quantity, 'Value' => (int) round((float) $item->native_value)];
-                }
-                $product = $allProducts->get($productId) ?? $allProducts->get((string) $productId);
-                if (!$product) $product = $service->getProductByIdLight($productId);
-                if (!$product) { $bulkMissing[] = $productId; return null; }
-                $value = (int) round($product['minFaceValue'] ?? $product['price']['min'] ?? 0);
-                if ($value <= 0) { $bulkMissing[] = $productId; return null; }
-                return ['ProductId' => $productId, 'Quantity' => (int) $item->quantity, 'Value' => $value];
-            })->filter()->values()->toArray();
-
-            if (!empty($bulkMissing) || empty($payload)) {
-                $results['failed']++;
-                $results['errors'][] = "#{$order->order_number} → catalogue incomplet";
-                continue;
-            }
-
-            try {
-                $response = Http::timeout(30)
-                    ->post(config('services.product_api.base_url') . '/orders/checkout', $payload);
-
-                if ($response->status() === 202 || $response->successful()) {
-                    $this->saveRetryCards($order, $response->json());
-                    $order->update([
-                        'status'       => Order::STATUS_COMPLETED,
-                        'completed_at' => now(),
-                    ]);
-                    $results['success']++;
-                } else {
-                    $results['failed']++;
-                    $results['errors'][] = "#{$order->order_number} → HTTP {$response->status()}";
-                    Log::warning('Bulk retry checkout : afrikard a echoue', [
-                        'order_id' => $order->id, 'status' => $response->status(),
-                    ]);
-                }
-            } catch (\Throwable $e) {
-                $results['failed']++;
-                $results['errors'][] = "#{$order->order_number} → " . $e->getMessage();
-                Log::error('Bulk retry checkout : exception', ['order_id' => $order->id, 'error' => $e->getMessage()]);
-                // Si on commence à timeout, on arrête le reste pour ne pas faire patienter l'admin
-                if (str_contains($e->getMessage(), 'Timeout') || str_contains($e->getMessage(), 'Failed to connect')) {
-                    $results['errors'][] = 'Lot interrompu : l\'API a coupé pendant le traitement.';
+            switch ($r['type']) {
+                case 'delivered':
+                    $results['delivered']++;
                     break;
-                }
+                case 'pending':
+                case 'unavailable':
+                    $results['pending']++;
+                    $results['errors'][] = "#{$order->order_number} → " . ($r['message'] ?? 'codes en attente (async) — polling auto');
+                    break;
+                case 'already_delivered':
+                case 'not_paid':
+                case 'refunded':
+                case 'no_afrikard_items':
+                    $results['skipped']++;
+                    break;
+                case 'orphan_debited':
+                    $results['failed']++;
+                    $results['errors'][] = "#{$order->order_number} → " . $r['message'];
+                    break;
+                case 'rejected':
+                case 'failed':
+                    $results['failed']++;
+                    $results['errors'][] = "#{$order->order_number} → fournisseur HTTP " . ($r['status'] ?? '?');
+                    Log::warning('Bulk retry checkout : afrikard a echoue', [
+                        'order_id' => $order->id, 'status' => $r['status'] ?? null,
+                    ]);
+                    break;
+                default:
+                    $results['failed']++;
+                    $results['errors'][] = "#{$order->order_number} → erreur inattendue";
             }
         }
 
-        $msg = "Retry terminé — {$results['success']} livrées, {$results['failed']} échouées, {$results['skipped']} ignorées.";
+        $msg = "Retry terminé — {$results['delivered']} livrées, {$results['pending']} en attente, "
+            . "{$results['failed']} échouées, {$results['skipped']} ignorées.";
         if (!empty($results['errors'])) {
             $msg .= ' Détails : ' . implode(' | ', array_slice($results['errors'], 0, 3));
         }
 
-        return back()->with($results['success'] > 0 ? 'success' : 'error', $msg);
+        return back()->with($results['delivered'] > 0 ? 'success' : 'error', $msg);
     }
 
     public function index(Request $request)
@@ -194,77 +173,35 @@ class OrderController extends Controller
     }
 
     /**
-     * Relancer l'appel afrikard /orders/checkout pour une commande payee mais sans cartes.
-     * Sync direct (pas de job async, pour feedback immediat dans l'UI admin).
+     * Relancer la livraison afrikard pour une commande payée mais sans cartes.
+     * Conforme H4 : ne re-POSTe JAMAIS si un checkout a déjà été demandé —
+     * dans ce cas, on poll GET /orders/{requestId} pour récupérer les cartes
+     * (génération asynchrone côté Bamboo).
      */
     public function retryCheckout(Order $order)
     {
-        $order->load('orderItems', 'userCards');
+        $result = app(OrderDeliveryService::class)->attempt($order);
 
-        if ($order->userCards->isNotEmpty()) {
-            return back()->with('error', 'Cette commande a deja des cartes livrees.');
-        }
-
-        if ($order->payment_status !== Order::PAYMENT_STATUS_COMPLETED) {
-            return back()->with('error', 'Le paiement de cette commande n\'est pas confirme.');
-        }
-
-        // Lookup face values natives (afrikard refuse FCFA pour les cartes EUR/USD)
-        $service = app(ProductApiService::class);
-        $allProducts = collect($service->getAllProducts(0, 99999))->keyBy('id');
-
-        $missing = [];
-        $payload = $order->orderItems->map(function ($item) use ($allProducts, $service, &$missing) {
-            $productId = (int) $item->product_id;
-
-            // 1. Valeur native stockée à la création
-            if ($item->native_value && (float) $item->native_value > 0) {
-                return ['ProductId' => $productId, 'Quantity' => (int) $item->quantity, 'Value' => (int) round((float) $item->native_value)];
-            }
-
-            // 2/3. Fallback cache puis API
-            $product = $allProducts->get($productId) ?? $allProducts->get((string) $productId);
-            if (!$product) $product = $service->getProductByIdLight($productId);
-            if (!$product) { $missing[] = $productId; return null; }
-            $value = (int) round($product['minFaceValue'] ?? $product['price']['min'] ?? 0);
-            if ($value <= 0) { $missing[] = $productId; return null; }
-            return ['ProductId' => $productId, 'Quantity' => (int) $item->quantity, 'Value' => $value];
-        })->filter()->values()->toArray();
-
-        if (!empty($missing)) {
-            Log::warning('Admin retry: aborted, products with unknown native value', [
-                'order_id' => $order->id, 'missing' => $missing,
-            ]);
-            return back()->with('error', "Catalogue fournisseur incomplet (produits ".implode(',', $missing)." manquants). Réessaie après le warm-cache.");
-        }
-
-        Log::info('Retry checkout (admin) : appel afrikard', [
-            'order_id' => $order->id,
-            'payload'  => $payload,
-        ]);
-
-        try {
-            $response = Http::timeout(30)
-                ->post(config('services.product_api.base_url') . '/orders/checkout', $payload);
-
-            if ($response->status() === 202 || $response->successful()) {
-                $checkoutData = $response->json();
-                $this->saveRetryCards($order, $checkoutData);
-                $order->update([
-                    'status'       => Order::STATUS_COMPLETED,
-                    'completed_at' => now(),
-                ]);
-                return back()->with('success', 'Cartes livrees avec succes pour #' . $order->order_number);
-            }
-
-            Log::warning('Admin retry checkout : afrikard a echoue', [
-                'order_id' => $order->id, 'status' => $response->status(), 'body' => $response->body(),
-            ]);
-            return back()->with('error', "Le fournisseur n'a pas pu finaliser la livraison. Réessayez dans quelques minutes.");
-        } catch (\Throwable $e) {
-            Log::error('Admin retry checkout : exception', ['order_id' => $order->id, 'error' => $e->getMessage()]);
-            return back()->with('error', "Connexion temporairement indisponible avec le fournisseur. Réessayez dans un instant.");
-        }
+        return match ($result['type']) {
+            'already_delivered' => back()->with('error', 'Cette commande a deja des cartes livrees.'),
+            'not_paid' => back()->with('error', 'Le paiement de cette commande n\'est pas confirme.'),
+            'refunded' => back()->with('error', 'Cette commande est remboursée ou annulée.'),
+            'missing' => back()->with('error',
+                'Catalogue fournisseur incomplet (produits ' . implode(', ', $result['missing']) . ' manquants). '
+                . 'Essai automatique programmé — patiente quelques minutes puis réessaie.'),
+            'no_afrikard_items' => back()->with('error', 'Aucun item fournisseur à livrer sur cette commande.'),
+            'orphan_debited' => back()->with('error', $result['message']),
+            'pending' => back()->with('warning',
+                'Livraison demandée — les codes sont en cours de génération côté fournisseur (asynchrone). '
+                . ($result['saved'] > 0 ? "{$result['saved']} carte(s) déjà enregistrée(s). " : '')
+                . 'Réessaie dans quelques minutes ou laisse la récupération automatique faire.'),
+            'delivered' => back()->with('success',
+                'Cartes livrees avec succes pour #' . $order->order_number
+                . ($result['saved'] > 0 ? " ({$result['saved']} cartes)" : '')),
+            'rejected' => back()->with('error', "Le fournisseur n'a pas pu finaliser la livraison. Réessayez dans quelques minutes."),
+            'unavailable' => back()->with('error', $result['message'] ?? "Connexion temporairement indisponible avec le fournisseur."),
+            default => back()->with('error', 'Erreur inattendue lors de la livraison.'),
+        };
     }
 
     /**
@@ -279,31 +216,63 @@ class OrderController extends Controller
         if ($order->payment_status !== Order::PAYMENT_STATUS_COMPLETED) {
             return back()->with('error', 'Le paiement n\'est pas confirmé.');
         }
-        if ($order->status === Order::STATUS_REFUNDED) {
-            return back()->with('error', 'Cette commande est déjà remboursée.');
+        if (in_array($order->status, [Order::STATUS_REFUNDED, Order::STATUS_REFUNDING], true)) {
+            return back()->with('error', 'Cette commande est déjà remboursée ou un remboursement est en cours.');
         }
 
-        // Cash chez vendeur : pas d'appel API, on note que le vendeur doit rendre le cash
-        if ($order->payment_method === Order::PAYMENT_METHOD_CASH_RESELLER) {
-            try {
-                DB::transaction(function () use ($order) {
-                    $reseller = Reseller::lockForUpdate()->find($order->cash_reseller_id);
+        // ============================================================
+        // Machine à états anti double-virement (H5) :
+        // 1. verrou + tombstone 'refunding' (cash : clôturé ici sous verrou)
+        // 2. virement E-Billing HORS transaction (réf. déterministe → PSP déduplique)
+        // 3. clôture = statut REFUNDED
+        // ============================================================
+        $previousStatus = null;
+        try {
+            $claim = DB::transaction(function () use ($order, &$previousStatus) {
+                $locked = Order::where('id', $order->id)->lockForUpdate()->first();
+
+                if ($locked->payment_status !== Order::PAYMENT_STATUS_COMPLETED
+                    || in_array($locked->status, [Order::STATUS_REFUNDED, Order::STATUS_REFUNDING], true)
+                    || $locked->userCards()->exists()) {
+                    return false;
+                }
+
+                $previousStatus = $locked->status;
+
+                // Cash chez vendeur : pas d'appel API — restaure le wallet et
+                // clôture immédiatement, le tout dans le verrou (anti double submit).
+                if ($locked->payment_method === Order::PAYMENT_METHOD_CASH_RESELLER) {
+                    $reseller = Reseller::lockForUpdate()->find($locked->cash_reseller_id);
                     if ($reseller) {
-                        $reseller->refundCredit((float) $order->total_amount, "Remboursement #{$order->order_number}", $order->order_number);
+                        $reseller->refundCredit((float) $locked->total_amount, "Remboursement #{$locked->order_number}", $locked->order_number);
                     }
-                    $order->update([
+                    $locked->update([
                         'status'         => Order::STATUS_REFUNDED,
                         'payment_status' => Order::PAYMENT_STATUS_REFUNDED,
                         'notes'          => 'Remboursée par admin — le vendeur doit rendre le cash au client',
                     ]);
-                });
-                return back()->with('success', 'Remboursement enregistré. Wallet vendeur restauré, le vendeur doit rendre le cash au client.');
-            } catch (\Throwable $e) {
-                return back()->with('error', 'Erreur : ' . $e->getMessage());
-            }
+                    return 'cash_done';
+                }
+
+                $locked->update(['status' => Order::STATUS_REFUNDING]);
+                return true;
+            });
+        } catch (\Throwable $e) {
+            Log::error('Admin refund claim exception', ['order_id' => $order->id, 'error' => $e->getMessage()]);
+            return back()->with('error', 'Erreur : ' . $e->getMessage());
         }
 
-        // E-Billing : transfer
+        if ($claim === false || $claim === null) {
+            return back()->with('error', 'Cette commande est déjà remboursée ou un remboursement est en cours.');
+        }
+
+        if ($claim === 'cash_done') {
+            return back()->with('success', 'Remboursement enregistré. Wallet vendeur restauré, le vendeur doit rendre le cash au client.');
+        }
+
+        // E-Billing : transfer HORS transaction. En cas d'échec, retour à l'état
+        // antérieur pour autoriser un futur retry (le PSP déduplique grâce à la
+        // référence de transfert déterministe REFUND_<originalReference>).
         if ($order->payment_method === 'ebilling') {
             $result = $refundSvc->refund(
                 originalReference: $order->external_reference,
@@ -316,6 +285,7 @@ class OrderController extends Controller
                 ],
             );
             if (!$result['ok']) {
+                Order::where('id', $order->id)->update(['status' => $previousStatus]);
                 return back()->with('error', 'Remboursement E-Billing refusé : ' . $result['message']);
             }
         }
@@ -329,47 +299,8 @@ class OrderController extends Controller
             return back()->with('success', 'Remboursement effectué avec succès.');
         } catch (\Throwable $e) {
             Log::error('Admin refund exception', ['order_id' => $order->id, 'error' => $e->getMessage()]);
+            Order::where('id', $order->id)->update(['status' => $previousStatus]);
             return back()->with('error', 'Erreur : ' . $e->getMessage());
-        }
-    }
-
-    private function saveRetryCards(Order $order, array $checkoutData): void
-    {
-        foreach ($checkoutData['items'] ?? [] as $item) {
-            $productId = $item['productId'] ?? null;
-            $cards     = $item['cards'] ?? [];
-            $orderItem = $order->orderItems
-                ->firstWhere('product_id', (string) $productId)
-                ?? $order->orderItems->firstWhere('product_id', $productId);
-
-            foreach ($cards as $card) {
-                // H4 : idempotence sur checkout_card_id (rejeu livraison admin).
-                $ccid  = $card['id'] ?? null;
-                $attrs = [
-                    'user_id'          => $order->user_id,
-                    'order_id'         => $order->id,
-                    'order_item_id'    => $orderItem?->id,
-                    'product_id'       => (string) $productId,
-                    'name'             => $orderItem?->name ?? 'Carte cadeau',
-                    'brand'            => $orderItem?->name ? explode(' ', $orderItem->name)[0] : null,
-                    'serial_number'    => $card['serialNumber'] ?? null,
-                    'card_code'        => $card['cardCode'] ?? '',
-                    'pin'              => $card['pin'] ?? null,
-                    'expiration_date'  => !empty($card['expirationDate']) ? $card['expirationDate'] : null,
-                    'status'           => match (strtolower($card['status'] ?? '')) {
-                        'used', 'redeemed', 'consumed' => UserCard::STATUS_USED,
-                        'expired'                       => UserCard::STATUS_EXPIRED,
-                        default                         => UserCard::STATUS_ACTIVE,
-                    },
-                    'face_value'       => $item['productFaceValue'] ?? $orderItem?->unit_price ?? 0,
-                    'currency'         => $checkoutData['currency'] ?? 'XAF',
-                    'image_url'        => $orderItem?->image_url,
-                    'metadata'         => ['retry_admin' => true, 'checkout_order_id' => $checkoutData['orderId'] ?? null],
-                ];
-                $ccid !== null
-                    ? UserCard::firstOrCreate(['checkout_card_id' => $ccid], $attrs)
-                    : UserCard::create($attrs + ['checkout_card_id' => null]);
-            }
         }
     }
 }

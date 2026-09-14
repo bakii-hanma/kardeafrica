@@ -13,6 +13,8 @@
     'productsCount' => null,
     'countryCode'   => null,       // 'FR', 'BE', 'EU', 'US' — pilote le drapeau + label région
     'variants'      => null,       // P1 §1 — mini-montants cliquables : [['label' => '10 €', 'url' => …], …] (max 4)
+    'exactPrice'    => false,      // Daywatch : prix XAF exacts (fournis par le partenaire),
+                                   // NE PAS arrondir au pas de vente (100 F ≠ 200 F).
 ])
 
 @php
@@ -81,29 +83,40 @@
                 // Économie réelle : la carte vaut sa valeur faciale, le client
                 // paie moins. On n'affiche jamais un « ancien prix » — ce n'en
                 // est pas un (voir App\Support\ProductPricing).
-                $_pricing = \App\Support\ProductPricing::display([
-                    'minFaceValue' => $faceValue ?? $price,
-                    'price'        => ['min' => $price, 'currencyCode' => $currency],
-                ]);
+                if ($exactPrice) {
+                    // Daywatch : prix/valeur en XAF exacts, sans arrondi au pas de vente.
+                    $_priceFcfa  = (int) round((float) $price);
+                    $_faceFcfa   = (int) round((float) ($faceValue ?? $price));
+                    $_hasSaving  = $_faceFcfa > $_priceFcfa;
+                    $_priceLabel = number_format($_priceFcfa, 0, ',', ' ') . ' FCFA';
+                } else {
+                    $_pricing    = \App\Support\ProductPricing::display([
+                        'minFaceValue' => $faceValue ?? $price,
+                        'price'        => ['min' => $price, 'currencyCode' => $currency],
+                    ]);
+                    $_faceFcfa   = $_pricing['face_fcfa'];
+                    $_hasSaving  = $_pricing['has_saving'];
+                    $_priceLabel = \App\Support\Money::formatFcfa($price, $currency);
+                }
             @endphp
 
             <div class="mt-2.5 sm:mt-3 pt-2.5 sm:pt-3 border-t border-slate-100">
                 <div class="flex items-end justify-between gap-2">
                     <span class="text-[10px] text-slate-400 font-medium">À partir de</span>
                     <span class="text-right leading-tight">
-                        @if($_pricing['has_saving'])
+                        @if($_hasSaving)
                             {{-- La valeur faciale est barrée en tant que VALEUR de la
                                  carte, pas en tant que tarif antérieur. --}}
                             <span class="block text-[10px] text-slate-400 line-through tabular-nums"
                                   title="Valeur de la carte chez le marchand">
-                                {{ number_format($_pricing['face_fcfa'], 0, ',', ' ') }} FCFA
+                                {{ number_format($_faceFcfa, 0, ',', ' ') }} FCFA
                             </span>
                         @endif
                         <span class="text-sm sm:text-base font-black tabular-nums text-slate-900 price-display whitespace-nowrap"
                               data-price="{{ $price }}"
                               data-currency="{{ $currency }}"
                               data-processed="true">
-                            {{ \App\Support\Money::formatFcfa($price, $currency) }}
+                            {{ $_priceLabel }}
                         </span>
                     </span>
                 </div>

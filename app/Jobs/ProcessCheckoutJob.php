@@ -115,18 +115,21 @@ class ProcessCheckoutJob implements ShouldQueue
                 || str_starts_with((string) $i->product_id, 'daywatch_')
         );
 
+        // Daywatch : émission de VRAIS codes via l'API partenaire. Si l'allocation
+        // échoue (stock épuisé, API indisponible), on NE livre PAS de code bidon :
+        // l'item reste "en attente" et la commande ne se clôt pas.
+        $daywatchPending = false;
         if ($daywatchItems->isNotEmpty()) {
-            Log::warning('ProcessCheckoutJob: items Daywatch à livrer manuellement', [
-                'order_id'   => $this->order->id,
-                'items'      => $daywatchItems->pluck('product_id')->all(),
-            ]);
+            $daywatchAllDelivered = $this->deliverDaywatch($daywatchItems);
+            $daywatchPending = ! $daywatchAllDelivered;
 
-            $this->order->update([
-                'status' => Order::STATUS_PROCESSING,
-                'notes'  => trim(($this->order->notes ?? '')
-                    . ' | Daywatch : ' . $daywatchItems->count()
-                    . ' abonnement(s) à activer manuellement (aucune émission automatique).'),
-            ]);
+            if ($daywatchPending) {
+                $this->order->update([
+                    'status' => Order::STATUS_PROCESSING,
+                    'notes'  => trim(($this->order->notes ?? '')
+                        . ' | Daywatch : allocation de code(s) en échec (stock épuisé ou API indisponible) — à réémettre.'),
+                ]);
+            }
         }
 
         // ============================================================
@@ -151,10 +154,10 @@ class ProcessCheckoutJob implements ShouldQueue
         // 2) Items afrikard : appel API (= comportement historique)
         // ============================================================
         if ($afrikardItems->isEmpty()) {
-            // Un abonnement Daywatch en attente d'activation manuelle interdit
-            // de clore la commande : elle doit rester dans « livraisons en
-            // attente » tant que l'admin ne l'a pas traitée.
-            if ($daywatchItems->isNotEmpty()) {
+            // Un Daywatch dont l'allocation a échoué interdit de clore la
+            // commande : elle reste dans « livraisons en attente » tant que le
+            // code n'a pas été réémis.
+            if ($daywatchPending) {
                 return;
             }
 
@@ -232,19 +235,28 @@ class ProcessCheckoutJob implements ShouldQueue
         }
 
         if ($deliveryState === 'already_requested') {
-            Log::critical('ProcessCheckoutJob: livraison afrikard déjà demandée mais commande non complétée — réconciliation manuelle requise (H4)', [
+            Log::warning('ProcessCheckoutJob: livraison afrikard déjà demandée — tentative de récupération asynchrone (H4)', [
                 'order_id'     => $this->order->id,
                 'order_number' => $this->order->order_number,
                 'attempt'      => $this->attempts(),
             ]);
-            $this->order->update([
-                'notes' => ($this->order->notes ?? '')
-                    . ' | LIVRAISON AFRIKARD DEJA DEMANDEE — cartes peut-être débitées côté fournisseur sans avoir été enregistrées.'
-                    . ' Vérifier avec afrikard avant tout retry (' . now()->toDateTimeString() . ')',
-            ]);
+
+            // Commande non complétée avec un premier appel posé : on tâche de
+            // RÉCUPÉRER les cartes auprès de Bamboo via GET /orders/{requestId}.
+            // Jamais de re-POST de /orders/checkout (double débit interdit).
+            $recovered = app(\App\Services\OrderDeliveryService::class)->recover($this->order);
+
+            if (!in_array($recovered['type'], ['delivered', 'pending'], true)) {
+                $this->order->update([
+                    'notes' => ($this->order->notes ?? '')
+                        . ' | LIVRAISON AFRIKARD EN RÉCUPÉRATION — ' . $recovered['type']
+                        . ' (' . now()->toDateTimeString() . ')',
+                ]);
+            }
+
             // return (et pas throw) : on ne veut SURTOUT PAS de retry automatique
-            // qui rappellerait afrikard. La commande reste "processing" avec la
-            // note explicite pour l'admin.
+            // qui rappellerait afrikard (le payload serait re-débité). Si la
+            // récupération échoue, le balayage orders:recover finira le travail.
             return;
         }
 
@@ -271,14 +283,12 @@ class ProcessCheckoutJob implements ShouldQueue
             $this->saveCards($checkoutData);
 
             $this->order->update([
-                // Commande mixte : les cartes afrikard sont livrées, mais un
-                // abonnement Daywatch reste à activer à la main. La clore
-                // maintenant la ferait disparaître de « livraisons en attente »
-                // avec un client qui n'a reçu qu'une partie de son achat.
-                'status'       => $daywatchItems->isEmpty()
-                    ? Order::STATUS_COMPLETED
-                    : Order::STATUS_PROCESSING,
-                'completed_at' => $daywatchItems->isEmpty() ? now() : null,
+                // Commande mixte : si un Daywatch n'a pas pu être émis, on ne
+                // clôt pas (le client n'a reçu qu'une partie de son achat).
+                'status'       => $daywatchPending
+                    ? Order::STATUS_PROCESSING
+                    : Order::STATUS_COMPLETED,
+                'completed_at' => $daywatchPending ? null : now(),
                 'billing_details' => array_merge((array) $this->order->billing_details, [
                     'checkout_order_id'   => $checkoutData['orderId'] ?? null,
                     'checkout_request_id' => $checkoutData['requestId'] ?? null,
@@ -327,6 +337,86 @@ class ProcessCheckoutJob implements ShouldQueue
     /**
      * Sauvegarder les cartes du checkout dans user_cards
      */
+    /**
+     * Émission des abonnements Daywatch via l'API partenaire (vrais codes).
+     * Idempotent : un item déjà livré (UserCards présentes) n'est pas réalloué.
+     *
+     * @param  \Illuminate\Support\Collection  $daywatchItems
+     * @return bool  true si TOUS les items ont été livrés, false sinon
+     *               (la commande reste alors « en attente » pour réémission).
+     */
+    private function deliverDaywatch($daywatchItems): bool
+    {
+        $service = app(\App\Services\DaywatchPartnerService::class);
+        $allOk   = true;
+
+        foreach ($daywatchItems as $item) {
+            $qty = max(1, (int) $item->quantity);
+
+            // Idempotence H4 : déjà livré (rejeu du job après crash) → on saute.
+            $already = UserCard::where('order_item_id', $item->id)
+                ->where('product_id', (string) $item->product_id)
+                ->count();
+            if ($already >= $qty) {
+                continue;
+            }
+
+            // product_id = "daywatch_<id local>" → plan réel côté Daywatch.
+            $localId = (int) substr((string) $item->product_id, strlen('daywatch_'));
+            $dw = \App\Models\DaywatchProduct::find($localId);
+
+            if (! $dw || ! $dw->is_active || empty($dw->plan_id)) {
+                $allOk = false;
+                Log::error('Daywatch fulfillment: produit local introuvable/invalide', [
+                    'order_id'   => $this->order->id,
+                    'product_id' => $item->product_id,
+                ]);
+                continue;
+            }
+
+            // allocationRef = idempotence côté partenaire (retry HTTP → mêmes codes).
+            $ref    = 'kardafrica-' . $this->order->order_number . '-item-' . $item->id;
+            $result = $service->allocate($dw->name, $qty - $already, $ref);
+
+            if (! $result['success'] || count($result['codes']) < 1) {
+                $allOk = false; // service a déjà loggé la cause (stock/API)
+                continue;
+            }
+
+            foreach ($result['codes'] as $code) {
+                $design = \App\Services\DaywatchPartnerService::designFor($result['designs'], $code);
+
+                // Le vrai code DW est unique → clé d'idempotence naturelle.
+                UserCard::firstOrCreate(
+                    ['card_code' => $code],
+                    [
+                        'user_id'         => $this->order->user_id,
+                        'order_id'        => $this->order->id,
+                        'order_item_id'   => $item->id,
+                        'product_id'      => (string) $item->product_id,
+                        'name'            => $dw->name,
+                        'brand'           => 'Daywatch',
+                        'serial_number'   => null,
+                        'pin'             => null,
+                        'expiration_date' => null,
+                        'status'          => UserCard::STATUS_ACTIVE,
+                        'face_value'      => $item->unit_price,
+                        'currency'        => 'XAF',
+                        'image_url'       => $design['frontUrl'] ?? $dw->image_url,
+                        'metadata'        => [
+                            'source'         => 'daywatch_partner',
+                            'plan_id'        => $dw->plan_id,
+                            'redemption_url' => $result['redemptionUrl'] ?? 'https://m.daywatch.online/cadeau',
+                            'design_back'    => $design['backUrl'] ?? $dw->image_back_url,
+                        ],
+                    ]
+                );
+            }
+        }
+
+        return $allOk;
+    }
+
     private function saveCards(array $checkoutData): void
     {
         $items = $checkoutData['items'] ?? [];

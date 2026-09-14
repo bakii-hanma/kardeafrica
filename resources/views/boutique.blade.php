@@ -325,7 +325,7 @@
             @endphp
             <div class="relative pb-2">
                 <div class="flex items-center gap-2 overflow-x-auto snap-x sm:flex-wrap sm:overflow-visible -mx-4 px-4 sm:mx-0 sm:px-0 pb-1 ka-hide-scroll">
-                    @foreach([['loc', 'FR', '🇫🇷', 'France', $frActive, $frLoc], ['region', 'europe', '🇪🇺', 'EU', in_array('europe', $selectedRegions, true), null], ['region', 'usa', '🇺🇸', 'US', in_array('usa', $selectedRegions, true), null]] as [$param, $val, $flag, $label, $isOn, $locNext])
+                    @foreach([['loc', 'FR', 'fr', 'France', $frActive, $frLoc], ['region', 'europe', 'eu', 'EU', in_array('europe', $selectedRegions, true), null], ['region', 'usa', 'us', 'US', in_array('usa', $selectedRegions, true), null]] as [$param, $val, $flag, $label, $isOn, $locNext])
                         @php
                             $href = $param === 'loc'
                                 ? $urlWith(['loc' => $locNext, 'page' => null])
@@ -335,7 +335,7 @@
                         @endphp
                         <a href="{{ $href }}" role="button" aria-pressed="{{ $isOn ? 'true' : 'false' }}"
                            class="{{ $pillBase }} {{ $isOn ? $pillOn : $pillOff }}">
-                            <span class="text-sm leading-none">{{ $flag }}</span>
+                            @include('partials._flag', ['code' => $flag])
                             {{ $label }}
                             @if($isOn)
                                 <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
@@ -760,11 +760,11 @@
                         </button>
                         <div x-show="open" x-collapse class="px-5 pb-4 space-y-1.5">
                             @foreach([
-                                ['loc',    'FR',     '🇫🇷', 'France',          'fr'],
-                                ['region', 'europe', '🇪🇺', 'Europe',          'europe'],
-                                ['region', 'usa',    '🇺🇸', 'États-Unis',      'usa'],
-                                ['region', 'africa', '🌍', 'Gabon & Afrique', 'africa'],
-                                ['region', 'global', '🌐', 'International',   'global'],
+                                ['loc',    'FR',     'fr',     'France',          'fr'],
+                                ['region', 'europe', 'eu',     'Europe',          'europe'],
+                                ['region', 'usa',    'us',     'États-Unis',      'usa'],
+                                ['region', 'africa', 'africa', 'Gabon & Afrique', 'africa'],
+                                ['region', 'global', 'global', 'International',   'global'],
                             ] as [$param, $value, $flag, $label, $facetKey])
                                 @php
                                     $checked = $param === 'loc' ? in_array($value, $selectedLoc, true) : in_array($value, $selectedRegions, true);
@@ -776,7 +776,7 @@
                                     <input type="checkbox" name="{{ $param }}[]" value="{{ $value }}"
                                            onchange="this.form.submit()" {{ $checked ? 'checked' : '' }} {{ $rDead ? 'disabled' : '' }}
                                            class="w-4 h-4 rounded border-slate-300 text-[#44A08D] focus:ring-[#44A08D]">
-                                    <span class="text-sm">{{ $flag }}</span>
+                                    @include('partials._flag', ['code' => $flag])
                                     <span class="flex-1 text-sm {{ $checked ? 'font-bold text-slate-900' : 'text-slate-700' }}">{{ $label }}</span>
                                     <span class="text-[11px] tabular-nums text-slate-400">{{ number_format($rCount, 0, ',', ' ') }}</span>
                                 </label>
@@ -935,6 +935,7 @@
                                     :products-count="$product['variants_count'] ?? $ctCount"
                                     :country-code="$product['cardType']['countryCode'] ?? null"
                                     :variants="$variantPills"
+                                    :exact-price="($product['meta']['source'] ?? null) === 'daywatch'"
                                 />
                             </div>
 
@@ -987,7 +988,12 @@
                                                data-price="{{ $minPrice }}"
                                                data-currency="{{ $currency }}"
                                                data-processed="true">
-                                                {{ \App\Support\Money::formatFcfa($minPrice, $currency) }}
+                                                @if(($product['meta']['source'] ?? null) === 'daywatch')
+                                                    {{-- Daywatch : prix XAF exact, sans arrondi au pas de vente --}}
+                                                    {{ number_format((int) round((float) $minPrice), 0, ',', ' ') }} FCFA
+                                                @else
+                                                    {{ \App\Support\Money::formatFcfa($minPrice, $currency) }}
+                                                @endif
                                             </p>
                                         </div>
                                         <span class="hidden sm:inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-50 group-hover:bg-[#44A08D] group-hover:text-white text-xs font-semibold text-slate-700 transition">
@@ -1358,12 +1364,22 @@
         // Le header du site est `fixed` en mobile (z-50) : la barre compacte
         // doit se poser DESSOUS, sinon elle est invisible. Hauteur mesurée
         // (et re-mesurée au resize) plutôt que codée en dur.
-        const siteHeader = document.querySelector('.md\\:hidden.fixed.top-0');
+        // La barre compacte doit se poser SOUS le header fixe RÉELLEMENT visible :
+        //  - mobile : l'en-tête mobile (.md:hidden.fixed.top-0)
+        //  - desktop : la nav fixe (top-bar 40px + nav) → son bas ≈ 104px
+        // L'ancien code ne mesurait que l'en-tête mobile : masqué en desktop
+        // (display:none → hauteur 0) la barre se calait à top:0 et apparaissait
+        // comme une bande blanche entre la top-bar et la nav.
+        const mobileHeader  = document.querySelector('.md\\:hidden.fixed.top-0');
+        const desktopNav    = document.querySelector('nav.fixed');
         const placeBar = () => {
-            const h = (siteHeader && getComputedStyle(siteHeader).display !== 'none')
-                ? Math.round(siteHeader.getBoundingClientRect().height)
-                : 0;
-            bar.style.top = h + 'px';
+            let top = 0;
+            if (mobileHeader && getComputedStyle(mobileHeader).display !== 'none') {
+                top = Math.round(mobileHeader.getBoundingClientRect().bottom);
+            } else if (desktopNav && getComputedStyle(desktopNav).display !== 'none') {
+                top = Math.round(desktopNav.getBoundingClientRect().bottom);
+            }
+            bar.style.top = Math.max(0, top) + 'px';
         };
         placeBar();
         window.addEventListener('resize', placeBar, { passive: true });

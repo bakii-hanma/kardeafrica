@@ -9,6 +9,7 @@ use App\Models\OrderItem;
 use App\Models\Payment;
 use App\Models\ShoppingCart;
 use App\Models\UserCard;
+use App\Services\OrderDeliveryService;
 use App\Services\ProductApiService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -499,143 +500,64 @@ class OrderController extends Controller
             return response()->json(['success' => false, 'message' => 'Commande non autorisée.'], 403);
         }
 
-        if ($order->userCards()->exists()) {
-            $cards = $order->userCards()->get();
-            return response()->json([
-                'success' => true,
-                'already_delivered' => true,
-                'message' => 'Cette commande a déjà été livrée.',
-                'cards'   => $cards->makeVisible(['card_code', 'pin']),
-            ]);
+        if ($order->user_id !== $user->id) {
+            return response()->json(['success' => false, 'message' => 'Commande non autorisée.'], 403);
         }
 
-        if ($order->payment_status !== Order::PAYMENT_STATUS_COMPLETED) {
-            return response()->json([
+        $result = app(OrderDeliveryService::class)->attempt($order);
+
+        return match ($result['type']) {
+            'already_delivered' => response()->json([
+                'success'           => true,
+                'already_delivered' => true,
+                'message'           => 'Cette commande a déjà été livrée.',
+                'cards'             => $order->userCards()->get()->makeVisible(['card_code', 'pin']),
+            ]),
+            'not_paid' => response()->json([
                 'success' => false,
                 'message' => "Cette commande n'a pas encore été payée.",
-            ], 422);
-        }
-
-        // Lookup face values réels (le panier stocke en XAF mais l'API attend
-        // la devise NATIVE). On préfère le native_value stocké sur l'OrderItem
-        // (= nouvelles commandes), sinon resolveNativeValue (cache → API ciblée
-        // → deepScan multi-pages pour les anciennes commandes ou produits
-        // récemment dépréciés du cache).
-        $service = app(ProductApiService::class);
-        $order->load('orderItems');
-
-        // Premier passage : cache + API ciblée (rapide)
-        $missing  = [];
-        $payload  = [];
-        foreach ($order->orderItems as $item) {
-            $productId = (int) $item->product_id;   // id RÉEL afrikard ("1571149v25" → 1571149)
-            $qty       = (int) $item->quantity;
-
-            // 1. Native value stocké sur l'OrderItem
-            if ($item->native_value && (float) $item->native_value > 0) {
-                $payload[] = ['ProductId' => $productId, 'Quantity' => $qty, 'Value' => (int) round((float) $item->native_value)];
-                continue;
-            }
-
-            // 2. Lookup rapide — sur l'id ORIGINAL (un id virtuel encode
-            // lui-même sa valeur ; l'id réel retomberait sur le bas de plage).
-            $resolved = $service->resolveNativeValue($item->product_id, deepScan: false);
-            if ($resolved && $resolved['value'] > 0) {
-                $payload[] = ['ProductId' => $productId, 'Quantity' => $qty, 'Value' => $resolved['value']];
-                continue;
-            }
-
-            // On garde l'id ORIGINAL (string) : un id virtuel doit être résolu
-            // tel quel au deepScan, et le cast (int) du payload suffit ensuite.
-            $missing[] = (string) $item->product_id;
-        }
-
-        // Deuxième passage : si manquants, on warm-cache (deepScan) et on retry
-        if (!empty($missing)) {
-            Log::info('Retry delivery: triggering deepScan for missing products', [
-                'order_id' => $order->id, 'missing' => $missing,
-            ]);
-            $stillMissing = [];
-            foreach ($missing as $productId) {
-                $resolved = $service->resolveNativeValue($productId, deepScan: true);
-                if ($resolved && $resolved['value'] > 0) {
-                    $payload[] = [
-                        'ProductId' => (int) $productId,
-                        'Quantity'  => (int) ($order->orderItems->firstWhere('product_id', (string) $productId)?->quantity ?? 1),
-                        'Value'     => $resolved['value'],
-                    ];
-                } else {
-                    $stillMissing[] = $productId;
-                }
-            }
-            $missing = $stillMissing;
-        }
-
-        if (!empty($missing)) {
-            // Dernier recours : on dispatche le job async qui a sa propre logique
-            // de retry avec backoff exponentiel — ça donne plus de chances que
-            // le catalogue soit complet d'ici-là.
-            ProcessCheckoutJob::dispatch($order);
-
-            Log::warning('Retry delivery: catalogue incomplete, dispatched async job', [
-                'order_id' => $order->id, 'still_missing' => $missing,
-            ]);
-            // success=true + cards_pending=true → le mobile affiche une info
-            // "Récupération relancée" plutôt qu'une erreur (le job va retry).
-            return response()->json([
+            ], 422),
+            'refunded' => response()->json([
+                'success' => false,
+                'message' => 'Cette commande est remboursée ou annulée.',
+            ], 422),
+            'missing' => response()->json([
                 'success'       => true,
                 'cards_pending' => true,
-                'message'       => 'Le catalogue du fournisseur est en train d\'être rafraîchi (produits ' . implode(', ', $missing) . ' temporairement manquants). On retentera automatiquement dans quelques minutes.',
-            ], 202);
-        }
-
-        Log::info('Retry delivery (mobile): appel afrikard', [
-            'user_id' => $user->id, 'order_id' => $order->id, 'payload' => $payload,
-        ]);
-
-        try {
-            $response = Http::timeout(30)
-                ->post(config('services.product_api.base_url') . '/orders/checkout', $payload);
-        } catch (\Throwable $e) {
-            Log::error('Retry delivery (mobile): exception réseau, fallback async', [
-                'order_id' => $order->id, 'error' => $e->getMessage(),
-            ]);
-            ProcessCheckoutJob::dispatch($order);
-            return response()->json([
+                'message'       => 'Le catalogue du fournisseur est en train d\'être rafraîchi (produits ' . implode(', ', $result['missing']) . ' temporairement manquants). On retentera automatiquement dans quelques minutes.',
+            ], 202),
+            'no_afrikard_items' => response()->json([
+                'success' => false,
+                'message' => 'Aucun item fournisseur à livrer sur cette commande.',
+            ], 422),
+            'orphan_debited' => response()->json([
+                'success'        => false,
+                'orphan_debited' => true,
+                'message'        => $result['message'] ?? 'Livraison impossible à automatiser — contacte le support.',
+            ], 422),
+            'pending' => response()->json([
                 'success'       => true,
                 'cards_pending' => true,
-                'message'       => 'API externe injoignable, traitement asynchrone relancé.',
-            ], 202);
-        }
-
-        if (!($response->status() === 202 || $response->successful())) {
-            Log::warning('Retry delivery (mobile): afrikard a échoué, fallback async', [
-                'order_id' => $order->id, 'status' => $response->status(), 'body' => $response->body(),
-            ]);
-            ProcessCheckoutJob::dispatch($order);
-            return response()->json([
+                'message'       => ($result['saved'] > 0 ? "{$result['saved']} carte(s) livrée(s). " : '')
+                    . 'Les codes restants sont en cours de génération côté fournisseur (asynchrone). La récupération est automatique.',
+            ], 202),
+            'delivered' => response()->json([
+                'success' => true,
+                'message' => $result['saved'] > 0 ? "{$result['saved']} cartes livrées avec succès." : 'Cartes livrées avec succès.',
+                'order'   => $order->fresh()->load('orderItems'),
+                'cards'   => $order->userCards()->get()->makeVisible(['card_code', 'pin']),
+            ]),
+            'rejected' => response()->json([
                 'success'       => true,
                 'cards_pending' => true,
                 'message'       => "Nos serveurs n'ont pas pu finaliser la livraison. Retry asynchrone en cours.",
-            ], 202);
-        }
-
-        $checkoutData = $response->json();
-        $savedCards = DB::transaction(function () use ($order, $checkoutData) {
-            $cards = $this->saveCards($order, $checkoutData);
-            $order->update([
-                'status'       => Order::STATUS_COMPLETED,
-                'completed_at' => now(),
-            ]);
-            return $cards;
-        });
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Cartes livrées avec succès.',
-            'order'   => $order->fresh()->load('orderItems'),
-            'cards'   => $savedCards->makeVisible(['card_code', 'pin']),
-        ]);
+            ], 202),
+            default => response()->json([
+                'success'       => true,
+                'cards_pending' => true,
+                'message'       => $result['message'] ?? 'API externe injoignable, traitement asynchrone relancé.',
+            ], 202),
+        };
     }
 
     /**

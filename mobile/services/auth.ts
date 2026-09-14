@@ -26,6 +26,9 @@ export interface AuthResponse {
     token: string;
   };
   errors?: any;
+  // Flux OTP WhatsApp
+  phone_masked?: string;
+  seconds?: number;
 }
 
 export const AuthService = {
@@ -49,6 +52,55 @@ export const AuthService = {
       return { ok: !!data.ok, message: data.message };
     } catch (e: any) {
       return { ok: false, message: e?.message || 'Erreur réseau' };
+    }
+  },
+
+  // Étape 1 — envoyer un code de vérification WhatsApp au numéro.
+  // Le compte est créé côté serveur si le numéro est nouveau (login = inscription).
+  sendWhatsAppCode: async (phone: string): Promise<AuthResponse & { seconds?: number }> => {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 20000);
+
+      const response = await fetch(`${BASE_URL}/whatsapp/send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({ phone }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+
+      const data = await response.json();
+      if (!response.ok && data.status !== 'cooldown') {
+        return { status: 'error', message: data.message || "L'envoi du code a échoué.", seconds: data.seconds };
+      }
+      return data;
+    } catch (error) {
+      return { status: 'error', message: 'Impossible de se connecter au serveur. Vérifiez votre connexion internet.' };
+    }
+  },
+
+  // Étape 2 — vérifier le code ; en cas de succès, renvoie user + token.
+  verifyWhatsAppCode: async (phone: string, code: string): Promise<AuthResponse> => {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 20000);
+
+      const response = await fetch(`${BASE_URL}/whatsapp/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({ phone, code }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+
+      const data = await response.json();
+      if (!response.ok) {
+        return { status: 'error', message: data.message || 'Code incorrect.', errors: data.errors };
+      }
+      return data;
+    } catch (error) {
+      return { status: 'error', message: 'Impossible de se connecter au serveur. Vérifiez votre connexion internet.' };
     }
   },
 

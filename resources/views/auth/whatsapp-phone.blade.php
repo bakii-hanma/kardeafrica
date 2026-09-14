@@ -32,8 +32,8 @@
         </form>
 
         <p class="wa-auth-alt">
-            Tu as un compte avec e-mail et mot de passe ?
-            <a href="{{ route('login') }}">Connexion classique</a>
+            Pas encore de compte ? Entre simplement ton numéro : ton compte est
+            créé automatiquement à la première connexion.
         </p>
     </div>
 </div>
