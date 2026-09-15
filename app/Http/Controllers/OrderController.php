@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use App\Services\OrderDeliveryService;
 use App\Services\PaymentRefundService;
+use App\Support\RefundPhone;
 
 class OrderController extends Controller
 {
@@ -209,6 +210,16 @@ class OrderController extends Controller
             return back()->with('error', 'Cette commande est déjà remboursée ou un remboursement est en cours.');
         }
 
+        // Numéro de destination du remboursement : numéro du compte par défaut,
+        // ou « autre numéro » saisi (nom + détection opérateur Mobile Money).
+        $refundPhone = null;
+        if ($order->payment_method === 'ebilling') {
+            $refundPhone = RefundPhone::resolve($order, $request);
+            if ($refundPhone['msisdn'] === null) {
+                return back()->with('error', 'Aucun numéro de remboursement valide. Choisis « numéro du compte » ou renseigne un autre numéro Mobile Money.');
+            }
+        }
+
         // Cash chez vendeur : on ne peut pas rembourser via API, le vendeur doit
         // rendre l'argent en physique. On informe le client. Tout est local →
         // une seule transaction verrouillée suffit (pas d'appel PSP).
@@ -287,7 +298,7 @@ class OrderController extends Controller
                 amountFcfa: (int) round($order->total_amount),
                 reason: "Remboursement commande {$order->order_number}",
                 extras: [
-                    'msisdn' => data_get($order->billing_details, 'phone'),
+                    'msisdn' => $refundPhone['msisdn'],
                     'name'   => data_get($order->billing_details, 'name') ?? optional($order->user)->name,
                     'email'  => data_get($order->billing_details, 'email') ?? optional($order->user)->email,
                 ],

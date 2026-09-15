@@ -8,6 +8,7 @@ use App\Models\Reseller;
 use App\Services\OrderDeliveryService;
 use App\Services\PaymentRefundService;
 use App\Services\ProductApiService;
+use App\Support\RefundPhone;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -220,6 +221,17 @@ class OrderController extends Controller
             return back()->with('error', 'Cette commande est déjà remboursée ou un remboursement est en cours.');
         }
 
+        // Numéro de destination du remboursement : numéro du compte du client
+        // par défaut, ou « autre numéro » saisi par l'admin. Résolu avant le
+        // verrou (lecture seule) ; le numéro ne change pas pendant le virement.
+        $refundPhone = null;
+        if ($order->payment_method === 'ebilling') {
+            $refundPhone = RefundPhone::resolve($order, $request);
+            if ($refundPhone['msisdn'] === null) {
+                return back()->with('error', 'Aucun numéro de remboursement valide. Renseigne le numéro du compte ou un autre numéro Mobile Money.');
+            }
+        }
+
         // ============================================================
         // Machine à états anti double-virement (H5) :
         // 1. verrou + tombstone 'refunding' (cash : clôturé ici sous verrou)
@@ -279,7 +291,7 @@ class OrderController extends Controller
                 amountFcfa: (int) round($order->total_amount),
                 reason: "Remboursement #{$order->order_number}",
                 extras: [
-                    'msisdn' => data_get($order->billing_details, 'phone'),
+                    'msisdn' => $refundPhone['msisdn'],
                     'name'   => data_get($order->billing_details, 'name') ?? optional($order->user)->name,
                     'email'  => data_get($order->billing_details, 'email') ?? optional($order->user)->email,
                 ],

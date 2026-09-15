@@ -53,6 +53,13 @@
     $payInfo    = $payMap[$order->payment_status] ?? ['label' => ucfirst($order->payment_status), 'tone' => 'slate'];
 
     $cards = $userCards ?? collect();
+
+    // Numéro de destination du remboursement (numéro du compte par défaut)
+    $refundAccountPhone = \App\Support\RefundPhone::accountPhone($order);
+    $refundAccountDisplay = \App\Support\RefundPhone::displayAccountPhone($order);
+    $refundAccountOperator = $refundAccountPhone !== null
+        ? \App\Support\PhoneOperator::label($refundAccountPhone)
+        : null;
 @endphp
 
 @section('content')
@@ -150,13 +157,20 @@
                                     <p class="text-xs text-slate-500">Tu as payé en cash chez un vendeur Kardafrica. Tu dois aller voir <strong class="text-slate-900">{{ optional($order->cashReseller)->name ?: 'le vendeur' }}</strong> pour récupérer ton argent en cash. Le remboursement est noté dans son compte.</p>
                                 @endif
                             </div>
-                            <div class="flex gap-2 p-4 bg-slate-50 border-t border-slate-100">
+                            <div class="flex gap-2 p-4 bg-slate-50 border-t border-slate-100 flex-col sm:flex-row">
                                 <button type="button" @click="refundModal = false" class="flex-1 px-4 py-2.5 rounded-xl bg-white border border-slate-200 hover:border-slate-400 text-slate-600 text-sm font-bold transition">Annuler</button>
                                 <form method="POST" action="{{ route('orders.refund', $order) }}" class="flex-1">
                                     @csrf
+                                    @if($order->payment_method === 'ebilling')
+                                        <div class="mb-4">
+                                            <x-refund-phone name="refund_phone"
+                                                            :account-display="$refundAccountDisplay"
+                                                            :account-operator="$refundAccountOperator" />
+                                        </div>
+                                    @endif
                                     <button type="submit" class="w-full inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-gradient-to-br from-rose-700 to-rose-500 hover:from-rose-800 hover:to-rose-600 text-white text-sm font-bold shadow-md transition active:scale-95">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-                                        Confirmer
+                                        Confirmer le remboursement
                                     </button>
                                 </form>
                             </div>

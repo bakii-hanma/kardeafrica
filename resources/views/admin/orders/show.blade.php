@@ -38,6 +38,13 @@
     $sInfo = $statusInfo[$order->status] ?? ['label' => $order->status, 'bg' => '#F1F5F9', 'text' => '#475569', 'border' => '#E2E8F0'];
     $pInfo = $payInfo[$order->payment_status] ?? ['label' => $order->payment_status, 'bg' => '#F1F5F9', 'text' => '#475569', 'border' => '#E2E8F0'];
     $showRetry = $order->payment_status === 'completed' && $order->userCards->isEmpty();
+
+    // Numéro de destination du remboursement (numéro du compte du client)
+    $refundAccountPhone = \App\Support\RefundPhone::accountPhone($order);
+    $refundAccountDisplay = \App\Support\RefundPhone::displayAccountPhone($order);
+    $refundAccountOperator = $refundAccountPhone !== null
+        ? \App\Support\PhoneOperator::label($refundAccountPhone)
+        : null;
 @endphp
 
 @section('content')
@@ -122,15 +129,20 @@
                                 @endif
                             </p>
                         </div>
-                        <div style="display:flex;gap:8px;padding:14px 18px 18px;background:linear-gradient(180deg,white,#F8FAFC);">
+                        <div style="display:flex;gap:8px;padding:14px 18px 18px;background:linear-gradient(180deg,white,#F8FAFC);flex-direction:column;">
                             <button type="button" @click="refundModal = false"
-                                    style="flex:1;padding:12px 14px;border-radius:12px;background:white;border:1px solid #E2E8F0;color:#475569;font-size:13px;font-weight:700;cursor:pointer;">Annuler</button>
-                            <form method="POST" action="{{ route('admin.orders.refund', $order) }}" style="flex:1;margin:0;">
+                                    style="padding:12px 14px;border-radius:12px;background:white;border:1px solid #E2E8F0;color:#475569;font-size:13px;font-weight:700;cursor:pointer;">Annuler</button>
+                            <form method="POST" action="{{ route('admin.orders.refund', $order) }}" style="margin:0;">
                                 @csrf
+                                @if($order->payment_method === 'ebilling')
+                                    <x-refund-phone name="refund_phone"
+                                                    :account-display="$refundAccountDisplay"
+                                                    :account-operator="$refundAccountOperator" />
+                                @endif
                                 <button type="submit"
-                                        style="width:100%;display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:12px 14px;border-radius:12px;background:linear-gradient(135deg,#BE123C,#F43F5E);color:white;border:0;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 8px 18px -6px rgba(244,63,94,0.50);">
+                                        style="width:100%;display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:12px 14px;margin-top:10px;border-radius:12px;background:linear-gradient(135deg,#BE123C,#F43F5E);color:white;border:0;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 8px 18px -6px rgba(244,63,94,0.50);">
                                     <svg style="width:14px;height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-                                    Confirmer
+                                    Confirmer le remboursement
                                 </button>
                             </form>
                         </div>
