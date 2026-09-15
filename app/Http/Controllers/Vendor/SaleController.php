@@ -10,6 +10,7 @@ use App\Support\VendorSalesFeed;
 use App\Models\ResellerOrderItem;
 use App\Services\PaymentRefundService;
 use App\Services\ProductApiService;
+use App\Support\RefundPhone;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -1006,6 +1007,17 @@ class SaleController extends Controller
             return back()->with('error', 'Coche la case de confirmation : tu dois avoir rendu l\'argent au client.');
         }
 
+        // Numéro de destination du remboursement E-Billing : numéro du client de
+        // la vente par défaut, ou « autre numéro » saisi par le vendeur. Lecture
+        // seule avant le verrou (le numéro ne change pas pendant le virement).
+        $refundPhone = null;
+        if ($order->payment_method === 'ebilling') {
+            $refundPhone = RefundPhone::resolveReseller($order, $request);
+            if ($refundPhone['msisdn'] === null) {
+                return back()->with('error', 'Aucun numéro de remboursement valide. Renseigne le numéro du compte du client ou un autre numéro Mobile Money.');
+            }
+        }
+
         // ============================================================
         // Machine à états anti double-virement (H5) :
         // 1. transaction {verrou + re-test des gardes + état 'refunding'}
@@ -1049,7 +1061,7 @@ class SaleController extends Controller
                 amountFcfa: (int) round($order->total_amount),
                 reason: "Remboursement vente {$order->order_number}",
                 extras: [
-                    'msisdn' => $order->customer_phone,
+                    'msisdn' => $refundPhone['msisdn'],
                     'name'   => $order->customer_name,
                 ],
             );

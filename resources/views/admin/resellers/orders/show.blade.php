@@ -19,6 +19,13 @@
         'refunded'   => ['#7C3AED','#EDE9FE','Remboursée'],
     ];
     $st = $statusMap[$order->status] ?? ['#475569','#E2E8F0',ucfirst($order->status)];
+
+    // Numéro de destination du remboursement (numéro du client de la vente)
+    $refundAccountPhone = \App\Support\RefundPhone::resellerCustomerPhone($order);
+    $refundAccountDisplay = \App\Support\RefundPhone::displayResellerCustomerPhone($order);
+    $refundAccountOperator = $refundAccountPhone !== null
+        ? \App\Support\PhoneOperator::label($refundAccountPhone)
+        : null;
 @endphp
 <div style="max-width:1100px;margin:0 auto;padding:0 4px;">
 
@@ -185,7 +192,8 @@
         <aside style="display:flex;flex-direction:column;gap:10px;">
 
             @if($needsAction)
-                <div style="background:white;border-radius:14px;border:1px solid #E2E8F0;padding:14px 16px;">
+                <div style="background:white;border-radius:14px;border:1px solid #E2E8F0;padding:14px 16px;"
+                     x-data="{ refundModal: false }">
                     <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:#94A3B8;margin-bottom:10px;">Actions disponibles</div>
 
                     <form method="POST" action="{{ route('admin.resellers.orders.retry-delivery', [$reseller, $order]) }}" style="margin:0 0 8px;">
@@ -196,14 +204,66 @@
                         </button>
                     </form>
 
-                    <form method="POST" action="{{ route('admin.resellers.orders.refund', [$reseller, $order]) }}" style="margin:0;"
-                          onsubmit="return confirm('Rembourser cette commande ? Le wallet du vendeur sera restauré et la commande passera en remboursée.');">
-                        @csrf
-                        <button type="submit" style="width:100%;display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:11px 14px;background:white;color:#BE123C;border:1px solid #FECACA;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;">
-                            <svg style="width:14px;height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M3 6a2 2 0 012-2h14a2 2 0 012 2v12a2 2 0 01-2 2H5a2 2 0 01-2-2V6z"/></svg>
-                            Rembourser
-                        </button>
-                    </form>
+                    <button type="button" @click="refundModal = true"
+                            style="width:100%;display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:11px 14px;margin:0;background:white;color:#BE123C;border:1px solid #FECACA;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;">
+                        <svg style="width:14px;height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M3 6a2 2 0 012-2h14a2 2 0 012 2v12a2 2 0 01-2 2H5a2 2 0 01-2-2V6z"/></svg>
+                        Rembourser
+                    </button>
+
+                    {{-- Modal remboursement --}}
+                    <div x-show="refundModal" x-cloak
+                         style="position:fixed;top:0;left:0;right:0;bottom:0;z-index:100;background:rgba(15,23,42,0.55);backdrop-filter:blur(6px);overflow-y:auto;"
+                         @keydown.escape.window="refundModal = false">
+                        <div x-show="refundModal" x-cloak
+                             style="display:flex;min-height:100%;align-items:center;justify-content:center;padding:16px;"
+                             @click.self="refundModal = false">
+                            <div x-show="refundModal" x-cloak
+                                 x-transition:enter="transition ease-out duration-200"
+                                 x-transition:enter-start="opacity-0 scale-95"
+                                 x-transition:enter-end="opacity-100 scale-100"
+                                 style="position:relative;width:100%;max-width:460px;background:white;border-radius:22px;overflow:hidden;box-shadow:0 28px 60px -16px rgba(15,23,42,0.50);">
+                                <div style="position:relative;padding:22px;background:linear-gradient(135deg,#BE123C,#F43F5E,#FB7185);color:white;display:flex;align-items:center;gap:14px;overflow:hidden;">
+                                    <div style="position:absolute;top:-60px;right:-60px;width:220px;height:220px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,0.30) 0%,transparent 70%);pointer-events:none;"></div>
+                                    <div style="position:relative;width:48px;height:48px;border-radius:14px;background:rgba(255,255,255,0.22);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                                        <svg style="width:22px;height:22px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M3 6a2 2 0 012-2h14a2 2 0 012 2v12a2 2 0 01-2 2H5a2 2 0 01-2-2V6z"/></svg>
+                                    </div>
+                                    <div style="position:relative;">
+                                        <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.10em;opacity:0.95;">Remboursement admin</div>
+                                        <div style="font-family:'Space Grotesk','Inter',sans-serif;font-size:18px;font-weight:800;line-height:1.15;margin-top:2px;">Rembourser cette vente&nbsp;?</div>
+                                    </div>
+                                </div>
+                                <div style="padding:18px 22px;font-size:14px;color:#475569;line-height:1.5;">
+                                    <p style="margin:0 0 10px;">Montant : <strong style="color:#0F172A;font-weight:800;">{{ number_format($order->total_amount, 0, ',', ' ') }} FCFA</strong></p>
+                                    <p style="margin:0;font-size:12px;color:#64748B;">
+                                        @if($order->payment_method === 'ebilling')
+                                            Appel API E-Billing transfer.php → renvoie le montant sur le numéro Mobile Money indiqué. Le wallet du vendeur sera restauré.
+                                        @elseif($order->payment_method === 'cash')
+                                            Aucun appel API : le wallet du vendeur sera restauré et {{ number_format($order->total_amount, 0, ',', ' ') }} FCFA seront déduits de cash_to_remit (le vendeur a rendu l'argent au client).
+                                        @else
+                                            La commande passera en « remboursée » sans appel API.
+                                        @endif
+                                    </p>
+                                </div>
+                                <div style="display:flex;gap:8px;padding:14px 18px 18px;background:linear-gradient(180deg,white,#F8FAFC);flex-direction:column;">
+                                    <button type="button" @click="refundModal = false"
+                                            style="padding:12px 14px;border-radius:12px;background:white;border:1px solid #E2E8F0;color:#475569;font-size:13px;font-weight:700;cursor:pointer;">Annuler</button>
+                                    <form method="POST" action="{{ route('admin.resellers.orders.refund', [$reseller, $order]) }}" style="margin:0;">
+                                        @csrf
+                                        @if($order->payment_method === 'ebilling')
+                                            <x-refund-phone name="refund_phone"
+                                                            :account-display="$refundAccountDisplay"
+                                                            :account-operator="$refundAccountOperator" />
+                                        @endif
+                                        <button type="submit"
+                                                style="width:100%;display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:12px 14px;margin-top:10px;border-radius:12px;background:linear-gradient(135deg,#BE123C,#F43F5E);color:white;border:0;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 8px 18px -6px rgba(244,63,94,0.50);">
+                                            <svg style="width:14px;height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                                            Confirmer le remboursement
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
                     <p style="font-size:11px;color:#94A3B8;line-height:1.5;margin:10px 0 0;">
                         En dernier recours, ouvre le panneau « Injection manuelle » pour entrer des codes carte d'une autre source.

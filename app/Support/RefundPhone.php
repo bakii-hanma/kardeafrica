@@ -3,15 +3,17 @@
 namespace App\Support;
 
 use App\Models\Order;
+use App\Models\ResellerOrder;
 
 /**
  * RefundPhone
  * ===========
- * Résout le MSISDN de destination d'un remboursement (client ou admin).
+ * Résout le MSISDN de destination d'un remboursement.
  *
  * Deux choix proposés à l'utilisateur :
  *   - « numéro du compte » : le téléphone enregistré sur le compte (users.phone
  *     / user_profile.phone), repli sur billing_details.phone (numéro du paiement) ;
+ *     pour une commande vendeur, le numéro de téléphone du client saisi à la vente ;
  *   - « autre numéro » : saisie libre (indicatif + national).
  *
  * Le résultat est toujours ramené en forme E.164 sans « + » (241XXXXXXXX),
@@ -23,10 +25,36 @@ class RefundPhone
     public const MODE_OTHER   = 'other';
 
     /**
+     * Résout la destination d'un remboursement de commande client (Order).
+     *
      * @param Request|array $input  champs refund_phone_mode / _country / _national
      * @return array{msisdn:?string, operator:?string, mode:string}
      */
     public static function resolve(Order $order, $input): array
+    {
+        return self::resolveFor(self::accountPhone($order), $input);
+    }
+
+    /**
+     * Résout la destination d'un remboursement de commande vendeur (ResellerOrder).
+     * « Numéro du compte » = customer_phone de la vente.
+     *
+     * @param Request|array $input  champs refund_phone_mode / _country / _national
+     * @return array{msisdn:?string, operator:?string, mode:string}
+     */
+    public static function resolveReseller(ResellerOrder $order, $input): array
+    {
+        return self::resolveFor(self::resellerCustomerPhone($order), $input);
+    }
+
+    /**
+     * Cœur du resolver : part d'un numéro de compte donné (éventuellement null)
+     * et applique le choix de l'utilisateur.
+     *
+     * @param Request|array $input  champs refund_phone_mode / _country / _national
+     * @return array{msisdn:?string, operator:?string, mode:string}
+     */
+    public static function resolveFor(?string $accountPhone, $input): array
     {
         if (is_array($input)) {
             $mode    = (string) ($input['refund_phone_mode'] ?? self::MODE_ACCOUNT);
@@ -41,7 +69,7 @@ class RefundPhone
         if ($mode === self::MODE_OTHER) {
             $msisdn = DialCodes::compose($country, $national);
         } else {
-            $msisdn = self::accountPhone($order);
+            $msisdn = $accountPhone;
         }
 
         $msisdn = $msisdn !== null ? Phone::normalize($msisdn) : null;
@@ -74,6 +102,20 @@ class RefundPhone
     public static function displayAccountPhone(Order $order): ?string
     {
         $n = self::accountPhone($order);
+
+        return $n !== null ? Phone::display($n) : null;
+    }
+
+    /** Numéro du client d'une commande vendeur (customer_phone), normalisé. */
+    public static function resellerCustomerPhone(ResellerOrder $order): ?string
+    {
+        return Phone::normalize((string) $order->customer_phone);
+    }
+
+    /** Numéro du client d'une commande vendeur, prêt à l'affichage (ou null). */
+    public static function displayResellerCustomerPhone(ResellerOrder $order): ?string
+    {
+        $n = self::resellerCustomerPhone($order);
 
         return $n !== null ? Phone::display($n) : null;
     }

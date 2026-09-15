@@ -16,6 +16,13 @@
         'refunded'   => ['#7C3AED','#EDE9FE','Remboursée'],
     ];
     $st = $statusMap[$order->status] ?? ['#475569','#E2E8F0',ucfirst($order->status)];
+
+    // Numéro de destination du remboursement (numéro du client de la vente)
+    $refundAccountPhone = \App\Support\RefundPhone::resellerCustomerPhone($order);
+    $refundAccountDisplay = \App\Support\RefundPhone::displayResellerCustomerPhone($order);
+    $refundAccountOperator = $refundAccountPhone !== null
+        ? \App\Support\PhoneOperator::label($refundAccountPhone)
+        : null;
 @endphp
 
 <div class="vo-detail-wrap">
@@ -280,6 +287,10 @@
                                                     <input type="checkbox" name="cash_returned_to_client" value="1" required>
                                                     <span>Je confirme avoir rendu <strong>{{ number_format($order->total_amount, 0, ',', ' ') }} FCFA</strong> en cash au client.</span>
                                                 </label>
+                                            @elseif($order->payment_method === 'ebilling')
+                                                <x-refund-phone name="refund_phone"
+                                                                :account-display="$refundAccountDisplay"
+                                                                :account-operator="$refundAccountOperator" />
                                             @endif
                                             <p class="vod-modal-impact">
                                                 Ton wallet sera restauré de +{{ number_format($order->subtotal, 0, ',', ' ') }} FCFA et la commission de {{ number_format($order->commission_earned, 0, ',', ' ') }} FCFA sera retirée.

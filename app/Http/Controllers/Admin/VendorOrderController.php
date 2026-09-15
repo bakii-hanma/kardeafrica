@@ -8,6 +8,7 @@ use App\Models\Reseller;
 use App\Models\ResellerCard;
 use App\Models\ResellerOrder;
 use App\Services\PaymentRefundService;
+use App\Support\RefundPhone;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -73,50 +74,107 @@ class VendorOrderController extends Controller
         if ($order->cards()->count() > 0) {
             return back()->with('error', 'Cartes déjà livrées — impossible de rembourser automatiquement.');
         }
+        if (in_array($order->status, [ResellerOrder::STATUS_REFUNDING, ResellerOrder::STATUS_REFUNDED], true)) {
+            return back()->with('error', 'Cette commande est déjà remboursée ou un remboursement est en cours.');
+        }
 
-        // E-Billing : appel API transfer
+        // Numéro de destination du remboursement : numéro du client de la vente
+        // par défaut, ou « autre numéro » saisi par l'admin. Lecture seule
+        // avant le verrou (le numéro ne change pas pendant le virement).
+        $refundPhone = null;
+        if ($order->payment_method === 'ebilling') {
+            $refundPhone = RefundPhone::resolveReseller($order, $request);
+            if ($refundPhone['msisdn'] === null) {
+                return back()->with('error', 'Aucun numéro de remboursement valide. Renseigne le numéro du compte du client ou un autre numéro Mobile Money.');
+            }
+        }
+
+        // Machine à états anti double-virement (H5) :
+        // 1. transaction {verrou + re-test des gardes + tombstone 'refunding'}
+        // 2. virement E-Billing HORS transaction (réf. déterministe → PSP déduplique)
+        // 3. transaction {verrou + crédits wallet + statut REFUNDED}
+
+        $previousStatus = null;
+        try {
+            $claimed = DB::transaction(function () use ($order, &$previousStatus) {
+                $locked = ResellerOrder::where('id', $order->id)->lockForUpdate()->first();
+
+                if ($locked->payment_status !== ResellerOrder::PAYMENT_COMPLETED
+                    || in_array($locked->status, [ResellerOrder::STATUS_REFUNDING, ResellerOrder::STATUS_REFUNDED], true)
+                    || $locked->cards()->count() > 0) {
+                    return false;
+                }
+
+                $previousStatus = $locked->status;
+                $locked->update(['status' => ResellerOrder::STATUS_REFUNDING]);
+                return true;
+            });
+        } catch (\Throwable $e) {
+            Log::error('Admin vendor refund claim exception', ['order_id' => $order->id, 'error' => $e->getMessage()]);
+            return back()->with('error', 'Erreur : ' . $e->getMessage());
+        }
+
+        if (!$claimed) {
+            return back()->with('error', 'Cette commande est déjà remboursée ou un remboursement est en cours.');
+        }
+
+        // E-Billing : virement HORS transaction. La référence de transfert
+        // est déterministe (REFUND_<ref d'origine>), le PSP déduplique
+        // un éventuel double appel.
         if ($order->payment_method === 'ebilling') {
             $result = $refundSvc->refund(
                 originalReference: $order->external_reference,
                 amountFcfa: (int) round($order->total_amount),
                 reason: "Refund admin {$order->order_number}",
                 extras: [
-                    'msisdn' => $order->customer_phone,
+                    'msisdn' => $refundPhone['msisdn'],
                     'name'   => $order->customer_name,
                 ],
             );
             if (!$result['ok']) {
+                // Échec du virement → retour à l'état antérieur pour permettre un retry
+                ResellerOrder::where('id', $order->id)->update(['status' => $previousStatus]);
                 return back()->with('error', 'Remboursement E-Billing refusé : ' . $result['message']);
             }
         }
 
+        // Transaction 2 : crédits wallet + clôture, sous verrou
         try {
             DB::transaction(function () use ($reseller, $order) {
-                $subtotal   = (float) $order->subtotal;
-                $commission = (float) $order->commission_earned;
+                $locked = ResellerOrder::where('id', $order->id)->lockForUpdate()->first();
+
+                $subtotal   = (float) $locked->subtotal;
+                $commission = (float) $locked->commission_earned;
 
                 // Restaure le wallet (les cartes n'ont pas été livrées)
                 // refundCredit : une restitution ne doit pas buter sur le plafond wallet.
-                $reseller->refundCredit($subtotal, "Remboursement admin #{$order->order_number}", $order->order_number);
+                $reseller->refundCredit($subtotal, "Remboursement admin #{$locked->order_number}", $locked->order_number);
                 if ($commission > 0) {
-                    $reseller->commission(-$commission, "Annulation commission admin #{$order->order_number}", $order->order_number);
+                    $reseller->commission(-$commission, "Annulation commission admin #{$locked->order_number}", $locked->order_number);
                 }
                 // Si vente cash, le vendeur va devoir rendre le cash → décrémente cash_to_remit
-                if ($order->payment_method === 'cash') {
+                if ($locked->payment_method === 'cash') {
                     $fresh = Reseller::lockForUpdate()->find($reseller->id);
                     $fresh->cash_to_remit = max(0, (float) $fresh->cash_to_remit - $subtotal);
                     $fresh->save();
                 }
 
-                $order->update([
+                $locked->update([
                     'status'         => ResellerOrder::STATUS_REFUNDED,
                     'payment_status' => ResellerOrder::PAYMENT_REFUNDED,
-                    'notes'          => 'Remboursée par admin (' . $order->payment_method . ')',
+                    'notes'          => 'Remboursée par admin (' . $locked->payment_method . ')',
                 ]);
             });
+
             return back()->with('success', 'Commande remboursée — wallet vendeur restauré.');
         } catch (\Throwable $e) {
-            Log::error('Admin vendor refund', ['order_id' => $order->id, 'error' => $e->getMessage()]);
+            Log::error('Admin vendor refund exception', ['order_id' => $order->id, 'error' => $e->getMessage()]);
+            // Retour à l'état antérieur : le retry est sûr même côté E-Billing
+            // grâce à la référence de transfert déterministe (déduplication PSP).
+            ResellerOrder::where('id', $order->id)->update([
+                'status' => $previousStatus,
+                'notes'  => 'Échec finalisation remboursement admin — à réessayer : ' . $e->getMessage(),
+            ]);
             return back()->with('error', 'Erreur : ' . $e->getMessage());
         }
     }
