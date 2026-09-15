@@ -99,14 +99,14 @@
 
                 {{-- Modal remboursement --}}
                 <div x-show="refundModal" x-cloak
-                     style="position:fixed;inset:0;z-index:100;background:rgba(15,23,42,0.55);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;padding:16px;overflow-y:auto;"
+                     style="position:fixed;inset:0;z-index:100;background:rgba(15,23,42,0.55);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;padding:16px;"
                      @click.self="refundModal = false"
                      @keydown.escape.window="refundModal = false">
                     <div x-show="refundModal" x-cloak
                          x-transition:enter="transition ease-out duration-200"
                          x-transition:enter-start="opacity-0 scale-95"
                          x-transition:enter-end="opacity-100 scale-100"
-                         style="position:relative;width:100%;max-width:460px;background:white;border-radius:22px;overflow:hidden;box-shadow:0 28px 60px -16px rgba(15,23,42,0.50);margin:auto;">
+                         style="position:relative;width:100%;max-width:460px;background:white;border-radius:22px;box-shadow:0 28px 60px -16px rgba(15,23,42,0.50);max-height:calc(100vh - 32px);overflow-y:auto;">
                         <div style="position:relative;padding:22px;background:linear-gradient(135deg,#BE123C,#F43F5E,#FB7185);color:white;display:flex;align-items:center;gap:14px;overflow:hidden;">
                             <div style="position:absolute;top:-60px;right:-60px;width:220px;height:220px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,0.30) 0%,transparent 70%);pointer-events:none;"></div>
                             <div style="position:relative;width:48px;height:48px;border-radius:14px;background:rgba(255,255,255,0.22);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
