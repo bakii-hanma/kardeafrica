@@ -129,7 +129,7 @@
 
                     {{-- Modal remboursement --}}
                     <div x-show="refundModal" x-cloak
-                         class="fixed inset-0 z-50 flex items-center justify-center p-4"
+                         class="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto"
                          style="background:rgba(15,23,42,0.55);backdrop-filter:blur(6px);"
                          @click.self="refundModal = false"
                          @keydown.escape.window="refundModal = false"
@@ -138,7 +138,7 @@
                              x-transition:enter="transition ease-out duration-200"
                              x-transition:enter-start="opacity-0 scale-95"
                              x-transition:enter-end="opacity-100 scale-100"
-                             class="bg-white rounded-3xl overflow-hidden shadow-pop max-w-md w-full">
+                             class="bg-white rounded-3xl overflow-hidden shadow-pop max-w-md w-full m-auto">
                             <div class="relative p-5 bg-gradient-to-br from-rose-700 via-rose-500 to-pink-400 text-white flex items-center gap-4">
                                 <div class="absolute -top-12 -right-12 w-44 h-44 rounded-full" style="background:radial-gradient(circle,rgba(255,255,255,0.30) 0%,transparent 70%);"></div>
                                 <div class="relative w-12 h-12 rounded-2xl bg-white/20 backdrop-blur flex items-center justify-center shrink-0">
@@ -155,6 +155,8 @@
                                     <p class="text-xs text-slate-500">L'argent te sera renvoyé via E-Billing sur ton moyen de paiement initial (Mobile Money / carte). Délai : quelques minutes à quelques heures.</p>
                                 @elseif($order->payment_method === \App\Models\Order::PAYMENT_METHOD_CASH_RESELLER)
                                     <p class="text-xs text-slate-500">Tu as payé en cash chez un vendeur Kardafrica. Tu dois aller voir <strong class="text-slate-900">{{ optional($order->cashReseller)->name ?: 'le vendeur' }}</strong> pour récupérer ton argent en cash. Le remboursement est noté dans son compte.</p>
+                                @elseif($order->payment_method === 'simulated')
+                                    <p class="text-xs text-slate-500">Commande de test (DEV&nbsp;: paiement simulé). Aucun virement réel n'est effectué&nbsp;: le statut passera simplement à «&nbsp;remboursée&nbsp;».</p>
                                 @endif
                             </div>
                             <div class="flex gap-2 p-4 bg-slate-50 border-t border-slate-100 flex-col sm:flex-row">
