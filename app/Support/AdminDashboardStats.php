@@ -46,9 +46,11 @@ class AdminDashboardStats
 
     /** Presets du sélecteur de période. */
     public const PRESETS = [
-        '7j'   => '7 jours',
-        '30j'  => '30 jours',
-        'mois' => 'Ce mois-ci',
+        '7j'            => '7 jours',
+        '30j'           => '30 jours',
+        'mois'          => 'Ce mois-ci',
+        'mois_precedent'=> 'Mois précédent',
+        'annee'         => 'Cette année',
     ];
 
     public const DEFAULT_PRESET = 'mois';
@@ -103,9 +105,11 @@ class AdminDashboardStats
         }
 
         [$from, $to] = match ($preset) {
-            '7j'  => [$now->copy()->subDays(6)->startOfDay(), $now->copy()->endOfDay()],
-            '30j' => [$now->copy()->subDays(29)->startOfDay(), $now->copy()->endOfDay()],
-            default => [$now->copy()->startOfMonth(), $now->copy()->endOfDay()],
+            '7j'             => [$now->copy()->subDays(6)->startOfDay(), $now->copy()->endOfDay()],
+            '30j'            => [$now->copy()->subDays(29)->startOfDay(), $now->copy()->endOfDay()],
+            'mois_precedent' => [$now->copy()->subMonthNoOverflow()->startOfMonth(), $now->copy()->subMonthNoOverflow()->endOfMonth()],
+            'annee'          => [$now->copy()->startOfYear(), $now->copy()->endOfDay()],
+            default          => [$now->copy()->startOfMonth(), $now->copy()->endOfDay()],
         };
 
         return new self($from, $to, $preset, false);
@@ -380,7 +384,8 @@ class AdminDashboardStats
         [$granularite, $pas] = match (true) {
             $jours <= 1  => ['hour', 'heure'],
             $jours <= 45 => ['day', 'jour'],
-            default      => ['week', 'semaine'],
+            $jours <= 120 => ['week', 'semaine'],
+            default      => ['month', 'mois'],
         };
 
         $courant   = $this->bucketise($this->from, $this->to, $granularite);
@@ -433,6 +438,7 @@ class AdminDashboardStats
             $curseur = match ($granularite) {
                 'hour' => $curseur->addHour(),
                 'week' => $curseur->addWeek(),
+                'month'=> $curseur->addMonthNoOverflow(),
                 default => $curseur->addDay(),
             };
         }
@@ -453,6 +459,7 @@ class AdminDashboardStats
         return match ($granularite) {
             'hour' => $d->format('H') . 'h',
             'week' => 'S' . $d->isoWeek(),
+            'month'=> $d->format('M') . ' ' . $d->format('y'),
             default => $d->format('j/m'),
         };
     }
