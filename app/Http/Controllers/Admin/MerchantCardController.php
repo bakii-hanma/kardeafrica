@@ -247,14 +247,42 @@ class MerchantCardController extends Controller
         }
     }
 
-    /** Supprime la carte (soft si purchases existantes) */
+    /**
+     * Supprime la carte.
+     *
+     * Une carte avec des achats RÉELS (non simulés) n'est jamais purgée : on
+     * la désactive seulement — supprimer du hardware/vrai existant casserait
+     * des commandes et des wallets. Une carte dont TOUS les achats sont des
+     * paiements `simulated` (tests/démo admin, sans argent réel) peut être
+     * supprimée franchement : la FK merchant_card_purchases est ON DELETE
+     * CASCADE, et les lignes simulées ne portent ni order, ni reseller, ni
+     * settlement (vérifié par purgeSymlink).
+     */
     public function destroy(MerchantCard $merchantCard)
     {
-        if ($merchantCard->purchases()->exists()) {
-            $merchantCard->update(['is_active' => false]);
+        $purchases = $merchantCard->purchases();
+
+        if ($purchases->exists()) {
+            $realPurchases = (clone $purchases)
+                ->where('payment_method', '<>', \App\Models\MerchantCardPurchase::PAYMENT_METHOD_SIMULATED)
+                ->count();
+
+            if ($realPurchases > 0) {
+                $merchantCard->update(['is_active' => false]);
+                return redirect()
+                    ->route('admin.merchant-cards.index')
+                    ->with('success', 'Carte désactivée (impossible de supprimer : des achats réels existent).');
+            }
+
+            // Uniquement des achats de test → purge complète en transaction.
+            \Illuminate\Support\Facades\DB::transaction(function () use ($merchantCard) {
+                $merchantCard->purchases()->delete();
+                $merchantCard->delete();
+            });
+
             return redirect()
                 ->route('admin.merchant-cards.index')
-                ->with('success', 'Carte désactivée (impossible de supprimer : des achats existent).');
+                ->with('success', 'Carte supprimée (ses achats de test l\'accompagnent).');
         }
 
         $this->deleteVisual($merchantCard->visual_url);

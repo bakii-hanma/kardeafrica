@@ -37,6 +37,9 @@ class MerchantCardPurchase extends Model
     public const PAYMENT_FAILED    = 'failed';
     public const PAYMENT_REFUNDED  = 'refunded';
 
+    // Méthodes de paiement (voir CheckoutController / Api\OrderController / Vendor\SaleController)
+    public const PAYMENT_METHOD_SIMULATED = 'simulated';
+
     protected $fillable = [
         'merchant_card_id',
         'order_id', 'order_item_id',
