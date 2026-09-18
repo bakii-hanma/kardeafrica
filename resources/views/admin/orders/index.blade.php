@@ -60,6 +60,7 @@
                         <th>Commande</th>
                         <th>Client</th>
                         <th class="c">Canal</th>
+                        <th>Cartes</th>
                         <th class="r">Montant</th>
                         <th class="c">Paiement</th>
                         <th class="c">Statut</th>
@@ -78,6 +79,7 @@
                             </td>
                             <td><x-admin.cell-user :name="$order->user?->name" :sub="$order->user?->email" /></td>
                             <td class="c"><x-admin.cell-channel :method="$order->payment_method" /></td>
+                            <td><x-admin.cell-cards :cards="$order->userCards" /></td>
                             <td class="r"><x-admin.cell-amount :value="$order->total_amount" /></td>
                             <td class="c"><x-ui.pill :status="$order->payment_status">{{ AdminStatus::label($order->payment_status) }}</x-ui.pill></td>
                             <td class="c"><x-ui.pill :status="$order->status">{{ AdminStatus::label($order->status) }}</x-ui.pill></td>

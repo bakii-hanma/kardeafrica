@@ -118,7 +118,7 @@ class OrderController extends Controller
     {
         // `withCount` : la liste affiche le nombre d'articles par commande.
         // Le charger par ligne coûtait une requête chacune — 20 par page.
-        $query = Order::with('user')->withCount('orderItems')->latest();
+        $query = Order::with('user', 'userCards')->withCount('orderItems')->latest();
 
         // Filtre par statut
         if ($request->filled('status')) {

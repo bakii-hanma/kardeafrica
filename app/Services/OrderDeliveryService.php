@@ -67,11 +67,14 @@ class OrderDeliveryService
             $fresh = Order::whereKey($order->id)->lockForUpdate()->first();
 
             // Un process concurrent a pu livrer entre-temps.
-            if ($fresh->userCards()->exists() || $fresh->status === Order::STATUS_COMPLETED) {
+            if ($fresh->userCards()->exists()) {
                 return 'delivered';
             }
-            // Livraison déjà demandée → on ne re-facture JAMAIS : récupération.
-            if ($fresh->delivery_requested_at !== null) {
+            // Une commande clôturée à vide (ancien ProcessCheckoutJob marquant
+            // completed sur un 202 async sans cartes) N'EST PAS livrée : on
+            // retombe sur la récupération GET /orders/{requestId} (safe, jamais
+            // de re-POST). Sinon le retry admin dirait à tort « déjà livrée ».
+            if ($fresh->delivery_requested_at !== null || $fresh->status === Order::STATUS_COMPLETED) {
                 return 'already_requested';
             }
             $fresh->delivery_requested_at = now();

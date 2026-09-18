@@ -282,19 +282,33 @@ class ProcessCheckoutJob implements ShouldQueue
 
             $this->saveCards($checkoutData);
 
+            // 202 async = codes en cours de génération : la commande ne doit
+            // PAS être clôturée tant que toutes les cartes attendues ne sont
+            // pas dans user_cards (sinon « completed » à vide + retry admin
+            // bloqué). Dans ce cas on la laisse en `processing`` : la
+            // récupération GET /orders/{requestId} la complètera plus tard.
+            $allReceived = app(\App\Services\OrderDeliveryService::class)->allCardsReceived($this->order);
+
             $this->order->update([
                 // Commande mixte : si un Daywatch n'a pas pu être émis, on ne
-                // clôt pas (le client n'a reçu qu'une partie de son achat).
-                'status'       => $daywatchPending
+                // clôt pas non plus (le client n'a reçu qu'une partie).
+                'status'       => ($daywatchPending || ! $allReceived)
                     ? Order::STATUS_PROCESSING
                     : Order::STATUS_COMPLETED,
-                'completed_at' => $daywatchPending ? null : now(),
+                'completed_at' => ($daywatchPending || ! $allReceived) ? null : now(),
                 'billing_details' => array_merge((array) $this->order->billing_details, [
                     'checkout_order_id'   => $checkoutData['orderId'] ?? null,
                     'checkout_request_id' => $checkoutData['requestId'] ?? null,
                     'checkout_status'     => $checkoutData['status'] ?? null,
                 ]),
             ]);
+
+            if (!$allReceived) {
+                $this->order->update([
+                    'notes' => trim(($this->order->notes ?? '')
+                        . ' | Cartes en cours de génération côté fournisseur (async) — récupération auto programmée (' . now()->toDateTimeString() . ')'),
+                ]);
+            }
 
             Log::info('ProcessCheckoutJob: Commande complétée avec succès', [
                 'order_id'        => $this->order->id,
