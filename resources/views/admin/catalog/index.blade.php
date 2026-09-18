@@ -111,6 +111,28 @@
         @endif
     </form>
 
+    {{-- ===== Barre d'affichage : toggle Grille / Liste ===== --}}
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
+        <span style="font-size:13px;font-weight:600;color:#64748B;">
+            {{ count($products) }} produit{{ count($products) > 1 ? 's' : '' }}
+            @if($activeFilters > 0)
+                — filtré{{ $category ? 's' : '' }}
+            @endif
+        </span>
+        <div style="display:inline-flex;background:#F1F5F9;border:1px solid #E2E8F0;border-radius:10px;padding:3px;gap:2px;">
+            <button type="button" id="btn-view-grid" onclick="switchView('grid')"
+                    style="display:inline-flex;align-items:center;gap:6px;padding:7px 14px;font-size:12px;font-weight:700;border:none;cursor:pointer;border-radius:7px;transition:all 0.15s;background:#0F172A;color:white;">
+                <svg style="width:13px;height:13px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
+                Grille
+            </button>
+            <button type="button" id="btn-view-list" onclick="switchView('list')"
+                    style="display:inline-flex;align-items:center;gap:6px;padding:7px 14px;font-size:12px;font-weight:700;border:none;cursor:pointer;border-radius:7px;transition:all 0.15s;background:transparent;color:#64748B;">
+                <svg style="width:13px;height:13px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
+                Liste
+            </button>
+        </div>
+    </div>
+
     {{-- ===== Grille produits ===== --}}
     @if(count($products) > 0)
         <div id="products-grid" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(240px, 1fr));gap:16px;margin-bottom:24px;">
@@ -214,47 +236,77 @@
             @endforeach
         </div>
 
-        {{-- Pagination --}}
-        @if($lastPage > 1)
-            <div style="display:flex;justify-content:center;align-items:center;gap:6px;flex-wrap:wrap;padding:16px 0;">
-                @if($page > 1)
-                    <a href="{{ route('admin.catalog.index', array_merge(request()->query(), ['page' => $page - 1])) }}"
-                       style="display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;background:white;border:1px solid #E2E8F0;border-radius:9px;color:#475569;text-decoration:none;transition:all 0.15s;"
-                       onmouseover="this.style.borderColor='#44A08D';this.style.color='#44A08D';"
-                       onmouseout="this.style.borderColor='#E2E8F0';this.style.color='#475569';">
-                        <svg style="width:14px;height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
-                    </a>
-                @else
-                    <span style="display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:9px;color:#CBD5E1;cursor:not-allowed;">
-                        <svg style="width:14px;height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
-                    </span>
-                @endif
+        {{-- ===== Vue liste ===== --}}
+        <div id="products-list" style="display:none;margin-bottom:24px;">
+            <div style="background:white;border-radius:14px;border:1px solid #E2E8F0;overflow:hidden;box-shadow:0 1px 2px rgba(15,23,42,0.04);">
+                <div style="overflow-x:auto;">
+                    <div style="min-width:640px;">
+                        <div style="display:grid;grid-template-columns:minmax(220px,1fr) 130px 120px 150px;gap:12px;padding:10px 16px;background:#F8FAFC;border-bottom:1px solid #E2E8F0;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#94A3B8;">
+                            <div>Produit</div>
+                            <div>Référence</div>
+                            <div>Pays</div>
+                            <div style="text-align:right;">Prix</div>
+                        </div>
 
-                @for($i = max(1, $page - 2); $i <= min($lastPage, $page + 2); $i++)
-                    @if($i === $page)
-                        <span style="display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;background:#44A08D;color:white;border-radius:9px;font-size:13px;font-weight:700;box-shadow:0 4px 12px rgba(68,160,141,0.25);">{{ $i }}</span>
-                    @else
-                        <a href="{{ route('admin.catalog.index', array_merge(request()->query(), ['page' => $i])) }}"
-                           style="display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;background:white;border:1px solid #E2E8F0;border-radius:9px;color:#475569;text-decoration:none;font-size:13px;font-weight:600;transition:all 0.15s;"
-                           onmouseover="this.style.borderColor='#44A08D';this.style.color='#44A08D';"
-                           onmouseout="this.style.borderColor='#E2E8F0';this.style.color='#475569';">{{ $i }}</a>
-                    @endif
-                @endfor
+                        @foreach($products as $product)
+                            @php
+                                $name      = $product['name'] ?? 'Produit';
+                                $brandName = $product['cardType']['name'] ?? $product['brand']['name'] ?? '';
+                                $brandLabel= $brandName ?: explode(' ', $name)[0];
+                                $logoUrl   = $product['cardType']['logoUrl'] ?? $product['brand']['logoUrl'] ?? $product['logoUrl'] ?? '';
+                                $priceMin  = $product['price']['min'] ?? 0;
+                                $priceMax  = $product['price']['max'] ?? $priceMin;
+                                $currency  = $product['price']['currencyCode'] ?? 'XAF';
+                                $productId = $product['id'] ?? '';
+                                $country   = $product['country']['name'] ?? '';
+                                $flagUrl   = $product['country']['flagUrl'] ?? '';
+                            @endphp
 
-                @if($page < $lastPage)
-                    <a href="{{ route('admin.catalog.index', array_merge(request()->query(), ['page' => $page + 1])) }}"
-                       style="display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;background:white;border:1px solid #E2E8F0;border-radius:9px;color:#475569;text-decoration:none;transition:all 0.15s;"
-                       onmouseover="this.style.borderColor='#44A08D';this.style.color='#44A08D';"
-                       onmouseout="this.style.borderColor='#E2E8F0';this.style.color='#475569';">
-                        <svg style="width:14px;height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
-                    </a>
-                @else
-                    <span style="display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:9px;color:#CBD5E1;cursor:not-allowed;">
-                        <svg style="width:14px;height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
-                    </span>
-                @endif
+                            <div class="product-card"
+                                 data-price-min="{{ $priceMin }}" data-price-max="{{ $priceMax }}" data-currency="{{ $currency }}"
+                                 style="display:grid;grid-template-columns:minmax(220px,1fr) 130px 120px 150px;gap:12px;align-items:center;padding:11px 16px;border-bottom:1px solid #F1F5F9;transition:background 0.15s;background:white;"
+                                 onmouseover="this.style.background='#F8FAFC';"
+                                 onmouseout="this.style.background='white';">
+
+                                <div style="display:flex;align-items:center;gap:12px;min-width:0;">
+                                    <div style="width:40px;height:40px;flex-shrink:0;border-radius:10px;background:linear-gradient(135deg,#F8FAFC,#F1F5F9);border:1px solid #E2E8F0;display:flex;align-items:center;justify-content:center;overflow:hidden;">
+                                        @if($logoUrl)
+                                            <img src="{{ $logoUrl }}" alt="{{ $brandLabel }}" style="width:70%;height:70%;object-fit:contain;" loading="lazy">
+                                        @else
+                                            <span style="font-family:'Space Grotesk', 'Inter', sans-serif;font-size:12px;font-weight:700;color:#475569;">{{ strtoupper(substr($brandLabel, 0, 2)) }}</span>
+                                        @endif
+                                    </div>
+                                    <div style="min-width:0;">
+                                        <div style="font-size:13px;font-weight:600;color:#0F172A;line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ $name }}</div>
+                                        <div style="font-size:11px;color:#64748B;margin-top:1px;">{{ $brandName ?: $brandLabel }}</div>
+                                    </div>
+                                </div>
+
+                                <div style="font-family:monospace;font-size:11px;font-weight:600;color:#475569;">#{{ $productId ?: '—' }}</div>
+
+                                <div>
+                                    <span style="display:inline-flex;align-items:center;gap:6px;font-size:11px;color:#475569;background:#F8FAFC;border:1px solid #E2E8F0;padding:3px 9px;border-radius:999px;">
+                                        @if($flagUrl)
+                                            <img src="{{ $flagUrl }}" alt="" style="width:16px;height:11px;border-radius:2px;object-fit:cover;">
+                                        @endif
+                                        {{ $country ?: '—' }}
+                                    </span>
+                                </div>
+
+                                <div style="text-align:right;">
+                                    <div class="price-display" style="font-family:'Space Grotesk', 'Inter', sans-serif;font-size:14px;font-weight:800;color:#0F172A;font-variant-numeric:tabular-nums;">
+                                        {{-- Rempli par updateAllPrices() --}}
+                                    </div>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
             </div>
-        @endif
+        </div>
+
+        {{-- Pagination — vue admin Layered (kardafrica) --}}
+        {{ $productsPaginator->links() }}
 
     @else
         <div style="background:white;border-radius:14px;border:1px solid #E2E8F0;padding:80px 40px;text-align:center;box-shadow:0 1px 2px rgba(15,23,42,0.04);">
@@ -280,6 +332,33 @@
 </div>
 
 <script>
+function switchView(mode) {
+    var grid = document.getElementById('products-grid');
+    var list = document.getElementById('products-list');
+    var btnGrid = document.getElementById('btn-view-grid');
+    var btnList = document.getElementById('btn-view-list');
+    if (!grid || !list || !btnGrid || !btnList) return;
+
+    if (mode === 'list') {
+        grid.style.display = 'none';
+        list.style.display = 'block';
+        btnGrid.style.background = 'transparent'; btnGrid.style.color = '#64748B';
+        btnList.style.background = '#0F172A'; btnList.style.color = 'white';
+    } else {
+        grid.style.display = 'grid';
+        list.style.display = 'none';
+        btnGrid.style.background = '#0F172A'; btnGrid.style.color = 'white';
+        btnList.style.background = 'transparent'; btnList.style.color = '#64748B';
+    }
+    try { localStorage.setItem('kardafrica_catalog_view', mode); } catch (e) {}
+}
+
+function applySavedView() {
+    var saved = null;
+    try { saved = localStorage.getItem('kardafrica_catalog_view'); } catch (e) {}
+    if (saved === 'list') switchView('list');
+}
+
 var EXCHANGE_RATES = {
     'XAF': 1, 'XOF': 1, 'EUR': 655.957, 'USD': 620, 'AED': 170, 'GBP': 780, 'CAD': 450,
     'ARS': 0.7, 'AUD': 405, 'BRL': 120, 'TRY': 20, 'MXN': 35, 'INR': 7.5, 'ZAR': 35,
@@ -335,6 +414,9 @@ function updateAllPrices() {
     });
 }
 
-document.addEventListener('DOMContentLoaded', updateAllPrices);
+document.addEventListener('DOMContentLoaded', function () {
+    updateAllPrices();
+    applySavedView();
+});
 </script>
 @endsection

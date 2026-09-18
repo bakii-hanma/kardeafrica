@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Services\ProductApiService;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 
 class CatalogController extends Controller
 {
@@ -32,10 +33,21 @@ class CatalogController extends Controller
         $total = $result['total'] ?? 0;
         $lastPage = $result['last_page'] ?? 1;
 
+        // Paginator réel (au lieu de rendre la pagination à la main dans le
+        // blade) : la vue admin par défaut (`vendor.pagination.kardafrica`,
+        // design « Layered ») s'applique automatiquement comme sur /admin/orders.
+        $productsPaginator = new LengthAwarePaginator(
+            $products,
+            (int) $total,
+            $perPage,
+            $page,
+            ['path' => $request->url(), 'query' => $request->query()]
+        );
+
         $categories = $this->productApi->getCategories();
 
         return view('admin.catalog.index', compact(
-            'products', 'total', 'page', 'lastPage', 'perPage',
+            'products', 'productsPaginator', 'total', 'page', 'lastPage', 'perPage',
             'search', 'category', 'categories'
         ));
     }
