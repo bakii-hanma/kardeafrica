@@ -27,6 +27,29 @@
     $commandes   = $stats->recentOrders();
     $cartes      = $stats->cards();
     $utilisateurs= $stats->users();
+    $topCartes   = $stats->topSoldCards();
+    $meilleurClient = $stats->bestClient();
+
+    /* Palette des marques (même source que /admin/catalog & /admin/cards) pour
+       dessiner les mini-cartes du top. */
+    $brandPalette = [
+        'Netflix' => '#E50914', 'Spotify' => '#1DB954', 'Apple' => '#000000',
+        'iTunes' => '#D60017', 'PlayStation' => '#003791', 'Xbox' => '#107C10',
+        'Amazon' => '#FF9900', 'Google' => '#01875F', 'Steam' => '#171A21',
+        'Roblox' => '#00A2FF', 'Nintendo' => '#E60012', 'Disney' => '#0E47A1',
+        'StarzPlay' => '#7C3AED', 'Talabat' => '#FF5A00', 'HUAWEI' => '#C7000B', 'IKEA' => '#0058A3',
+    ];
+    $brandColorFor = function ($name) use ($brandPalette) {
+        if (!$name) return '#1F2937';
+        foreach ($brandPalette as $key => $color) {
+            if (stripos($name, $key) !== false) return $color;
+        }
+        $palette = ['#0F172A', '#44A08D', '#0EA5E9', '#7C3AED', '#DC2626', '#EA580C', '#059669'];
+        $hash = 0;
+        for ($i = 0; $i < strlen($name); $i++) $hash = (ord($name[$i]) + (($hash << 5) - $hash)) & 0x7FFFFFFF;
+        $idx = (($hash % count($palette)) + count($palette)) % count($palette);
+        return $palette[$idx];
+    };
 
     /* Les onglets conservent une plage personnalisée nulle : basculer sur un
        preset doit effacer date_from/date_to, sinon la plage l'emporterait. */
@@ -283,6 +306,97 @@
             </x-ui.card>
         </div>
 
+        {{-- ============ 3.5 TOP CARTES VENDUES + MEILLEUR CLIENT ============ --}}
+        <div class="dsh-top">
+
+            {{-- Cartes les plus vendues, avec design de carte --}}
+            <x-ui.card variant="inset" class="dsh-top-sold">
+                <div class="dsh-w-head">
+                    <h2 class="ui-stat-label">Cartes les plus vendues</h2>
+                    <a href="{{ route('admin.cards.index') }}" class="dsh-w-link">Voir tout</a>
+                </div>
+
+                @if ($topCartes->isEmpty())
+                    <x-ui.empty-state label="Aucune vente sur cette période." />
+                @else
+                    <div class="dsh-sold-grid">
+                        @foreach ($topCartes as $i => $p)
+                            @php
+                                $couleur = $brandColorFor($p['name']);
+                                $brand   = explode(' ', $p['name'])[0];
+                                $gagnant = $i === 0;
+                            @endphp
+                            <div class="dsh-sold-card">
+                                {{-- Design de carte --}}
+                                <div class="dsh-sold-visual" style="background-color:{{ $couleur }};">
+                                    <svg class="dsh-sold-pattern" viewBox="0 0 32 32" aria-hidden="true">
+                                        <circle cx="16" cy="16" r="13" fill="none" stroke="white" stroke-width="1.2"/>
+                                    </svg>
+                                    <div class="dsh-sold-glow"></div>
+                                    <div class="dsh-sold-visual-top">
+                                        <span class="dsh-sold-brand">{{ strtoupper($brand) }}</span>
+                                        @if ($gagnant)
+                                            <span class="dsh-sold-medal">Top vente</span>
+                                        @endif
+                                    </div>
+                                    <div class="dsh-sold-visual-bottom">
+                                        <span class="dsh-sold-value">{{ $fmt($p['amount']) }} <small>FCFA</small></span>
+                                        @if ($p['image_url'])
+                                            <img src="{{ $p['image_url'] }}" alt="" class="dsh-sold-logo" loading="lazy">
+                                        @endif
+                                    </div>
+                                </div>
+                                {{-- Infos --}}
+                                <div class="dsh-sold-body">
+                                    <div class="dsh-sold-name">{{ $p['name'] }}</div>
+                                    <div class="dsh-sold-sub">
+                                        {{ $p['count'] }} vente{{ $p['count'] > 1 ? 's' : '' }}
+                                        @if ($gagnant)
+                                            · <span class="dsh-sold-top">la plus vendue</span>
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
+            </x-ui.card>
+
+            {{-- Meilleur client --}}
+            <x-ui.card variant="inset" class="dsh-top-client">
+                <div class="dsh-w-head">
+                    <h2 class="ui-stat-label">Meilleur client</h2>
+                </div>
+
+                @if (! $meilleurClient)
+                    <x-ui.empty-state label="Aucun client sur cette période." />
+                @else
+                    @php
+                        $cli = $meilleurClient['user'];
+                        $initiales = mb_strtoupper(mb_substr($cli->name ?? 'C', 0, 2));
+                    @endphp
+                    <div class="dsh-client">
+                        <div class="dsh-client-avatar">{{ $initiales }}</div>
+                        <div class="dsh-client-name">{{ $cli->name ?? 'Client' }}</div>
+                        @if ($cli->email)
+                            <div class="dsh-client-mail">{{ $cli->email }}</div>
+                        @endif
+                        <div class="dsh-client-stats">
+                            <div>
+                                <span class="dsh-client-num">{{ $fmt($meilleurClient['amount']) }}</span>
+                                <span class="dsh-client-lbl">FCFA dépensés</span>
+                            </div>
+                            <div>
+                                <span class="dsh-client-num">{{ $meilleurClient['count'] }}</span>
+                                <span class="dsh-client-lbl">commande{{ $meilleurClient['count'] > 1 ? 's' : '' }}</span>
+                            </div>
+                        </div>
+                        <a href="{{ route('admin.users.show', $cli) }}" class="dsh-w-link">Voir le profil →</a>
+                    </div>
+                @endif
+            </x-ui.card>
+        </div>
+
         {{-- ============ 4. COMMANDES RÉCENTES ============ --}}
         <section class="dsh-recent">
             <div class="dsh-w-head">
@@ -441,6 +555,41 @@
 
     .dsh-w--pay { display: flex; flex-direction: column; gap: 4px; justify-content: center; }
     .dsh-pay-meta { font-size: 12px; color: var(--text-muted); margin: 0 0 8px; }
+
+    /* ---- 3.5 Top cartes vendues + meilleur client ---- */
+    .dsh-top { display: grid; grid-template-columns: 1fr; gap: 12px; margin-bottom: 22px; }
+    @media (min-width: 900px) { .dsh-top { grid-template-columns: 2fr 1fr; } }
+    .dsh-top-sold { padding: 16px; }
+    .dsh-top-client { padding: 16px; }
+
+    .dsh-sold-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+    .dsh-sold-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-sub); padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+    .dsh-sold-visual { position: relative; overflow: hidden; border-radius: 10px; padding: 12px; height: 88px; display: flex; flex-direction: column; justify-content: space-between; }
+    .dsh-sold-pattern { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0.08; }
+    .dsh-sold-glow { position: absolute; top: -20px; right: -20px; width: 80px; height: 80px; border-radius: 50%; background: rgba(255,255,255,0.15); filter: blur(16px); }
+    .dsh-sold-visual-top, .dsh-sold-visual-bottom { position: relative; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+    .dsh-sold-brand { font-family: 'Space Grotesk','Inter',sans-serif; color: white; font-size: 14px; font-weight: 700; letter-spacing: -0.02em; }
+    .dsh-sold-medal { background: rgba(255,255,255,0.22); backdrop-filter: blur(4px); color: white; font-size: 9px; font-weight: 800; padding: 3px 8px; border-radius: var(--r-pill); white-space: nowrap; }
+    .dsh-sold-value { font-family: 'Space Grotesk','Inter',sans-serif; color: white; font-size: 13px; font-weight: 800; font-variant-numeric: tabular-nums; }
+    .dsh-sold-value small { font-size: .7em; font-weight: 500; opacity: .75; }
+    .dsh-sold-logo { width: 22px; height: 22px; object-fit: contain; filter: drop-shadow(0 1px 2px rgba(0,0,0,.3)); }
+    .dsh-sold-name { font-size: 12px; font-weight: 700; color: var(--text); line-height: 1.25; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+    .dsh-sold-sub { font-size: 10.5px; color: var(--text-muted); }
+    .dsh-sold-top { color: var(--teal); font-weight: 700; }
+
+    .dsh-client { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 4px; padding: 8px 0; }
+    .dsh-client-avatar {
+        width: 56px; height: 56px; border-radius: 16px; flex: none; margin-bottom: 6px;
+        background: linear-gradient(135deg, var(--teal), var(--teal-light));
+        color: var(--surface); display: flex; align-items: center; justify-content: center;
+        font-family: 'Space Grotesk','Inter',sans-serif; font-size: 18px; font-weight: 800;
+    }
+    .dsh-client-name { font-size: 15px; font-weight: 800; color: var(--text); }
+    .dsh-client-mail { font-size: 11px; color: var(--text-muted); font-family: monospace; margin-bottom: 8px; }
+    .dsh-client-stats { display: flex; gap: 18px; margin: 8px 0 10px; }
+    .dsh-client-stats > div { display: flex; flex-direction: column; }
+    .dsh-client-num { font-family: 'Space Grotesk','Inter',sans-serif; font-size: 20px; font-weight: 800; color: var(--text); }
+    .dsh-client-lbl { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; }
 
     /* ---- Table ---- */
     .dsh-recent { background: var(--surface-inset); border-radius: var(--r-sub); padding: 16px; }

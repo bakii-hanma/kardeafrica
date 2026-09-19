@@ -129,6 +129,57 @@
         @endforeach
     </div>
 
+    {{-- ===== Top cartes vendues (design) ===== --}}
+    @if(isset($topSold) && $topSold->isNotEmpty())
+        <div style="background:var(--surface);border-radius:14px;border:1px solid var(--border);box-shadow:0 1px 2px rgba(15,23,42,0.04);margin-bottom:18px;overflow:hidden;">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--surface-inset);">
+                <div>
+                    <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted);">Cartes les plus vendues</div>
+                    <div style="font-family:'Space Grotesk', 'Inter', sans-serif;font-size:14px;font-weight:700;color:var(--text);margin-top:2px;">Depuis la création</div>
+                </div>
+                <div style="font-size:10px;color:var(--text-faint);font-weight:600;">dépense totale · récap</div>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;padding:14px;">
+                @foreach($topSold as $i => $p)
+                    @php
+                        $couleur = $brandColorFor($p['name']);
+                        $brand   = explode(' ', $p['name'])[0];
+                        $gagnant = $i === 0;
+                    @endphp
+                    <div style="display:flex;flex-direction:column;gap:8px;">
+                        <div style="position:relative;overflow:hidden;border-radius:10px;padding:12px;height:88px;display:flex;flex-direction:column;justify-content:space-between;background-color:{{ $couleur }};">
+                            <svg style="position:absolute;inset:0;width:100%;height:100%;opacity:0.08;" viewBox="0 0 32 32" aria-hidden="true">
+                                <circle cx="16" cy="16" r="13" fill="none" stroke="white" stroke-width="1.2"/>
+                            </svg>
+                            <div style="position:absolute;top:-20px;right:-20px;width:80px;height:80px;border-radius:50%;background:rgba(255,255,255,0.15);filter:blur(16px);"></div>
+                            <div style="position:relative;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:6px;">
+                                <span style="font-family:'Space Grotesk','Inter',sans-serif;color:white;font-size:14px;font-weight:700;letter-spacing:-0.02em;">{{ strtoupper($brand) }}</span>
+                                @if($gagnant)
+                                    <span style="background:rgba(255,255,255,0.22);backdrop-filter:blur(4px);color:white;font-size:9px;font-weight:800;padding:3px 8px;border-radius:9999px;white-space:nowrap;">Top vente</span>
+                                @endif
+                            </div>
+                            <div style="position:relative;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:6px;">
+                                <span style="font-family:'Space Grotesk','Inter',sans-serif;color:white;font-size:13px;font-weight:800;font-variant-numeric:tabular-nums;">
+                                    {{ number_format($p['amount'], 0, ',', ' ') }} <span style="font-size:.7em;font-weight:500;opacity:.75;">FCFA</span>
+                                </span>
+                                @if($p['image_url'])
+                                    <img src="{{ $p['image_url'] }}" alt="" style="width:22px;height:22px;object-fit:contain;filter:drop-shadow(0 1px 2px rgba(0,0,0,.3));" loading="lazy">
+                                @endif
+                            </div>
+                        </div>
+                        <div style="font-size:12px;font-weight:700;color:var(--text);line-height:1.25;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;">{{ $p['name'] }}</div>
+                        <div style="font-size:10.5px;color:var(--text-muted);">
+                            {{ $p['count'] }} vente{{ $p['count'] > 1 ? 's' : '' }}
+                            @if($gagnant)
+                                · <span style="color:var(--teal);font-weight:700;">la plus vendue</span>
+                            @endif
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+    @endif
+
     {{-- ===== Filtres ===== --}}
     <form method="GET" action="{{ route('admin.cards.index') }}"
           style="background:var(--surface);border-radius:14px;padding:12px;border:1px solid var(--border);box-shadow:0 1px 2px rgba(15,23,42,0.04);margin-bottom:18px;display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;align-items:center;">

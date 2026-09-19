@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Order;
+use App\Models\OrderItem;
 use App\Models\User;
 use App\Models\UserCard;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class CardController extends Controller
 {
@@ -80,9 +82,26 @@ class CardController extends Controller
             ->latest()
             ->get();
 
+        // Top des cartes vendues (commandes payées en ligne, agrégé par produit)
+        // — même triptyque que le dashboard : nom, CA, nombre de ventes.
+        $topSold = OrderItem::whereHas('order', function ($q) {
+                $q->where('payment_status', Order::PAYMENT_STATUS_COMPLETED);
+            })
+            ->select('name', DB::raw('MAX(image_url) as image_url'), DB::raw('SUM(total_price) as revenu'), DB::raw('COUNT(*) as n'))
+            ->groupBy('name')
+            ->orderByDesc('revenu')
+            ->take(6)
+            ->get()
+            ->map(fn ($l) => [
+                'name'      => $l->name ?: 'Carte',
+                'image_url' => $l->image_url ?: null,
+                'amount'    => (float) $l->revenu,
+                'count'     => (int) $l->n,
+            ]);
+
         return view('admin.cards.index', compact(
             'cards', 'totalCards', 'activeCards', 'usedCards', 'expiredCards', 'totalRevenue', 'stuckOrders',
-            'filteredUser', 'userCardCounts'
+            'filteredUser', 'userCardCounts', 'topSold'
         ));
     }
 }

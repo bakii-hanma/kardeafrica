@@ -566,6 +566,69 @@ class AdminDashboardStats
     }
 
     // ------------------------------------------------------------------
+    // Top cartes vendues & meilleur client
+    // ------------------------------------------------------------------
+
+    /**
+     * Cartes les plus vendues sur la période, mesuré sur les commandes PAYÉES
+     * (`order_items` des commandes livrées). Une ligne d'OrderItem = un produit
+     * vendu ; on agrège par nom de produit (le champ `name` porte à la fois la
+     * marque et la déclinaison, ex. « Apple France 5 EUR »).
+     *
+     * @return Collection<int, array{name:string, image_url:?string, amount:float, count:int}>
+     */
+    public function topSoldCards(int $limite = 6): Collection
+    {
+        return $this->memo['top_cards'] ??= \App\Models\OrderItem::whereHas('order', function ($q) {
+                $q->where('payment_status', Order::PAYMENT_STATUS_COMPLETED)
+                  ->whereBetween('created_at', [$this->utc($this->from), $this->utc($this->to)]);
+            })
+            ->select('name', DB::raw('MAX(image_url) as image_url'), DB::raw('SUM(total_price) as revenu'), DB::raw('COUNT(*) as n'))
+            ->groupBy('name')
+            ->orderByDesc('revenu')
+            ->take($limite)
+            ->get()
+            ->map(fn ($l) => [
+                'name'      => $l->name ?: 'Carte',
+                'image_url' => $l->image_url ?: null,
+                'amount'    => (float) $l->revenu,
+                'count'     => (int) $l->n,
+            ])
+            ->values();
+    }
+
+    /**
+     * Meilleur client de la période : plus gros total facturé, sur les
+     * commandes payées en ligne. Retourne null si aucune vente.
+     *
+     * @return array{user:User, amount:float, count:int}|null
+     */
+    public function bestClient(): ?array
+    {
+        if (array_key_exists('best_client', $this->memo)) {
+            return $this->memo['best_client'];
+        }
+
+        $ligne = Order::where('payment_status', Order::PAYMENT_STATUS_COMPLETED)
+            ->whereNotNull('user_id')
+            ->whereBetween('created_at', [$this->utc($this->from), $this->utc($this->to)])
+            ->select('user_id', DB::raw('SUM(total_amount) as total'), DB::raw('COUNT(*) as n'))
+            ->groupBy('user_id')
+            ->orderByDesc('total')
+            ->first();
+
+        if (! $ligne) {
+            return $this->memo['best_client'] = null;
+        }
+
+        return $this->memo['best_client'] = [
+            'user'   => User::find($ligne->user_id),
+            'amount' => (float) $ligne->total,
+            'count'  => (int) $ligne->n,
+        ];
+    }
+
+    // ------------------------------------------------------------------
     // Versements en attente
     // ------------------------------------------------------------------
 
