@@ -513,15 +513,35 @@
 .bmb-err { color: rgb(224 95 78); font-weight: 700; }
 .bmb-refresh { text-decoration: none; font-size: 12px; font-weight: 700; color: var(--teal); white-space: nowrap; }
 .bmb-refresh:hover { text-decoration: underline; }
-.bmb-accounts { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+
+/* Solde hebdo (« hero ») : carte navy, total FCFA en vedette */
+.bmb-hero { padding: 22px; }
+.bmb-head--navy { align-items: center; }
+.bmb-head--navy .bmb-meta { color: rgb(255 255 255 / .60); }
+.bmb-head--navy .bmb-err { color: rgb(224 95 78); }
+.bmb-hero-actions { display: flex; align-items: center; gap: 10px; }
+.bmb-hero-actions .bmb-refresh { color: var(--teal-light); }
+.bmb-hero-actions .bmb-refresh:hover { text-decoration: underline; }
+.bmb-hero-meta { margin: 6px 0 14px; }
+.bmb-hero-sub {
+    font-size: 13px; color: rgb(255 255 255 / .75);
+    margin: 10px 0 0; font-variant-numeric: tabular-nums;
+}
+.bmb-hero-sub strong { color: #FFFFFF; }
+.bmb-empty-navy .ui-empty-label { color: rgb(255 255 255 / .60); }
+.bmb-empty-navy svg { color: rgb(255 255 255 / .35); width: 26px; height: 26px; }
+
+.bmb-accounts { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 12px; }
 @media (min-width: 900px) { .bmb-accounts { grid-template-columns: repeat(4, 1fr); } }
 .bmb-acc {
     background: var(--surface); border: 1px solid var(--border);
     border-radius: var(--r-sub); padding: 14px 16px;
 }
 .bmb-acc--low { border-color: rgb(224 95 78); background: rgb(224 95 78 / .08); }
+.bmb-acc-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .bmb-acc-cur { font-size: 11px; font-weight: 800; letter-spacing: .08em; color: var(--text-faint); }
 .bmb-acc-bal { font-size: 22px; font-weight: 800; color: var(--navy); font-variant-numeric: tabular-nums; margin: 4px 0; }
+.bmb-acc-xaf { font-size: 13px; font-weight: 700; color: var(--teal); font-variant-numeric: tabular-nums; margin-bottom: 3px; }
 .bmb-acc-meta { font-size: 11.5px; color: var(--text-muted); }
 .bmb-low { color: rgb(224 95 78); }
 .bmb-alert {

@@ -305,7 +305,7 @@
                 <a href="{{ route('admin.versements.index') }}" class="dsh-w-link">Ouvrir les versements →</a>
             </x-ui.card>
 
-            {{-- Solde fournisseur Bamboo (alerte seuil bas) --}}
+            {{-- Solde fournisseur Bamboo : total FCFA + seuil bas (alerte) --}}
             <x-ui.card variant="inset" class="dsh-w dsh-w--bamboo">
                 <div class="dsh-w-head">
                     <h2 class="ui-stat-label">Solde fournisseur Bamboo</h2>
@@ -319,8 +319,12 @@
                         $eur  = $accs->firstWhere('currency', 'EUR');
                         $usd  = $accs->firstWhere('currency', 'USD');
                         $fmt  = fn ($n) => number_format((float) $n, 2, ',', ' ');
+                        $fmt0 = fn ($n) => number_format((float) $n, 0, ',', ' ');
                         $low  = $eur !== null && (float) $eur['balance'] < $bambooThreshold;
                     @endphp
+                    @if ($bambooTotalXaf !== null)
+                        <x-ui.stat-number :value="$bambooTotalXaf" label="Équivalent total" />
+                    @endif
                     <div class="dsh-bamboo">
                         <div class="dsh-bamboo-row {{ $low ? 'is-low' : '' }}">
                             <span>{{ $fmt($eur['balance'] ?? 0) }} <small>EUR</small></span>
@@ -334,6 +338,9 @@
                             <div class="dsh-bamboo-sub">{{ $fmt($usd['balance']) }} USD · compte #{{ $usd['id'] ?? '—' }}</div>
                         @endif
                     </div>
+                    @if ($bambooTotalXaf !== null)
+                        <p class="dsh-pay-meta">Soit {{ $fmt0($bambooTotalXaf) }} FCFA · {{ $bamboo['fetched_at'] ?? '' }}</p>
+                    @endif
                 @endif
             </x-ui.card>
         </div>
@@ -589,12 +596,14 @@
     .dsh-pay-meta { font-size: 12px; color: var(--text-muted); margin: 0 0 8px; }
 
     .dsh-w--bamboo { display: flex; flex-direction: column; gap: 4px; justify-content: center; }
-    .dsh-bamboo { display: flex; flex-direction: column; gap: 6px; }
+    .dsh-bamboo { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
     .dsh-bamboo-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
     .dsh-bamboo-row > span { font-size: 26px; font-weight: 800; color: var(--text); font-variant-numeric: tabular-nums; }
     .dsh-bamboo-row > span small { font-size: .5em; font-weight: 600; color: var(--text-muted); margin-left: 3px; }
-    .dsh-bamboo-row.is-low > span { color: rgb(224 95 78); }
+    .dsh-bamboo-row.is-low > span { color: var(--danger); }
     .dsh-bamboo-sub { font-size: 11.5px; color: var(--text-muted); }
+    .dsh-bamboo .dsh-pay-meta { margin: 2px 0 0; }
+    .dsh-w--bamboo .dsh-pay-meta { font-size: 11.5px; color: var(--text-faint); margin: 4px 0 0; }
 
     /* ---- 3.5 Top cartes vendues + meilleur client ---- */
     .dsh-top { display: grid; grid-template-columns: 1fr; gap: 12px; margin-bottom: 22px; }

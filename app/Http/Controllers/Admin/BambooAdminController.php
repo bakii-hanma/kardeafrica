@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Services\BambooReportingService;
 use App\Services\OrderDeliveryService;
+use App\Support\BambooRates;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 
@@ -46,6 +47,20 @@ class BambooAdminController extends Controller
         $transactions = $this->bamboo->transactions($startDate, $endDate, $request->boolean('refresh'));
         $rates       = $this->bamboo->exchangeRates($request->boolean('refresh'));
 
+        // Équivalents FCFA (feature : solde visible en monnaie locale) —
+        // taux officiels Bamboo convertis vers XAF, fallback Money.
+        $xafRates    = BambooRates::toXafRates($rates['rates'] ?? []);
+        $totalXaf    = BambooRates::totalXaf($accounts['accounts'] ?? [], $xafRates);
+        $accountsXaf = [];
+        foreach ($accounts['accounts'] as $acc) {
+            $cur    = strtoupper((string) ($acc['currency'] ?? ''));
+            $accountsXaf[$cur] = BambooRates::convert(
+                (float) ($acc['balance'] ?? 0),
+                $cur,
+                $xafRates,
+            );
+        }
+
         // Seuil d'alerte sur le solde (feature 3) : compte EUR (le compte de
         // travail) et équivalents USD convertis grossièrement.
         $threshold = (float) config('services.bamboo.accounts_alert_threshold_eur');
@@ -59,7 +74,8 @@ class BambooAdminController extends Controller
         }
 
         return view('admin.bamboo.index', compact(
-            'accounts', 'transactions', 'rates', 'startDate', 'endDate', 'threshold', 'low'
+            'accounts', 'transactions', 'rates', 'startDate', 'endDate', 'threshold', 'low',
+            'xafRates', 'totalXaf', 'accountsXaf'
         ));
     }
 

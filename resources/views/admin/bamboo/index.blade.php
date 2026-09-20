@@ -5,13 +5,19 @@
 
 @section('content')
 @php
-    $fmt = fn ($n) => number_format((float) $n, 2, ',', ' ');
+    $fmt  = fn ($n) => number_format((float) $n, 2, ',', ' ');
+    $fmt0 = fn ($n) => number_format((float) $n, 0, ',', ' ');
 
-    $accByCur = collect($accounts['accounts'])->filter(fn ($a) => (bool) ($a['isActive'] ?? false))
-        ->keyBy(fn ($a) => strtoupper((string) ($a['currency'] ?? '?')));
+    $accs = collect($accounts['accounts'] ?? [])->filter(fn ($a) => (bool) ($a['isActive'] ?? false));
+    $accByCur = $accs->keyBy(fn ($a) => strtoupper((string) ($a['currency'] ?? '?')));
 
-    $totalEur = (float) ($accByCur['EUR']['balance'] ?? 0)
-        + (float) ($accByCur['USD']['balance'] ?? 0) * 0.92; // approximation USD→EUR
+    // Comptes EUR sous le seuil d'alerte, distinct du flag booléen $low des pillules.
+    $lowAccounts = $accs->filter(fn ($a) => strtoupper((string) ($a['currency'] ?? '')) === 'EUR'
+        && (float) ($a['balance'] ?? 0) < $threshold)->values();
+    $low = $lowAccounts->isNotEmpty();
+
+    $eur = $accByCur->get('EUR');
+    $usd = $accByCur->get('USD');
 
     // Transactions flat (tous les clients) pour un tableau lisible.
     $tx = collect($transactions['clients'] ?? [])
@@ -19,8 +25,8 @@
         ->sortByDesc('transactionDate')
         ->values();
 
-    // Taux utiles (les taux Bamboo sont donnés pour 1 unité : EUR→XAF etc.)
-    $ratesByCur = collect($rates['rates'] ?? [])->keyBy('currencyCode');
+    // Taux utiles (cotes devise→XAF déjà préparées par le contrôleur).
+    $rate = fn (string $c) => $xafRates[$c] ?? null;
 @endphp
 
 <div class="lst">
@@ -32,12 +38,12 @@
         <div class="lst-flash lst-flash--err" role="alert">{{ $errors->first() }}</div>
     @endif
 
-    {{-- ============ 1. SOLDES DES COMPTES (feature 3) ============ --}}
-    <x-ui.card variant="inset" class="lst-summary">
-        <div class="bmb-head">
+    {{-- ============ 1. SOLDE TOTAL (hero) ============ --}}
+    <x-ui.card variant="highlight" class="bmb-hero">
+        <div class="bmb-head bmb-head--navy">
             <div>
-                <div class="bmb-title">Soldes des comptes fournisseur</div>
-                <p class="bmb-meta">
+                <div class="ui-stat-label ui-card-accent">Solde fournisseur Bamboo</div>
+                <p class="bmb-hero-meta">
                     @if ($accounts['ok'])
                         Actualisé {{ $accounts['fetched_at'] }}
                     @else
@@ -45,25 +51,58 @@
                     @endif
                 </p>
             </div>
-            <a class="bmb-refresh" href="{{ route('admin.bamboo.index', request()->except('refresh') + ['refresh' => 1]) }}">↻ Actualiser</a>
+            <div class="bmb-hero-actions">
+                @if ($accounts['ok'] && $eur)
+                    @if ($low)
+                        <x-ui.pill status="pending">Sous {{ $fmt($threshold) }} EUR</x-ui.pill>
+                    @else
+                        <x-ui.pill status="completed">Seuil OK</x-ui.pill>
+                    @endif
+                @endif
+                <a class="bmb-refresh" href="{{ route('admin.bamboo.index', request()->except('refresh') + ['refresh' => 1]) }}">↻ Actualiser</a>
+            </div>
         </div>
 
+        @if ($accounts['ok'] && $totalXaf !== null)
+            <x-ui.stat-number :value="$totalXaf" label="Équivalent FCFA" />
+            <p class="bmb-hero-sub">
+                ≈ {{ $fmt($eur['balance'] ?? 0) }} EUR
+                @if ($usd)
+                    + {{ $fmt($usd['balance']) }} USD
+                @endif
+                · parité officielle {{ $fmt0($rate('EUR') ?? 655.957) }} FCFA / EUR
+            </p>
+        @else
+            <x-ui.empty-state label="Solde Bamboo indisponible." class="bmb-empty-navy" />
+        @endif
+    </x-ui.card>
+
+    {{-- ============ 2. COMPTES FOURNISSEUR ============ --}}
+    <x-ui.card variant="inset" class="bmb-card">
+        <div class="bmb-title">Comptes fournisseur</div>
+        <p class="bmb-meta">Chaque compte avec son équivalent en monnaie locale.</p>
+
         <div class="bmb-accounts">
-            @forelse (($accounts['accounts'] ?? []) as $acc)
+            @forelse ($accs as $acc)
                 @php
                     $cur   = strtoupper((string) ($acc['currency'] ?? ''));
                     $bal   = (float) ($acc['balance'] ?? 0);
                     $isLow = $cur === 'EUR' && $bal < $threshold;
                 @endphp
                 <div class="bmb-acc {{ $isLow ? 'bmb-acc--low' : '' }}">
-                    <div class="bmb-acc-cur">{{ $cur }}</div>
+                    <div class="bmb-acc-top">
+                        <div class="bmb-acc-cur">{{ $cur }}</div>
+                        @if ($isLow)
+                            <span class="bmb-low">SOLDE BAS</span>
+                        @endif
+                    </div>
                     <div class="bmb-acc-bal">{{ $fmt($bal) }} {{ $cur }}</div>
+                    @if (array_key_exists($cur, $accountsXaf) && $accountsXaf[$cur] !== null)
+                        <div class="bmb-acc-xaf">≈ {{ $fmt0($accountsXaf[$cur]) }} FCFA</div>
+                    @endif
                     <div class="bmb-acc-meta">
                         Compte #{{ $acc['id'] ?? '—' }}
                         · {{ ($acc['sandboxMode'] ?? false) ? 'sandbox' : 'prod' }}
-                        @if ($isLow)
-                            · <strong class="bmb-low">SOLDE BAS</strong>
-                        @endif
                     </div>
                 </div>
             @empty
@@ -71,43 +110,39 @@
             @endforelse
         </div>
 
-        @if (count($low) > 0)
+        @if ($lowAccounts->isNotEmpty())
             <div class="bmb-alert">
-                ⚠ Alerte : le solde du compte {{ strtoupper((string) ($low[0]['currency'] ?? 'EUR')) }}
-                ({{ $fmt($low[0]['balance'] ?? 0) }}) est passé sous le seuil de {{ $fmt($threshold) }}
+                ⚠ Alerte : le solde du compte {{ strtoupper((string) ($lowAccounts[0]['currency'] ?? 'EUR')) }}
+                ({{ $fmt($lowAccounts[0]['balance'] ?? 0) }}) est passé sous le seuil de {{ $fmt($threshold) }}
                 — pensez à créditer le compte fournisseur.
             </div>
-        @elseif (count($accounts['accounts'] ?? []) > 0)
-            @if ($totalEur > 0)
-                <p class="bmb-meta">Solde total approximatif (EUR + USD ≈ EUR) : <strong>{{ $fmt($totalEur) }} EUR</strong></p>
-            @endif
         @endif
     </x-ui.card>
 
-    {{-- ============ 2. PÉRIODE ============ --}}
+    {{-- ============ 3. PÉRIODE ============ --}}
     <form method="GET" action="{{ route('admin.bamboo.index') }}" class="bmb-filter">
         <label>Du <input type="date" name="start_date" value="{{ $startDate }}"></label>
         <label>au <input type="date" name="end_date" value="{{ $endDate }}"></label>
         <button type="submit" class="lst-apply">Filtrer</button>
+        <button type="submit" name="refresh" value="1" class="lst-apply lst-apply--ghost">↻ Rafraîchir</button>
     </form>
 
-    {{-- ============ 3. TAUX DE CHANGE (feature 5) ============ --}}
+    {{-- ============ 4. TAUX DE CHANGE ============ --}}
     <x-ui.card variant="inset" class="bmb-card">
         <div class="bmb-title">Taux de change officiels Bamboo</div>
-        <p class="bmb-meta">Base : {{ $rates['base'] ?? '—' }} · 1 unité de devise cible ({{ $rates['ok'] ? '' : 'indisponible' }})</p>
+        <p class="bmb-meta">{{ $rates['ok'] ? 'Base : ' . ($rates['base'] ?? '—') . ' — cotes converties vers FCFA.' : 'Taux indisponibles.' }}</p>
         @if ($rates['ok'])
             <div class="bmb-rates">
-                <span class="bmb-rate"><strong>EUR</strong> → XAF : {{ $fmt(($ratesByCur['XAF']['value'] ?? 0) !== 0 ? 655.957 * (($ratesByCur['EUR'] ?? [])['value'] ?? 1) / (($ratesByCur['USD'] ?? [])['value'] ?? 1) : 0) }}</span>
-                @foreach (['USD', 'EUR', 'AED', 'GBP'] as $c)
-                    @if ($r = $ratesByCur[$c] ?? null)
-                        <span class="bmb-rate"><strong>{{ $c }}</strong> : {{ $fmt($r['value']) }}</span>
+                @foreach (['EUR', 'USD', 'GBP', 'AED'] as $c)
+                    @if (($r = $rate($c)) !== null)
+                        <span class="bmb-rate"><strong>{{ $c }}</strong> → FCFA : {{ $fmt0($r) }}</span>
                     @endif
                 @endforeach
             </div>
         @endif
     </x-ui.card>
 
-    {{-- ============ 4. TRANSACTIONS / MARGE (feature 4) ============ --}}
+    {{-- ============ 5. TRANSACTIONS / MARGE ============ --}}
     <x-ui.card variant="inset" class="bmb-card">
         <div class="bmb-head">
             <div>
@@ -131,12 +166,18 @@
                             <th>Commande</th>
                             <th>Produit</th>
                             <th class="r">Montant</th>
+                            <th>Équivalent FCFA</th>
                             <th>Solde après</th>
                             <th>Type</th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach ($tx->take(60) as $t)
+                            @php
+                                $tAmt = (float) ($t['transactionAmount']['value'] ?? 0);
+                                $tCur = (string) ($t['transactionAmount']['currencyCode'] ?? '');
+                                $tXaf = \App\Support\BambooRates::convert($tAmt, $tCur, $xafRates);
+                            @endphp
                             <tr>
                                 <td>{{ \Illuminate\Support\Carbon::parse($t['transactionDate'] ?? null)->setTimezone('Africa/Libreville')->format('d/m H:i') }}</td>
                                 <td>
@@ -153,8 +194,14 @@
                                     @endif
                                 </td>
                                 <td class="r">
-                                    <x-admin.cell-amount :value="(float) ($t['transactionAmount']['value'] ?? 0)"
-                                        :unit="$t['transactionAmount']['currencyCode'] ?? ''" />
+                                    <x-admin.cell-amount :value="$tAmt" :unit="$tCur" />
+                                </td>
+                                <td class="r">
+                                    @if ($tXaf !== null)
+                                        <span class="cll-amount">{{ $fmt0($tXaf) }}<small>FCFA</small></span>
+                                    @else
+                                        <span class="lst-soon">—</span>
+                                    @endif
                                 </td>
                                 <td class="r">
                                     <span class="lst-soon">{{ $fmt($t['availableBalance']['value'] ?? 0) }}</span>
