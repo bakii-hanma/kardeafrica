@@ -10,6 +10,12 @@ use Illuminate\Support\Facades\Log;
 /**
  * Réception des webhooks Svix Bamboo : `ordercompleted.v1` et `productupdated.v1`.
  *
+ * Le type d'événement n'est PAS dans le payload Bamboo (pas de champ
+ * `eventType` à la racine) : il se déduit de la structure, conformément à la
+ * doc officielle :
+ *   - `ordercompleted.v1` : { orderId, status, totalCards, requestId, ... }
+ *   - `productupdated.v1` : { products: [...], timestamp }
+ *
  * Sécurité : endpoint public → protégé par la signature Svix (HMAC-SHA256).
  * Fail-closed : pas de secret configuré, horodatage hors fenêtre (±5 min) ou
  * signature invalide → 400/403, sans traitement.
@@ -38,13 +44,22 @@ class BambooWebhookController extends Controller
             return response()->json(['ok' => false], 400);
         }
 
-        $event = $request->input('eventType');
+        $payload = (array) ($request->json()->all() ?? []);
 
-        match ($event) {
-            'ordercompleted.v1'    => HandleBambooOrderCompleted::dispatch($request->all()),
-            'productupdated.v1'    => HandleBambooProductUpdated::dispatch($request->input('products', [])),
-            default                => Log::info('Bamboo webhook: événement ignoré', ['eventType' => $event]),
-        };
+        // Les payloads Bamboo n'ont pas de champ "eventType" : le type se
+        // déduit de la structure (doc officielle) :
+        //   - ordercompleted.v1 => { orderId, requestId, ... }
+        //   - productupdated.v1 => { products: [...], ... }
+        if (isset($payload['orderId']) || isset($payload['requestId'])) {
+            HandleBambooOrderCompleted::dispatch($payload);
+        } elseif (isset($payload['products']) && is_array($payload['products'])) {
+            HandleBambooProductUpdated::dispatch($payload['products']);
+        } else {
+            Log::info('Bamboo webhook: événement ignoré', [
+                'eventType' => $payload['eventType'] ?? null,
+                'keys'      => array_keys($payload),
+            ]);
+        }
 
         return response()->json(['ok' => true]);
     }
