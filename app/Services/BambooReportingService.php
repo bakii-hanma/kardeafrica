@@ -12,9 +12,10 @@ use Illuminate\Support\Facades\Log;
  * lecture (soldes, transactions, taux, historique) passent par le proxy
  * afrikard (`/accounts`, `/transactions`, `/exchange-rates`, `/orders/report`).
  *
- * Mise en cache courte (60 s) : les écrans admin ne martèlent pas Bamboo.
- * Swallow plus jamais : toute erreur réseau retourne un état dégradé lisible
- * plutôt qu'une exception 500 du dashboard.
+ * Mise en cache courte (60 s) des SEULS succès : les écrans admin ne
+ * martèlent pas Bamboo, et un échec transitoire (429, réseau) n'est jamais
+ * figé pendant une minute. Swallow plus jamais : toute erreur réseau retourne
+ * un état dégradé lisible plutôt qu'une exception 500 du dashboard.
  */
 class BambooReportingService
 {
@@ -23,6 +24,67 @@ class BambooReportingService
     private function proxyBase(): string
     {
         return rtrim((string) config('services.bamboo.admin_base_url'), '/');
+    }
+
+    /**
+     * GET via le proxy, avec retries sur le rate-limit Bamboo (429).
+     *
+     * Un 429 est transitoire : on attend `Retry-After` (plafonné à quelques
+     * secondes) puis on réessaie une poignée de fois avant d'abandonner, ce qui
+     * évite d'afficher « 0 transaction » juste parce que la page a été
+     * rafraîchie quelques secondes trop tôt.
+     *
+     * @return array{status:?int, json:?array, error:?string}
+     */
+    private function proxyGet(string $path, array $query = [], int $timeout = 12): array
+    {
+        $maxAttempts = 3;
+
+        for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
+            try {
+                $res = Http::timeout($timeout)->get($this->proxyBase() . $path, $query);
+
+                if ($res->successful()) {
+                    return ['status' => $res->status(), 'json' => $res->json(), 'error' => null];
+                }
+
+                if ($res->status() === 429 && $attempt < $maxAttempts) {
+                    $wait = min((int) ($res->header('Retry-After') ?: $attempt * 2), 5);
+                    usleep($wait * 1_000_000);
+                    continue;
+                }
+
+                if ($res->status() === 429) {
+                    return ['status' => 429, 'json' => null, 'error' => 'API Bamboo saturée (429) — réessayez dans quelques instants'];
+                }
+
+                return ['status' => $res->status(), 'json' => null, 'error' => "HTTP {$res->status()}"];
+            } catch (\Throwable $e) {
+                Log::warning("BambooReporting.{$path}: erreur", ['error' => $e->getMessage()]);
+                return ['status' => null, 'json' => null, 'error' => 'afrikard/Bamboo injoignable'];
+            }
+        }
+
+        return ['status' => null, 'json' => null, 'error' => 'afrikard/Bamboo injoignable'];
+    }
+
+    /**
+     * Cache un appel : seul un résultat `ok` est persisté (TTL court). Un échec
+     * est retourné tel quel et pourra être re-tenté à la prochaine visite.
+     */
+    private function rememberOk(string $key, int $ttl, callable $fetch): array
+    {
+        if (($cached = cache()->get($key)) !== null) {
+            return $cached;
+        }
+
+        $result = $fetch();
+
+        if (($result['ok'] ?? false) === true) {
+            cache()->put($key, $result, $ttl);
+        }
+
+        return $result;
     }
 
     /**
@@ -38,24 +100,19 @@ class BambooReportingService
             cache()->forget($cacheKey);
         }
 
-        return cache()->remember($cacheKey, self::CACHE_TTL, function () {
-            try {
-                $res = Http::timeout(12)->get($this->proxyBase() . '/accounts');
-                if (! $res->successful()) {
-                    return ['ok' => false, 'accounts' => [], 'fetched_at' => null, 'error' => "HTTP {$res->status()}"];
-                }
-                $data = $res->json();
+        return $this->rememberOk($cacheKey, self::CACHE_TTL, function () {
+            $data = $this->proxyGet('/accounts');
 
-                return [
-                    'ok'         => true,
-                    'accounts'   => $data['accounts'] ?? [],
-                    'fetched_at' => now()->toDateTimeString(),
-                    'error'      => null,
-                ];
-            } catch (\Throwable $e) {
-                Log::warning('BambooReporting.accounts: erreur', ['error' => $e->getMessage()]);
-                return ['ok' => false, 'accounts' => [], 'fetched_at' => null, 'error' => 'afrikard/Bamboo injoignable'];
+            if ($data['error'] !== null) {
+                return ['ok' => false, 'accounts' => [], 'fetched_at' => null, 'error' => $data['error']];
             }
+
+            return [
+                'ok'         => true,
+                'accounts'   => $data['json']['accounts'] ?? [],
+                'fetched_at' => now()->toDateTimeString(),
+                'error'      => null,
+            ];
         });
     }
 
@@ -72,27 +129,22 @@ class BambooReportingService
             cache()->forget($cacheKey);
         }
 
-        return cache()->remember($cacheKey, self::CACHE_TTL, function () use ($startDate, $endDate) {
-            try {
-                $res = Http::timeout(20)->get($this->proxyBase() . '/transactions', [
-                    'startDate' => $startDate,
-                    'endDate'   => $endDate,
-                ]);
-                if (! $res->successful()) {
-                    return ['ok' => false, 'clients' => [], 'fetched_at' => null, 'error' => "HTTP {$res->status()}"];
-                }
-                $data = $res->json();
+        return $this->rememberOk($cacheKey, self::CACHE_TTL, function () use ($startDate, $endDate) {
+            $data = $this->proxyGet('/transactions', [
+                'startDate' => $startDate,
+                'endDate'   => $endDate,
+            ], 20);
 
-                return [
-                    'ok'         => true,
-                    'clients'    => $data['clients'] ?? [],
-                    'fetched_at' => now()->toDateTimeString(),
-                    'error'      => null,
-                ];
-            } catch (\Throwable $e) {
-                Log::warning('BambooReporting.transactions: erreur', ['error' => $e->getMessage()]);
-                return ['ok' => false, 'clients' => [], 'fetched_at' => null, 'error' => 'afrikard/Bamboo injoignable'];
+            if ($data['error'] !== null) {
+                return ['ok' => false, 'clients' => [], 'fetched_at' => null, 'error' => $data['error']];
             }
+
+            return [
+                'ok'         => true,
+                'clients'    => $data['json']['clients'] ?? [],
+                'fetched_at' => now()->toDateTimeString(),
+                'error'      => null,
+            ];
         });
     }
 
@@ -103,28 +155,25 @@ class BambooReportingService
      */
     public function exchangeRates(?bool $fresh = false): array
     {
+        $cacheKey = 'bamboo_rates_v1';
+
         if ($fresh) {
-            cache()->forget('bamboo_rates_v1');
+            cache()->forget($cacheKey);
         }
 
-        return cache()->remember('bamboo_rates_v1', 600, function () {
-            try {
-                $res = Http::timeout(12)->get($this->proxyBase() . '/exchange-rates');
-                if (! $res->successful()) {
-                    return ['ok' => false, 'base' => null, 'rates' => [], 'error' => "HTTP {$res->status()}"];
-                }
-                $data = $res->json();
+        return $this->rememberOk($cacheKey, 600, function () {
+            $data = $this->proxyGet('/exchange-rates');
 
-                return [
-                    'ok'    => true,
-                    'base'  => $data['baseCurrencyCode'] ?? null,
-                    'rates' => $data['rates'] ?? [],
-                    'error' => null,
-                ];
-            } catch (\Throwable $e) {
-                Log::warning('BambooReporting.exchangeRates: erreur', ['error' => $e->getMessage()]);
-                return ['ok' => false, 'base' => null, 'rates' => [], 'error' => 'afrikard/Bamboo injoignable'];
+            if ($data['error'] !== null) {
+                return ['ok' => false, 'base' => null, 'rates' => [], 'error' => $data['error']];
             }
+
+            return [
+                'ok'    => true,
+                'base'  => $data['json']['baseCurrencyCode'] ?? null,
+                'rates' => $data['json']['rates'] ?? [],
+                'error' => null,
+            ];
         });
     }
 
@@ -135,28 +184,27 @@ class BambooReportingService
      */
     public function orderReport(string $startDate, string $endDate, ?bool $fresh = false): array
     {
+        $cacheKey = 'bamboo_orders_v1_' . $startDate . '_' . $endDate;
+
         if ($fresh) {
-            cache()->forget('bamboo_orders_v1_' . $startDate . '_' . $endDate);
+            cache()->forget($cacheKey);
         }
 
-        return cache()->remember('bamboo_orders_v1_' . $startDate . '_' . $endDate, self::CACHE_TTL, function () use ($startDate, $endDate) {
-            try {
-                $res = Http::timeout(20)->get($this->proxyBase() . '/orders/report', [
-                    'startDate' => $startDate,
-                    'endDate'   => $endDate,
-                ]);
-                if (! $res->successful()) {
-                    return ['ok' => false, 'orders' => [], 'error' => "HTTP {$res->status()}"];
-                }
-                return [
-                    'ok'     => true,
-                    'orders' => $res->json() ?? [],
-                    'error'  => null,
-                ];
-            } catch (\Throwable $e) {
-                Log::warning('BambooReporting.orderReport: erreur', ['error' => $e->getMessage()]);
-                return ['ok' => false, 'orders' => [], 'error' => 'afrikard/Bamboo injoignable'];
+        return $this->rememberOk($cacheKey, self::CACHE_TTL, function () use ($startDate, $endDate) {
+            $data = $this->proxyGet('/orders/report', [
+                'startDate' => $startDate,
+                'endDate'   => $endDate,
+            ], 20);
+
+            if ($data['error'] !== null) {
+                return ['ok' => false, 'orders' => [], 'error' => $data['error']];
             }
+
+            return [
+                'ok'     => true,
+                'orders' => $data['json'] ?? [],
+                'error'  => null,
+            ];
         });
     }
 }
