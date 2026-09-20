@@ -34,6 +34,19 @@ class ProductApiService
         return $this->useClassifier() ? self::CACHE_SNAPSHOT . '_clf' : self::CACHE_SNAPSHOT;
     }
 
+    /**
+     * Invalidation déclenchée par le webhook Bamboo `productupdated.v1` :
+     * purge le catalogue frais + le snapshot, dans LES DEUX modes de
+     * classification (v8/v9) — on ne connaît pas le drapeau actif depuis le job.
+     */
+    public function invalidateCatalogCache(): void
+    {
+        foreach ([self::CACHE_FRESH, self::CACHE_FRESH_CLASSIFIER] as $clé) {
+            Cache::forget($clé);
+            Cache::forget($clé === self::CACHE_FRESH_CLASSIFIER ? self::CACHE_SNAPSHOT . '_clf' : self::CACHE_SNAPSHOT);
+        }
+    }
+
     /** Snapshot "dernier bon catalogue connu" (TTL long). Sert le web en stale-while-revalidate. */
     private const CACHE_SNAPSHOT = 'processed_all_products_snapshot_v2';
 

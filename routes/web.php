@@ -503,6 +503,10 @@ Route::prefix('admin')->middleware(['auth', 'is_admin'])->group(function () {
     Route::get('/newsletter/export',         [App\Http\Controllers\Admin\NewsletterController::class, 'export'])->name('admin.newsletter.export');
     Route::patch('/newsletter/{subscriber}/toggle', [App\Http\Controllers\Admin\NewsletterController::class, 'toggle'])->name('admin.newsletter.toggle');
     Route::delete('/newsletter/{subscriber}', [App\Http\Controllers\Admin\NewsletterController::class, 'destroy'])->name('admin.newsletter.destroy');
+
+    // Fournisseur Bamboo : solde / transactions / taux / réconciliation
+    Route::get('/bamboo',                       [App\Http\Controllers\Admin\BambooAdminController::class, 'index'])->name('admin.bamboo.index');
+    Route::get('/bamboo/reconcile',             [App\Http\Controllers\Admin\BambooAdminController::class, 'reconcile'])->name('admin.bamboo.reconcile');
 });
 
 /*

@@ -170,6 +170,13 @@ Route::post('/webhooks/whapi', [App\Http\Controllers\WhapiWebhookController::cla
     ->middleware('throttle:120,1')
     ->name('api.webhooks.whapi');
 
+// Webhook Svix Bamboo (ordercompleted.v1 + productupdated.v1). Public, protégé
+// par la signature HMAC vérifiée dans le contrôleur (fail-closed). Throttle
+// large : Bamboo peut envoyer une rafale après une recatégorisation de stock.
+Route::post('/webhooks/bamboo', [App\Http\Controllers\BambooWebhookController::class, 'handle'])
+    ->middleware('throttle:300,1')
+    ->name('api.webhooks.bamboo');
+
 
 /* ============================================================
  * Catalogue public pour l'app mobile (Expo) — wrap ProductApiService

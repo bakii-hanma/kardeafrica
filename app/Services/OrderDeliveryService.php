@@ -50,6 +50,18 @@ class OrderDeliveryService
 
         [$payload, $missing] = $this->buildPayload($order);
 
+        // ---- Feature 6 : refus de commande si un produit est en rupture
+        // (count === 0 côté Bamboo). On bloque AVANT tout appel fournisseur :
+        // un retry sur un produit épuisé est inutile et, en cas de stock
+        // fragmentaire, rejetterait l'ordre entier ailleurs.
+        $stockOut = $this->findOutOfStock($order);
+        if (!empty($stockOut)) {
+            Log::warning('OrderDelivery.attempt: produit(s) en rupture de stock', [
+                'order_id' => $order->id, 'products' => $stockOut,
+            ]);
+            return ['type' => 'out_of_stock', 'products' => $stockOut, 'message' => 'Un des produits est actuellement en rupture de stock.'];
+        }
+
         if (!empty($missing)) {
             // Catalogue incomplet : le job async retentera (avec son propre H4).
             ProcessCheckoutJob::dispatch($order);
@@ -327,5 +339,49 @@ class OrderDeliveryService
         }
 
         return [$payload, $missing];
+    }
+
+    /**
+     * Feature 6 — Rupture de stock : liste les produits afrikard de la commande
+     * dont `count` vaut 0 dans le catalogue Bamboo (via ProductApiService).
+     * Les items marchand/daywatch sont gérés hors stock afrikard → exclus.
+     *
+     * @return array<int,string>
+     */
+    private function findOutOfStock(Order $order): array
+    {
+        $service = app(ProductApiService::class);
+        $catalog = $service->getAllProducts(0, 99999);
+        $byId    = collect($catalog)->keyBy('id');
+        $out     = [];
+
+        foreach ($order->orderItems as $item) {
+            $pid = (string) $item->product_id;
+            if (str_starts_with($pid, 'merchant_') || str_starts_with($pid, 'daywatch_')) {
+                continue;
+            }
+
+            // Id virtuel ("1571149v25") : le stock vit sur le produit réel parent.
+            $real = \App\Support\VirtualDenominations::parse($pid);
+            $key  = $real ? $real['real'] : (int) $pid;
+
+            $product = $byId->get($key)
+                ?? $byId->get((string) $key);
+
+            // Seul un produit PRÉSENT au catalogue avec count <= 0 est une
+            // rupture avérée. Un produit introuvable (cache froid, catalogue
+            // partiel) ne bloque pas la livraison : le flux `missing` prendra
+            // le relais, et interdire ici créerait des faux positifs.
+            if (! $product) {
+                continue;
+            }
+
+            $count = (int) ($product['count'] ?? 0);
+            if ($count <= 0) {
+                $out[] = $pid;
+            }
+        }
+
+        return $out;
     }
 }

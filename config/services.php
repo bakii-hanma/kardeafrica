@@ -83,6 +83,22 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Bamboo (fournisseur) — webhooks Svix + administration
+    |--------------------------------------------------------------------------
+    | `webhook_secret` est le secret Svix affiché dans le portail Bamboo
+    | (Webhooks). Il sert à vérifier la signature HMAC-SHA256 des événements
+    | `ordercompleted.v1` et `productupdated.v1` reçus sur POST /api/webhooks/bamboo.
+    | `accounts_alert_threshold_eur` : alerté via log/dashboard quand le solde du
+    | compte EUR passe sous ce seuil (soldes en EUR/EUR).
+    */
+    'bamboo' => [
+        'webhook_secret' => env('BAMBOO_WEBHOOK_SECRET'),
+        'admin_base_url' => env('BAMBOO_ADMIN_API_URL', env('PRODUCT_API_URL', 'https://srv1882929.hstgr.cloud/api/v1')),
+        'accounts_alert_threshold_eur' => (float) env('BAMBOO_ACCOUNTS_ALERT_THRESHOLD_EUR', 300),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | WHAPI — WhatsApp API (OTP d'inscription pro + notifications)
     |--------------------------------------------------------------------------
     | Le token reste UNIQUEMENT côté serveur (.env), jamais dans le frontend.

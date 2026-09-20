@@ -505,3 +505,47 @@
 .lst-in--amount { width: 96px; font-variant-numeric: tabular-nums; }
 .lst-in--ref { width: 80px; }
 .lst-inline-form .lst-apply { min-height: 34px; padding: 0 14px; font-size: 12px; }
+
+/* ---- Écran fournisseur Bamboo ---- */
+.bmb-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.bmb-title { font-size: 14px; font-weight: 800; color: var(--text); }
+.bmb-meta { font-size: 12px; color: var(--text-muted); margin: 4px 0 0; }
+.bmb-err { color: rgb(224 95 78); font-weight: 700; }
+.bmb-refresh { text-decoration: none; font-size: 12px; font-weight: 700; color: var(--teal); white-space: nowrap; }
+.bmb-refresh:hover { text-decoration: underline; }
+.bmb-accounts { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+@media (min-width: 900px) { .bmb-accounts { grid-template-columns: repeat(4, 1fr); } }
+.bmb-acc {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--r-sub); padding: 14px 16px;
+}
+.bmb-acc--low { border-color: rgb(224 95 78); background: rgb(224 95 78 / .08); }
+.bmb-acc-cur { font-size: 11px; font-weight: 800; letter-spacing: .08em; color: var(--text-faint); }
+.bmb-acc-bal { font-size: 22px; font-weight: 800; color: var(--navy); font-variant-numeric: tabular-nums; margin: 4px 0; }
+.bmb-acc-meta { font-size: 11.5px; color: var(--text-muted); }
+.bmb-low { color: rgb(224 95 78); }
+.bmb-alert {
+    margin-top: 12px; padding: 11px 14px; border-radius: var(--r-btn);
+    background: rgb(224 95 78 / .12); border: 1px solid rgb(224 95 78 / .35);
+    color: var(--navy); font-size: 13px; font-weight: 700;
+}
+.bmb-filter { display: flex; align-items: flex-end; gap: 8px; flex-wrap: wrap; margin: 14px 0; }
+.bmb-filter label { display: flex; flex-direction: column; gap: 3px; font-size: 11px; font-weight: 700; color: var(--text-muted); }
+.bmb-filter input[type="date"] {
+    min-height: 34px; padding: 6px 10px; border: 1px solid var(--border);
+    border-radius: var(--r-btn); background: var(--surface); font-family: inherit; font-size: 12.5px; color: var(--text);
+}
+.bmb-filter .lst-apply { min-height: 34px; padding: 0 14px; font-size: 12px; }
+.lst-apply--ghost { background: var(--surface-inset) !important; border: 1px solid var(--border) !important; color: var(--text-muted) !important; }
+.lst-apply--ghost:hover { color: var(--text) !important; }
+.lst-apply--warn { background: rgb(224 95 78) !important; color: #FFFFFF !important; }
+.bmb-card { padding: 16px 18px; }
+.bmb-rates { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.bmb-rate {
+    padding: 6px 11px; border-radius: var(--r-pill);
+    background: var(--surface); border: 1px solid var(--border);
+    font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums;
+}
+.bmb-rate strong { color: var(--text); }
+.bmb-order { font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+.bmb-ref-sub { display: block; font-size: 11px; color: var(--text-faint); font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace; }

@@ -304,6 +304,38 @@
                 </p>
                 <a href="{{ route('admin.versements.index') }}" class="dsh-w-link">Ouvrir les versements →</a>
             </x-ui.card>
+
+            {{-- Solde fournisseur Bamboo (alerte seuil bas) --}}
+            <x-ui.card variant="inset" class="dsh-w dsh-w--bamboo">
+                <div class="dsh-w-head">
+                    <h2 class="ui-stat-label">Solde fournisseur Bamboo</h2>
+                    <a href="{{ route('admin.bamboo.index') }}" class="dsh-w-link">Ouvrir →</a>
+                </div>
+                @if (! ($bamboo['ok'] ?? false))
+                    <x-ui.empty-state label="Solde Bamboo indisponible." />
+                @else
+                    @php
+                        $accs = collect($bamboo['accounts'] ?? []);
+                        $eur  = $accs->firstWhere('currency', 'EUR');
+                        $usd  = $accs->firstWhere('currency', 'USD');
+                        $fmt  = fn ($n) => number_format((float) $n, 2, ',', ' ');
+                        $low  = $eur !== null && (float) $eur['balance'] < $bambooThreshold;
+                    @endphp
+                    <div class="dsh-bamboo">
+                        <div class="dsh-bamboo-row {{ $low ? 'is-low' : '' }}">
+                            <span>{{ $fmt($eur['balance'] ?? 0) }} <small>EUR</small></span>
+                            @if ($low)
+                                <x-ui.pill status="pending">Sous {{ $fmt($bambooThreshold) }}</x-ui.pill>
+                            @else
+                                <x-ui.pill status="completed">OK</x-ui.pill>
+                            @endif
+                        </div>
+                        @if ($usd)
+                            <div class="dsh-bamboo-sub">{{ $fmt($usd['balance']) }} USD · compte #{{ $usd['id'] ?? '—' }}</div>
+                        @endif
+                    </div>
+                @endif
+            </x-ui.card>
         </div>
 
         {{-- ============ 3.5 TOP CARTES VENDUES + MEILLEUR CLIENT ============ --}}
@@ -555,6 +587,14 @@
 
     .dsh-w--pay { display: flex; flex-direction: column; gap: 4px; justify-content: center; }
     .dsh-pay-meta { font-size: 12px; color: var(--text-muted); margin: 0 0 8px; }
+
+    .dsh-w--bamboo { display: flex; flex-direction: column; gap: 4px; justify-content: center; }
+    .dsh-bamboo { display: flex; flex-direction: column; gap: 6px; }
+    .dsh-bamboo-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .dsh-bamboo-row > span { font-size: 26px; font-weight: 800; color: var(--text); font-variant-numeric: tabular-nums; }
+    .dsh-bamboo-row > span small { font-size: .5em; font-weight: 600; color: var(--text-muted); margin-left: 3px; }
+    .dsh-bamboo-row.is-low > span { color: rgb(224 95 78); }
+    .dsh-bamboo-sub { font-size: 11.5px; color: var(--text-muted); }
 
     /* ---- 3.5 Top cartes vendues + meilleur client ---- */
     .dsh-top { display: grid; grid-template-columns: 1fr; gap: 12px; margin-bottom: 22px; }
