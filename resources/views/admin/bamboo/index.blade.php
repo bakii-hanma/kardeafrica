@@ -19,12 +19,6 @@
     $eur = $accByCur->get('EUR');
     $usd = $accByCur->get('USD');
 
-    // Transactions flat (tous les clients) pour un tableau lisible.
-    $tx = collect($transactions['clients'] ?? [])
-        ->flatMap(fn ($c) => $c['transactions'] ?? [])
-        ->sortByDesc('transactionDate')
-        ->values();
-
     // Taux utiles (cotes devise→XAF déjà préparées par le contrôleur).
     $rate = fn (string $c) => $xafRates[$c] ?? null;
 
@@ -139,22 +133,21 @@
 
     {{-- ============ 4. TRANSACTIONS / MARGE ============ --}}
     <x-ui.card variant="inset" class="bmb-card">
-        <div class="bmb-head">
-            <div>
-                <div class="bmb-title">Transactions Bamboo</div>
-                <p class="bmb-meta">
-                    Du {{ $dmy($startDate) }} au {{ $dmy($endDate) }} · {{ $tx->count() }} transaction(s)
-                    @if (! $transactions['ok']) <span class="bmb-err">— {{ $transactions['error'] }}</span> @endif
-                </p>
-            </div>
-            <a class="bmb-refresh" href="{{ route('admin.bamboo.reconcile', ['start_date' => $startDate, 'end_date' => $endDate]) }}">Historique & réconciliation →</a>
+        <div class="lst-head">
+            <h1 class="lst-title">Transactions Bamboo</h1>
+            <x-ui.pill variant="count" class="lst-total">{{ number_format($tx->count(), 0, ',', ' ') }}</x-ui.pill>
         </div>
+        <p class="bmb-meta">
+            Du {{ $dmy($startDate) }} au {{ $dmy($endDate) }}
+            @if (! $transactions['ok']) <span class="bmb-err">— {{ $transactions['error'] }}</span> @endif
+        </p>
 
-        <form method="GET" action="{{ route('admin.bamboo.index') }}" class="lst-toolbar lst-filters">
+        <form method="GET" action="{{ route('admin.bamboo.index') }}" class="lst-toolbar lst-filters" data-no-loader>
             <label class="lst-date"><span>Du</span><input type="date" name="start_date" value="{{ $startDate }}"></label>
             <label class="lst-date"><span>Au</span><input type="date" name="end_date" value="{{ $endDate }}"></label>
             <button type="submit" class="lst-apply">Filtrer</button>
             <button type="submit" name="refresh" value="1" class="lst-apply lst-apply--ghost">↻ Rafraîchir</button>
+            <a class="lst-action" href="{{ route('admin.bamboo.reconcile', ['start_date' => $startDate, 'end_date' => $endDate]) }}">Historique & réconciliation</a>
         </form>
 
         @if ($tx->isEmpty())
@@ -166,29 +159,42 @@
                         <tr>
                             <th>Date</th>
                             <th>Commande</th>
+                            <th>Client</th>
                             <th>Produit</th>
                             <th class="r">Montant</th>
                             <th class="r">Équivalent FCFA</th>
                             <th class="r">Solde après</th>
-                            <th class="c">Type</th>
+                            <th></th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach ($tx->take(60) as $t)
                             @php
-                                $tAmt = (float) ($t['transactionAmount']['value'] ?? 0);
-                                $tCur = (string) ($t['transactionAmount']['currencyCode'] ?? '');
-                                $tXaf = \App\Support\BambooRates::convert($tAmt, $tCur, $xafRates);
-                                $bal  = (float) ($t['availableBalance']['value'] ?? 0);
+                                $tAmt   = (float) ($t['transactionAmount']['value'] ?? 0);
+                                $tCur   = (string) ($t['transactionAmount']['currencyCode'] ?? '');
+                                $tXaf   = \App\Support\BambooRates::convert($tAmt, $tCur, $xafRates);
+                                $bal    = (float) ($t['availableBalance']['value'] ?? 0);
                                 $balCur = (string) ($t['availableBalance']['currencyCode'] ?? $tCur);
+                                $local  = $localByBamboo['order:' . ($t['orderId'] ?? '')]
+                                    ?? $localByBamboo['req:' . ($t['requestId'] ?? '')] ?? null;
+                                $clientName = $local?->user?->name ?: ($t['bambooClient'] ?? null);
+                                $clientSub  = $local?->user?->email ?: ($local ? '#' . $local->order_number : null);
                             @endphp
-                            <tr>
+                            <tr class="{{ $local ? 'is-clickable' : '' }}" @if ($local) onclick="window.location='{{ route('admin.orders.show', $local) }}'" @endif>
                                 <td><x-admin.cell-date :value="$t['transactionDate'] ?? null" /></td>
                                 <td>
-                                    <span class="lst-ref">#{{ $t['orderId'] ?? '—' }}</span>
-                                    @if ($ref = $t['requestId'] ?? null)
-                                        <span class="lst-ref-sub">{{ mb_substr($ref, 0, 8) }}…</span>
+                                    @if ($local)
+                                        <a class="lst-link" href="{{ route('admin.orders.show', $local) }}">#{{ $t['orderId'] ?? '—' }}</a>
+                                        <span class="lst-ref-sub">Commande locale · {{ $local->order_number }}</span>
+                                    @else
+                                        <span class="lst-ref">#{{ $t['orderId'] ?? '—' }}</span>
+                                        @if ($ref = $t['requestId'] ?? null)
+                                            <span class="lst-ref-sub">{{ mb_substr($ref, 0, 8) }}…</span>
+                                        @endif
                                     @endif
+                                </td>
+                                <td>
+                                    <x-admin.cell-user :name="$clientName" :sub="$clientSub" tone="{{ $local ? 'navy' : 'teal' }}" />
                                 </td>
                                 <td>
                                     @php $oi = ($t['orderItems'][0] ?? null); @endphp
@@ -210,7 +216,13 @@
                                 <td class="r">
                                     <span class="cll-amount">{{ $fmt($bal) }}@if ($balCur)<small>{{ $balCur }}</small>@endif</span>
                                 </td>
-                                <td class="c"><x-ui.pill status="{{ strtolower($t['transactionType'] ?? 'order') === 'order' ? 'completed' : 'pending' }}">{{ strtolower($t['transactionType'] ?? 'order') === 'order' ? 'Commande' : ($t['transactionType'] ?? '—') }}</x-ui.pill></td>
+                                <td class="r">
+                                    @if ($local)
+                                        <a href="{{ route('admin.orders.show', $local) }}" class="lst-action" onclick="event.stopPropagation();">Voir</a>
+                                    @else
+                                        <span class="lst-soon">Ext.</span>
+                                    @endif
+                                </td>
                             </tr>
                         @endforeach
                     </tbody>

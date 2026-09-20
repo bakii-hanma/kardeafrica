@@ -61,21 +61,49 @@ class BambooAdminController extends Controller
             );
         }
 
-        // Seuil d'alerte sur le solde (feature 3) : compte EUR (le compte de
-        // travail) et équivalents USD convertis grossièrement.
-        $threshold = (float) config('services.bamboo.accounts_alert_threshold_eur');
-        $low = [];
-        foreach ($accounts['accounts'] as $acc) {
-            $bal = (float) ($acc['balance'] ?? 0);
-            $cur = strtoupper((string) ($acc['currency'] ?? ''));
-            if ($cur === 'EUR' && $bal < $threshold) {
-                $low[] = $acc;
+        // Transactions flat (tous les clients) pour le tableau, AVEC le nom de
+        // client Bamboo porté sur chaque ligne (top-level `clients[].clientName`).
+        $tx = collect($transactions['clients'] ?? [])
+            ->flatMap(fn ($c) => collect($c['transactions'] ?? [])->map(fn ($t) => $t + [
+                'bambooClient' => $c['clientName'] ?? null,
+            ]))
+            ->sortByDesc('transactionDate')
+            ->values();
+
+        // Liaison transaction Bamboo → commande locale : `billing_details`
+        // garde checkout_order_id / checkout_request_id, exactement les
+        // `orderId` / `requestId` de la transaction.
+        $localByBamboo = [];
+        $orderIds      = $tx->pluck('orderId')->filter()->map(fn ($v) => (string) $v)->unique()->all();
+        $requestIds    = $tx->pluck('requestId')->filter()->map(fn ($v) => (string) $v)->unique()->all();
+
+        if (! empty($orderIds) || ! empty($requestIds)) {
+            $locals = Order::with('user')
+                ->whereBetween('created_at', [
+                    Carbon::parse($startDate, $tz)->startOfDay()->utc(),
+                    Carbon::parse($endDate, $tz)->endOfDay()->utc(),
+                ])
+                ->get();
+
+            foreach ($locals as $o) {
+                $bd = (array) $o->billing_details;
+                $oid = $bd['checkout_order_id'] ?? null;
+                $rid = $bd['checkout_request_id'] ?? null;
+                if ($oid !== null) {
+                    $localByBamboo['order:' . $oid] = $o;
+                }
+                if ($rid !== null) {
+                    $localByBamboo['req:' . $rid] = $o;
+                }
             }
         }
 
+        // Comptes EUR sous le seuil d'alerte (calculé par la vue pour les pillules).
+        $threshold = (float) config('services.bamboo.accounts_alert_threshold_eur');
+
         return view('admin.bamboo.index', compact(
-            'accounts', 'transactions', 'rates', 'startDate', 'endDate', 'threshold', 'low',
-            'xafRates', 'totalXaf', 'accountsXaf'
+            'accounts', 'transactions', 'rates', 'startDate', 'endDate', 'threshold',
+            'xafRates', 'totalXaf', 'accountsXaf', 'tx', 'localByBamboo'
         ));
     }
 

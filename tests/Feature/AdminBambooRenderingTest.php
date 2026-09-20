@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Order;
 use App\Models\User;
 use App\Services\BambooReportingService;
 use App\Support\AdminBadges;
@@ -144,6 +145,67 @@ class AdminBambooRenderingTest extends TestCase
         $response->assertSee('Solde fournisseur Bamboo', false);
         $response->assertSee('Équivalent total', false);
         $response->assertSee('FCFA', false);
+    }
+
+    /**
+     * Une transaction Bamboo liée à une commande locale (par checkout_order_id)
+     * affiche le client de la commande et un lien vers la fiche de détail —
+     * « Adopter list-screen partout » + liaison vers les commandes.
+     */
+    public function test_bamboo_index_lie_les_transactions_aux_commandes_locales(): void
+    {
+        $client = User::factory()->create([
+            'name' => 'Clara Ikouma',
+            'email' => 'clara.' . uniqid() . '@example.com',
+            'role' => 'user',
+        ]);
+        $order = Order::create([
+            'user_id' => $client->id,
+            'status' => Order::STATUS_COMPLETED,
+            'subtotal' => 9.42,
+            'tax_amount' => 0.0,
+            'total_amount' => 9.42,
+            'currency' => 'EUR',
+            'payment_status' => Order::PAYMENT_STATUS_COMPLETED,
+            'billing_details' => ['checkout_order_id' => 33909211, 'checkout_request_id' => 'req-abc-123'],
+        ]);
+
+        try {
+            $this->mockBamboo(['transactions' => [
+                'ok' => true,
+                'clients' => [[
+                    'clientName' => 'FUTUR SOWAX - Client',
+                    'transactions' => [[
+                        'orderId' => 33909211,
+                        'requestId' => 'req-abc-123',
+                        'transactionId' => '33747291 ',
+                        'transactionType' => 'Order',
+                        'orderTotal' => ['value' => 9.42, 'currencyCode' => 'EUR'],
+                        'transactionAmount' => ['value' => 9.42, 'currencyCode' => 'EUR'],
+                        'availableBalance' => ['value' => 81.25, 'currencyCode' => 'EUR'],
+                        'orderItems' => [[
+                            'productName' => 'Carte Airtel 5 000 FCFA',
+                            'denomination' => ['value' => 5000, 'currencyCode' => 'FCFA'],
+                        ]],
+                        'transactionDate' => '2026-09-19T15:30:00.000Z',
+                    ]],
+                ]],
+            ]]);
+            $this->actingAsAdmin();
+
+            $response = $this->get(route('admin.bamboo.index'));
+
+            $response->assertOk();
+            $response->assertSee('Clara Ikouma', false);
+            $response->assertSee('Commande locale · ' . $order->order_number, false);
+            $response->assertSee(route('admin.orders.show', $order), false);
+        } finally {
+            // DatabaseTransactions ne rolle back ici que pour les écritures via
+            // la connexion reconfigurée : purge explicite pour ne surtout pas
+            // laisser la commande créer des ventes sur le dashboard des autres tests.
+            $order->delete();
+            $client->delete();
+        }
     }
 
     /**
