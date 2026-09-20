@@ -27,6 +27,9 @@
 
     // Taux utiles (cotes devise→XAF déjà préparées par le contrôleur).
     $rate = fn (string $c) => $xafRates[$c] ?? null;
+
+    // Dates de période lisibles pour le titre ("Du 22/08/2026 au 20/09/2026").
+    $dmy = fn ($d) => \Illuminate\Support\Carbon::parse($d)->format('d/m/Y');
 @endphp
 
 <div class="lst">
@@ -146,9 +149,9 @@
     <x-ui.card variant="inset" class="bmb-card">
         <div class="bmb-head">
             <div>
-                <div class="bmb-title">Transactions Bamboo · {{ $startDate }} → {{ $endDate }}</div>
+                <div class="bmb-title">Transactions Bamboo</div>
                 <p class="bmb-meta">
-                    {{ $tx->count() }} transaction(s)
+                    Du {{ $dmy($startDate) }} au {{ $dmy($endDate) }} · {{ $tx->count() }} transaction(s)
                     @if (! $transactions['ok']) <span class="bmb-err">— {{ $transactions['error'] }}</span> @endif
                 </p>
             </div>
@@ -177,24 +180,26 @@
                                 $tAmt = (float) ($t['transactionAmount']['value'] ?? 0);
                                 $tCur = (string) ($t['transactionAmount']['currencyCode'] ?? '');
                                 $tXaf = \App\Support\BambooRates::convert($tAmt, $tCur, $xafRates);
+                                $bal  = (float) ($t['availableBalance']['value'] ?? 0);
+                                $balCur = (string) ($t['availableBalance']['currencyCode'] ?? $tCur);
                             @endphp
                             <tr>
-                                <td>{{ \Illuminate\Support\Carbon::parse($t['transactionDate'] ?? null)->setTimezone('Africa/Libreville')->format('d/m H:i') }}</td>
+                                <td><x-admin.cell-date :value="$t['transactionDate'] ?? null" /></td>
                                 <td>
-                                    <span class="bmb-order">#{{ $t['orderId'] ?? '—' }}</span>
+                                    <span class="lst-ref">#{{ $t['orderId'] ?? '—' }}</span>
                                     @if ($ref = $t['requestId'] ?? null)
-                                        <span class="bmb-ref-sub">{{ mb_substr($ref, 0, 8) }}…</span>
+                                        <span class="lst-ref-sub">{{ mb_substr($ref, 0, 8) }}…</span>
                                     @endif
                                 </td>
                                 <td>
                                     @php $oi = ($t['orderItems'][0] ?? null); @endphp
                                     {{ $oi['productName'] ?? '—' }}
                                     @if (($oi['denomination']['value'] ?? null) !== null)
-                                        <span class="bmb-ref-sub">{{ $oi['denomination']['value'] }} {{ $oi['denomination']['currencyCode'] ?? '' }}</span>
+                                        <span class="lst-ref-sub">{{ $oi['denomination']['value'] }} {{ $oi['denomination']['currencyCode'] ?? '' }}</span>
                                     @endif
                                 </td>
                                 <td class="r">
-                                    <x-admin.cell-amount :value="$tAmt" :unit="$tCur" />
+                                    <span class="cll-amount">{{ $fmt($tAmt) }}@if ($tCur)<small>{{ $tCur }}</small>@endif</span>
                                 </td>
                                 <td class="r">
                                     @if ($tXaf !== null)
@@ -204,7 +209,7 @@
                                     @endif
                                 </td>
                                 <td class="r">
-                                    <span class="lst-soon">{{ $fmt($t['availableBalance']['value'] ?? 0) }}</span>
+                                    <span class="cll-amount">{{ $fmt($bal) }}@if ($balCur)<small>{{ $balCur }}</small>@endif</span>
                                 </td>
                                 <td><x-ui.pill status="{{ strtolower($t['transactionType'] ?? 'order') === 'order' ? 'completed' : 'pending' }}">{{ $t['transactionType'] ?? 'Order' }}</x-ui.pill></td>
                             </tr>
