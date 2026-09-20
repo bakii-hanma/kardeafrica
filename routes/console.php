@@ -15,12 +15,7 @@ Schedule::command('cash:expire-orders')->everyFiveMinutes()->withoutOverlapping(
 // poll GET /orders/{requestId} uniquement — jamais de re-POST (anti double débit).
 Schedule::command('orders:recover')->everyFiveMinutes()->withoutOverlapping();
 
-// Réconciliation quotidienne avec l'historique Bamboo : rapproche les commandes
-// locales en attente de l'historique fournisseur et récupère les orphelines,
-// + alerte console si un solde passe sous le seuil (feature 7 + 3).
-Schedule::command('orders:reconcile --days=7 --run')
-    ->dailyAt('06:15')
-    ->withoutOverlapping();
+
 
 // Garde le cache catalogue afrikard chaud (refresh toutes les 50 min, juste
 // avant l'expiration du cache de 1h). Évite que le premier visiteur paie le

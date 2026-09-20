@@ -90,11 +90,15 @@ return [
     | `ordercompleted.v1` et `productupdated.v1` reçus sur POST /api/webhooks/bamboo.
     | `accounts_alert_threshold_eur` : alerté via log/dashboard quand le solde du
     | compte EUR passe sous ce seuil (soldes en EUR/EUR).
+    | `reconcile_secret` : secret partagé avec l'API (afrikard) qui déclenche la
+    | réconciliation quotidienne via POST /api/bamboo/reconcile — le cron vit
+    | côté API (scheduler Spring), jamais dans l'app Laravel (pas de cron mutualisé).
     */
     'bamboo' => [
         'webhook_secret' => env('BAMBOO_WEBHOOK_SECRET'),
         'admin_base_url' => env('BAMBOO_ADMIN_API_URL', env('PRODUCT_API_URL', 'https://srv1882929.hstgr.cloud/api/v1')),
         'accounts_alert_threshold_eur' => (float) env('BAMBOO_ACCOUNTS_ALERT_THRESHOLD_EUR', 300),
+        'reconcile_secret' => env('BAMBOO_RECONCILE_SECRET'),
     ],
 
     /*

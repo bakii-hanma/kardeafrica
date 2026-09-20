@@ -177,6 +177,13 @@ Route::post('/webhooks/bamboo', [App\Http\Controllers\BambooWebhookController::c
     ->middleware('throttle:300,1')
     ->name('api.webhooks.bamboo');
 
+// Déclencheur de réconciliation appelé par l'API (afrikard) — le cron vit côté
+// API (scheduler Spring), pas dans l'app Laravel. Sécurisé par secret partagé.
+// Throttle strict : un seul appel par jour suffit.
+Route::post('/bamboo/reconcile', [App\Http\Controllers\BambooReconcileController::class, 'trigger'])
+    ->middleware('throttle:10,1')
+    ->name('api.bamboo.reconcile');
+
 
 /* ============================================================
  * Catalogue public pour l'app mobile (Expo) — wrap ProductApiService
