@@ -122,15 +122,7 @@
         @endif
     </x-ui.card>
 
-    {{-- ============ 3. PÉRIODE ============ --}}
-    <form method="GET" action="{{ route('admin.bamboo.index') }}" class="bmb-filter">
-        <label>Du <input type="date" name="start_date" value="{{ $startDate }}"></label>
-        <label>au <input type="date" name="end_date" value="{{ $endDate }}"></label>
-        <button type="submit" class="lst-apply">Filtrer</button>
-        <button type="submit" name="refresh" value="1" class="lst-apply lst-apply--ghost">↻ Rafraîchir</button>
-    </form>
-
-    {{-- ============ 4. TAUX DE CHANGE ============ --}}
+    {{-- ============ 3. TAUX DE CHANGE ============ --}}
     <x-ui.card variant="inset" class="bmb-card">
         <div class="bmb-title">Taux de change officiels Bamboo</div>
         <p class="bmb-meta">{{ $rates['ok'] ? 'Base : ' . ($rates['base'] ?? '—') . ' — cotes converties vers FCFA.' : 'Taux indisponibles.' }}</p>
@@ -145,7 +137,7 @@
         @endif
     </x-ui.card>
 
-    {{-- ============ 5. TRANSACTIONS / MARGE ============ --}}
+    {{-- ============ 4. TRANSACTIONS / MARGE ============ --}}
     <x-ui.card variant="inset" class="bmb-card">
         <div class="bmb-head">
             <div>
@@ -158,6 +150,13 @@
             <a class="bmb-refresh" href="{{ route('admin.bamboo.reconcile', ['start_date' => $startDate, 'end_date' => $endDate]) }}">Historique & réconciliation →</a>
         </div>
 
+        <form method="GET" action="{{ route('admin.bamboo.index') }}" class="lst-toolbar lst-filters">
+            <label class="lst-date"><span>Du</span><input type="date" name="start_date" value="{{ $startDate }}"></label>
+            <label class="lst-date"><span>Au</span><input type="date" name="end_date" value="{{ $endDate }}"></label>
+            <button type="submit" class="lst-apply">Filtrer</button>
+            <button type="submit" name="refresh" value="1" class="lst-apply lst-apply--ghost">↻ Rafraîchir</button>
+        </form>
+
         @if ($tx->isEmpty())
             <x-ui.empty-state :label="$transactions['ok'] ? 'Aucune transaction sur cette période.' : 'Transactions indisponibles.'" />
         @else
@@ -169,9 +168,9 @@
                             <th>Commande</th>
                             <th>Produit</th>
                             <th class="r">Montant</th>
-                            <th>Équivalent FCFA</th>
-                            <th>Solde après</th>
-                            <th>Type</th>
+                            <th class="r">Équivalent FCFA</th>
+                            <th class="r">Solde après</th>
+                            <th class="c">Type</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -211,7 +210,7 @@
                                 <td class="r">
                                     <span class="cll-amount">{{ $fmt($bal) }}@if ($balCur)<small>{{ $balCur }}</small>@endif</span>
                                 </td>
-                                <td><x-ui.pill status="{{ strtolower($t['transactionType'] ?? 'order') === 'order' ? 'completed' : 'pending' }}">{{ $t['transactionType'] ?? 'Order' }}</x-ui.pill></td>
+                                <td class="c"><x-ui.pill status="{{ strtolower($t['transactionType'] ?? 'order') === 'order' ? 'completed' : 'pending' }}">{{ strtolower($t['transactionType'] ?? 'order') === 'order' ? 'Commande' : ($t['transactionType'] ?? '—') }}</x-ui.pill></td>
                             </tr>
                         @endforeach
                     </tbody>
