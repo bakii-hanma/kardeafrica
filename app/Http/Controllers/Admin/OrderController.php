@@ -5,11 +5,15 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\Reseller;
+use App\Services\BambooReportingService;
 use App\Services\OrderDeliveryService;
 use App\Services\PaymentRefundService;
 use App\Services\ProductApiService;
+use App\Support\BambooProfit;
+use App\Support\BambooRates;
 use App\Support\RefundPhone;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -163,14 +167,49 @@ class OrderController extends Controller
         return view('admin.orders.index', compact('orders', 'statusCounts'));
     }
 
-    public function show(Order $order)
+    public function show(Order $order, BambooReportingService $bamboo)
     {
-        $order->load(['user', 'orderItems', 'payments', 'userCards']);
+        $order->load(['user', 'orderItems', 'payments', 'userCards', 'cashReseller']);
 
         $canRetry = $order->status === Order::STATUS_PROCESSING
             && $order->userCards->isEmpty();
 
-        return view('admin.orders.show', compact('order', 'canRetry'));
+        // Bénéfice : coût réel (transaction Bamboo) ou valeur faciale en repli.
+        $profit  = null;
+        $split   = [];
+        $rates   = $bamboo->exchangeRates();
+        $xafRates = BambooRates::toXafRates($rates['rates'] ?? []);
+
+        if (! empty($xafRates)) {
+            $bd = (array) $order->billing_details;
+            $hasLink = ($bd['checkout_order_id'] ?? null) !== null
+                || ($bd['checkout_request_id'] ?? null) !== null;
+
+            if ($hasLink && $order->created_at) {
+                $tz = 'Africa/Libreville';
+                $from = $order->created_at->setTimezone($tz)->subDays(2)->format('Y-m-d');
+                $to   = $order->created_at->setTimezone($tz)->addDays(2)->format('Y-m-d');
+
+                $tx = $bamboo->transactions($from, $to);
+                $flat = collect($tx['clients'] ?? [])
+                    ->flatMap(fn ($c) => collect($c['transactions'] ?? [])
+                        ->map(fn ($t) => $t + ['bambooClient' => $c['clientName'] ?? null]));
+
+                $matched = BambooProfit::matchTransaction($order, $flat);
+
+                if ($matched !== null) {
+                    $split = BambooProfit::splitByItem($order, $matched, $xafRates);
+                }
+
+                $profit = BambooProfit::forOrder($order, $matched, $xafRates);
+            }
+
+            if ($profit === null) {
+                $profit = BambooProfit::forOrder($order, null, $xafRates);
+            }
+        }
+
+        return view('admin.orders.show', compact('order', 'canRetry', 'profit', 'split', 'xafRates'));
     }
 
     /**

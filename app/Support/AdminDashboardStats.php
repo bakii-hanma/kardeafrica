@@ -629,6 +629,53 @@ class AdminDashboardStats
     }
 
     // ------------------------------------------------------------------
+    // Bénéfice de la période (coût réel Bamboo, repli valeur faciale)
+    // ------------------------------------------------------------------
+
+    /**
+     * Ventes payées de la période, avec leurs articles — source comptable du
+     * bénéfice. Requête unique, chargée une seule fois (memo).
+     *
+     * @return \Illuminate\Support\Collection<int, Order>
+     */
+    public function soldOrders(): Collection
+    {
+        if (isset($this->memo['sold_orders'])) {
+            return $this->memo['sold_orders'];
+        }
+
+        return $this->memo['sold_orders'] = Order::with('orderItems')
+            ->where('payment_status', Order::PAYMENT_STATUS_COMPLETED)
+            ->whereBetween('created_at', [$this->utc($this->from), $this->utc($this->to)])
+            ->get();
+    }
+
+    /**
+     * Bénéfice de la période : rapproche les ventes payées des transactions
+     * Bamboo (coût réel) pour sortir la marge Kardafrica. `transactions` est
+     * la liste flat des transactions Bamboo de la fenêtre (côté contrôleur).
+     *
+     * @param  \Illuminate\Support\Collection<int, array<string, mixed>>  $transactions
+     * @return array{
+     *   sale_total_fcfa: float, cost_total_fcfa: ?float, profit_fcfa: ?float,
+     *   margin_percent: ?float, cards_sold: int, matched_orders: int,
+     *   estimated_orders: int, note: ?string
+     * }
+     */
+    public function profit(Collection $transactions, array $xafRates): array
+    {
+        if (isset($this->memo['profit'])) {
+            return $this->memo['profit'];
+        }
+
+        return $this->memo['profit'] = \App\Support\BambooProfit::periodStats(
+            $this->soldOrders(),
+            $transactions,
+            $xafRates,
+        );
+    }
+
+    // ------------------------------------------------------------------
     // Versements en attente
     // ------------------------------------------------------------------
 

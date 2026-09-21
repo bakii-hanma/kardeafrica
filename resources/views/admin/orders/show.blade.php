@@ -307,6 +307,11 @@
                     <h2 style="font-family:'Space Grotesk', 'Inter', sans-serif;font-size:14px;font-weight:700;color:#0F172A;margin:0;">Articles ({{ $order->orderItems->count() }})</h2>
                 </div>
                 @foreach($order->orderItems as $item)
+                    @php
+                        $splitCost = isset($split) ? ($split[$loop->index]['cost_fcfa'] ?? null) : null;
+                        $nativeCost = \App\Support\BambooProfit::itemNativeCostFcfa($item, $xafRates ?? []);
+                        $articleCost = $splitCost ?? $nativeCost;
+                    @endphp
                     <div style="padding:12px 18px;display:flex;align-items:center;gap:12px;{{ !$loop->last ? 'border-bottom:1px solid #F1F5F9;' : '' }}">
                         <div style="width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,#F8FAFC,#F1F5F9);border:1px solid #E2E8F0;display:flex;align-items:center;justify-content:center;color:#475569;font-weight:700;flex-shrink:0;">
                             @if($item->image_url)
@@ -321,12 +326,20 @@
                                 <span style="font-size:13px;font-weight:600;color:#0F172A;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ $item->name }}</span>
                             </div>
                             <div style="font-size:11px;color:#64748B;font-family:monospace;">Product ID: {{ $item->product_id ?? '—' }}</div>
+                            @if($articleCost !== null)
+                                <div style="font-size:11px;color:#94A3B8;margin-top:1px;">Coût: {{ number_format($articleCost, 0, ',', ' ') }} FCFA</div>
+                            @endif
                         </div>
                         <div style="text-align:right;flex-shrink:0;">
                             <div style="font-size:11px;color:#94A3B8;">{{ number_format($item->unit_price, 0, ',', ' ') }} FCFA / unité</div>
                             <div style="font-family:'Space Grotesk', 'Inter', sans-serif;font-size:14px;font-weight:800;color:#0F172A;font-variant-numeric:tabular-nums;">
                                 {{ number_format($item->total_price, 0, ',', ' ') }} FCFA
                             </div>
+                            @if($articleCost !== null)
+                                <div style="font-size:10px;color:{{ ($item->total_price - $articleCost) >= 0 ? '#059669' : '#BE123C' }};font-weight:700;">
+                                    {{ ($item->total_price - $articleCost) >= 0 ? '+' : '' }}{{ number_format($item->total_price - $articleCost, 0, ',', ' ') }} FCFA
+                                </div>
+                            @endif
                         </div>
                     </div>
                 @endforeach
@@ -376,32 +389,67 @@
                     <h2 style="font-family:'Space Grotesk', 'Inter', sans-serif;font-size:14px;font-weight:700;color:#0F172A;margin:0;">Récapitulatif</h2>
                 </div>
                 <div style="padding:16px 18px;">
-                    <div style="display:flex;justify-content:space-between;font-size:13px;color:#64748B;margin-bottom:8px;">
-                        <span>Sous-total</span>
-                        <span style="color:#0F172A;font-weight:600;font-variant-numeric:tabular-nums;">{{ number_format($order->subtotal, 0, ',', ' ') }} FCFA</span>
-                    </div>
-                    @if($order->tax_amount > 0)
-                        <div style="display:flex;justify-content:space-between;font-size:13px;color:#64748B;margin-bottom:8px;">
-                            <span>TVA</span>
-                            <span style="color:#0F172A;font-weight:600;font-variant-numeric:tabular-nums;">{{ number_format($order->tax_amount, 0, ',', ' ') }} FCFA</span>
-                        </div>
-                    @endif
-                    <div style="display:flex;justify-content:space-between;font-size:13px;color:#64748B;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid #F1F5F9;">
-                        <span>Frais de service</span>
-                        <span style="color:#059669;font-weight:600;">Offerts</span>
-                    </div>
-                    <div style="display:flex;justify-content:space-between;align-items:flex-end;">
-                        <div>
-                            <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.08em;font-weight:700;color:#94A3B8;">Total</div>
-                            <div style="font-size:10px;color:#94A3B8;margin-top:2px;">{{ $order->orderItems->count() }} article{{ $order->orderItems->count() > 1 ? 's' : '' }}</div>
-                        </div>
-                        <div style="font-family:'Space Grotesk', 'Inter', sans-serif;font-size:22px;font-weight:800;color:#0F172A;font-variant-numeric:tabular-nums;line-height:1;">
-                            {{ number_format($order->total_amount, 0, ',', ' ') }}
-                            <span style="font-size:12px;font-weight:500;color:#94A3B8;">FCFA</span>
-                        </div>
-                    </div>
+<div style="display:flex;justify-content:space-between;font-size:13px;color:#64748B;margin-bottom:8px;">
+                <span>Sous-total</span>
+                <span style="color:#0F172A;font-weight:600;font-variant-numeric:tabular-nums;">{{ number_format($order->subtotal, 0, ',', ' ') }} FCFA</span>
+            </div>
+            @if($order->tax_amount > 0)
+                <div style="display:flex;justify-content:space-between;font-size:13px;color:#64748B;margin-bottom:8px;">
+                    <span>TVA</span>
+                    <span style="color:#0F172A;font-weight:600;font-variant-numeric:tabular-nums;">{{ number_format($order->tax_amount, 0, ',', ' ') }} FCFA</span>
+                </div>
+            @endif
+            <div style="display:flex;justify-content:space-between;font-size:13px;color:#64748B;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid #F1F5F9;">
+                <span>Frais de service</span>
+                <span style="color:#059669;font-weight:600;">Offerts</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:flex-end;">
+                <div>
+                    <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.08em;font-weight:700;color:#94A3B8;">Total</div>
+                    <div style="font-size:10px;color:#94A3B8;margin-top:2px;">{{ $order->orderItems->count() }} article{{ $order->orderItems->count() > 1 ? 's' : '' }}</div>
+                </div>
+                <div style="font-family:'Space Grotesk', 'Inter', sans-serif;font-size:22px;font-weight:800;color:#0F172A;font-variant-numeric:tabular-nums;line-height:1;">
+                    {{ number_format($order->total_amount, 0, ',', ' ') }}
+                    <span style="font-size:12px;font-weight:500;color:#94A3B8;">FCFA</span>
                 </div>
             </div>
+        </div>
+    </div>
+
+    {{-- Bénéfice gagné --}}
+    @if($profit && $profit['cost_fcfa'] !== null)
+        <div style="background:white;border-radius:14px;border:1px solid #E2E8F0;box-shadow:0 1px 2px rgba(15,23,42,0.04);overflow:hidden;">
+            <div style="padding:14px 18px;border-bottom:1px solid #F1F5F9;background:linear-gradient(180deg,#F8FAFC,white);">
+                <h2 style="font-family:'Space Grotesk', 'Inter', sans-serif;font-size:14px;font-weight:700;color:#0F172A;margin:0;">Bénéfice gagné</h2>
+            </div>
+            <div style="padding:16px 18px;">
+                <div style="display:flex;justify-content:space-between;font-size:13px;color:#64748B;margin-bottom:8px;">
+                    <span>Prix Kardafrica</span>
+                    <span style="color:#0F172A;font-weight:700;font-variant-numeric:tabular-nums;">{{ number_format($profit['card_total_fcfa'], 0, ',', ' ') }} <small style="color:#94A3B8;font-weight:500;">FCFA</small></span>
+                </div>
+                <div style="display:flex;justify-content:space-between;font-size:13px;color:#64748B;margin-bottom:12px;">
+                    <span>Coût (vrai prix)</span>
+                    <span style="color:#0F172A;font-weight:700;font-variant-numeric:tabular-nums;">{{ number_format($profit['cost_fcfa'], 0, ',', ' ') }} <small style="color:#94A3B8;font-weight:500;">FCFA</small></span>
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center;padding-top:12px;border-top:1px solid #F1F5F9;">
+                    <span style="font-size:10px;text-transform:uppercase;letter-spacing:0.08em;font-weight:700;color:#94A3B8;">Bénéfice</span>
+                    <div style="text-align:right;">
+                        <div style="font-family:'Space Grotesk', 'Inter', sans-serif;font-size:20px;font-weight:800;color:{{ $profit['profit_fcfa'] >= 0 ? '#059669' : '#BE123C' }};font-variant-numeric:tabular-nums;line-height:1.1;">
+                            {{ $profit['profit_fcfa'] >= 0 ? '+' : '' }}{{ number_format($profit['profit_fcfa'], 0, ',', ' ') }} <small style="font-size:11px;font-weight:500;color:#94A3B8;">FCFA</small>
+                        </div>
+                        @if($profit['margin_percent'] !== null)
+                            <div style="font-size:11px;color:#64748B;margin-top:2px;">marge {{ $profit['margin_percent'] }} %</div>
+                        @endif
+                    </div>
+                </div>
+                @if($profit['note'])
+                    <div style="font-size:11px;color:#94A3B8;line-height:1.45;margin-top:12px;padding:8px 10px;background:#F8FAFC;border:1px solid #F1F5F9;border-radius:8px;">
+                        {{ $profit['note'] }}
+                    </div>
+                @endif
+            </div>
+        </div>
+    @endif
 
             @if($order->payment_method)
                 <div style="background:white;border-radius:14px;border:1px solid #E2E8F0;box-shadow:0 1px 2px rgba(15,23,42,0.04);padding:14px 16px;">

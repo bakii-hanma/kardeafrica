@@ -22,6 +22,8 @@ class DashboardController extends Controller
     {
         $threshold = (float) config('services.bamboo.accounts_alert_threshold_eur');
 
+        $stats    = AdminDashboardStats::fromRequest($request);
+
         // Équivalent FCFA du solde fournisseur : taux officiels Bamboo
         // convertis vers XAF (fallback Money), pour un total lisible dans
         // la monnaie locale de l'admin.
@@ -30,11 +32,23 @@ class DashboardController extends Controller
         $xafRates  = BambooRates::toXafRates($rates['rates'] ?? []);
         $totalXaf  = $accounts['ok'] ? BambooRates::totalXaf($accounts['accounts'] ?? [], $xafRates) : null;
 
+        // Transactions Bamboo sur la même fenêtre que la topbar : le bénéfice
+        // (prix Kardafrica − coût réel) est rapproché des ventes payées.
+        $txPeriod = $bamboo->transactions(
+            $stats->from()->format('Y-m-d'),
+            $stats->to()->format('Y-m-d'),
+        );
+        $transactions = collect($txPeriod['clients'] ?? [])
+            ->flatMap(fn ($c) => collect($c['transactions'] ?? [])
+                ->map(fn ($t) => $t + ['bambooClient' => $c['clientName'] ?? null]));
+        $profit = $stats->profit($transactions, $xafRates);
+
         return view('admin.dashboard', [
-            'stats'    => AdminDashboardStats::fromRequest($request),
+            'stats'    => $stats,
             'bamboo'   => $accounts,
             'bambooThreshold' => $threshold,
             'bambooTotalXaf'  => $totalXaf,
+            'profit'   => $profit,
         ]);
     }
 }

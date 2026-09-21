@@ -10,7 +10,7 @@
     $fmt = fn ($n) => number_format((float) $n, 0, ',', ' ');
 
     /* Montants compactés pour les axes : « 120 k » se lit, « 120 000 » déborde. */
-    $compact = function ($n) {
+    $compact = function ($n) use ($fmt) {
         $n = (float) $n;
         if (abs($n) >= 1_000_000) return rtrim(rtrim(number_format($n / 1_000_000, 1, ',', ' '), '0'), ',') . ' M';
         if (abs($n) >= 1_000)     return rtrim(rtrim(number_format($n / 1_000, 1, ',', ' '), '0'), ',') . ' k';
@@ -305,6 +305,41 @@
                 <a href="{{ route('admin.versements.index') }}" class="dsh-w-link">Ouvrir les versements →</a>
             </x-ui.card>
 
+            {{-- Bénéfice sur les cartes vendues (prix Kardafrica − coût réel Bamboo) --}}
+            <x-ui.card variant="inset" class="dsh-w dsh-w--profit">
+                <div class="dsh-w-head">
+                    <h2 class="ui-stat-label">Bénéfice sur les cartes vendues</h2>
+                    <a href="{{ route('admin.bamboo.index') }}" class="dsh-w-link">Détail →</a>
+                </div>
+
+                @if ($profit['profit_fcfa'] === null)
+                    <x-ui.empty-state label="Coût indisponible : transactions Bamboo ou valeur faciale manquantes." />
+                @else
+                    <x-ui.stat-number :value="$profit['profit_fcfa']" label="Bénéfice · {{ $stats->label() }}" class="{{ $profit['profit_fcfa'] >= 0 ? '' : 'dsh-profit--neg' }}" />
+                    @if ($profit['margin_percent'] !== null)
+                        <x-ui.pill :status="$profit['margin_percent'] >= 0 ? 'completed' : 'failed'" class="dsh-profit-pill">
+                            marge {{ $profit['margin_percent'] }} %
+                        </x-ui.pill>
+                    @endif
+                    <div class="dsh-profit-row">
+                        <span>Vente totale</span>
+                        <strong>{{ $fmt($profit['sale_total_fcfa']) }} <small>FCFA</small></strong>
+                    </div>
+                    <div class="dsh-profit-row">
+                        <span>Coût réel</span>
+                        <strong>{{ $fmt($profit['cost_total_fcfa'] ?? 0) }} <small>FCFA</small></strong>
+                    </div>
+                    <p class="dsh-pay-meta">
+                        {{ $profit['cards_sold'] }} carte{{ $profit['cards_sold'] > 1 ? 's' : '' }} vendue{{ $profit['cards_sold'] > 1 ? 's' : '' }}
+                        · {{ $profit['matched_orders'] }} liée{{ $profit['matched_orders'] > 1 ? 's' : '' }} à Bamboo
+                        · {{ $profit['estimated_orders'] }} coût estimé
+                    </p>
+                    @if ($profit['note'])
+                        <p class="dsh-profit-note">{{ $profit['note'] }}</p>
+                    @endif
+                @endif
+            </x-ui.card>
+
             {{-- Solde fournisseur Bamboo : total FCFA + seuil bas (alerte) --}}
             <x-ui.card variant="inset" class="dsh-w dsh-w--bamboo">
                 <div class="dsh-w-head">
@@ -594,6 +629,14 @@
 
     .dsh-w--pay { display: flex; flex-direction: column; gap: 4px; justify-content: center; }
     .dsh-pay-meta { font-size: 12px; color: var(--text-muted); margin: 0 0 8px; }
+
+    .dsh-w--profit { display: flex; flex-direction: column; gap: 4px; justify-content: center; }
+    .dsh-profit--neg .ui-stat { color: var(--danger); }
+    .dsh-profit-pill { align-self: flex-start; margin-top: 2px; }
+    .dsh-profit-row { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--text-muted); margin-top: 8px; }
+    .dsh-profit-row strong { font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+    .dsh-profit-row strong small { font-size: .7em; font-weight: 600; color: var(--text-muted); margin-left: 2px; }
+    .dsh-profit-note { font-size: 11px; color: var(--text-faint); margin: 6px 0 0; }
 
     .dsh-w--bamboo { display: flex; flex-direction: column; gap: 4px; justify-content: center; }
     .dsh-bamboo { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
