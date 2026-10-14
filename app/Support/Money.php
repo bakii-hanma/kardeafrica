@@ -52,6 +52,14 @@ class Money
     private static ?int   $memoStep  = null;
 
     /**
+     * Devises déjà signalées comme sans taux dans ce process. Le catalogue
+     * convertit N produits × M devises à chaque requête (et il est crawlé) :
+     * journaliser à chaque appel a fait gonfler laravel.log jusqu'à 3,5 Go.
+     * On ne signale chaque devise manquante qu'UNE fois par process.
+     */
+    private static array $memoLoggedUnknown = [];
+
+    /**
      * Convertit un montant + sa devise en FCFA, en appliquant :
      *  1. Le taux configuré (BDD prioritaire, fallback table en mémoire).
      *  2. Un arrondi VERS LE HAUT au prochain palier configuré (ex: 100).
@@ -151,6 +159,7 @@ class Money
     {
         self::$memoRates = null;
         self::$memoStep  = null;
+        self::$memoLoggedUnknown = [];
     }
 
     /**
@@ -180,7 +189,11 @@ class Money
             // `Money` est volontairement utilisable hors framework (MoneyTest
             // tourne sans Laravel) : journaliser inconditionnellement cassait
             // « A facade root has not been set ».
-            if (function_exists('app') && app()->bound('log')) {
+            // Dédup par process : une devise manquante n'est signalée qu'une
+            // fois (cf. $memoLoggedUnknown), sinon les endpoints catalogue
+            // inondaient le log.
+            if (! isset(self::$memoLoggedUnknown[$code]) && function_exists('app') && app()->bound('log')) {
+                self::$memoLoggedUnknown[$code] = true;
                 \Illuminate\Support\Facades\Log::warning(
                     'Money: devise sans taux de change, conversion au taux 1',
                     ['devise' => $code],

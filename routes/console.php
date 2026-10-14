@@ -15,6 +15,14 @@ Schedule::command('cash:expire-orders')->everyFiveMinutes()->withoutOverlapping(
 // poll GET /orders/{requestId} uniquement — jamais de re-POST (anti double débit).
 Schedule::command('orders:recover')->everyFiveMinutes()->withoutOverlapping();
 
+// Réconciliation des paiements : un client peut PAYER sans jamais revenir sur la
+// page webview /verify (app fermée, réseau coupé) → finalize() jamais appelé →
+// la commande reste bloquée en "processing", sans livraison. orders:recover ne
+// couvre PAS ce cas. Cette passe interroge BillingEasy (GET, lecture seule, donc
+// aucun double débit) et finalise+livre les commandes réellement PAYÉES. Les
+// abandons (non payés) sont laissés tels quels.
+Schedule::command('orders:reconcile-payments')->everyTenMinutes()->withoutOverlapping();
+
 
 
 // Garde le cache catalogue afrikard chaud (refresh toutes les 50 min, juste

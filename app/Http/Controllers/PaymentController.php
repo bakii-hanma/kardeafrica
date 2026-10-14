@@ -6,14 +6,12 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Payment;
 use App\Models\UserCard;
 use App\Models\ShoppingCart;
-use App\Jobs\ProcessCheckoutJob;
 
 class PaymentController extends Controller
 {
@@ -315,7 +313,7 @@ class PaymentController extends Controller
             // (check_status.php) peut répondre « not found » alors que le client
             // a payé ; BillingEasy fait foi.
             $billId = Payment::where('transaction_id', $validated['external_reference'])->value('external_transaction_id');
-            $ebill  = $this->ebillPaid($billId, 0, $validated['external_reference']);
+            $ebill  = app(\App\Services\EbillingService::class)->findPaidByReference($billId, 0, $validated['external_reference']);
             $isCompleted = (bool) ($data['is_completed'] ?? false) || $ebill['paid'];
 
             // SÉCURITÉ (C6) : endpoint PUBLIC (polling WebView). On ne renvoie QUE
@@ -346,12 +344,6 @@ class PaymentController extends Controller
     }
 
     /**
-     * Source de vérité du paiement : BillingEasy GET /e_bills/{bill_id}.
-     * Payé si state === "paid" OU amount_paid >= montant attendu (cf. doc Sowax).
-     *
-     * @return array{paid:bool, state:?string, amount_paid:float}
-     */
-    /**
      * En-têtes de navigateur exigés par futursowax (anti-bot sgcaptcha) : sans
      * eux, on reçoit du HTML au lieu du JSON sur init/portal/check_status.
      */
@@ -363,70 +355,6 @@ class PaymentController extends Controller
             'Origin'     => $appUrl,
             'Referer'    => $appUrl . '/',
         ];
-    }
-
-    private function ebillPaid(?string $billId, int $expectedAmount = 0, ?string $externalRef = null): array
-    {
-        // 1. Chemin rapide : le bill suivi en base.
-        $res = $this->ebillGetPaid($billId, $expectedAmount);
-        if ($res['paid']) {
-            return $res + ['bill_id' => $billId];
-        }
-
-        // 2. Multi-bills : le portail crée parfois PLUSIEURS e-bills pour la même
-        //    référence (un expire, le client en paie un autre). On scanne la liste
-        //    BillingEasy récente pour retrouver un bill PAYÉ de cette référence.
-        if ($externalRef) {
-            try {
-                $base = rtrim((string) config('services.ebilling.url'), '/');
-                $r = Http::withHeaders(['Authorization' => (string) config('services.ebilling.auth')])
-                    ->acceptJson()->timeout(15)->get($base, ['per_page' => 50]);
-                if ($r->successful()) {
-                    foreach (($r->json()['entries'] ?? []) as $e) {
-                        if (($e['external_reference'] ?? null) !== $externalRef) {
-                            continue;
-                        }
-                        $state = strtolower((string) ($e['state'] ?? ''));
-                        $ap    = (float) ($e['amount_paid'] ?? 0);
-                        if ($state === 'paid' || ($expectedAmount > 0 && $ap >= $expectedAmount)) {
-                            return [
-                                'paid' => true, 'state' => 'paid', 'amount_paid' => $ap,
-                                'bill_id' => $e['bill_id'] ?? $billId,
-                            ];
-                        }
-                    }
-                }
-            } catch (\Throwable $e) {
-                Log::warning('ebillPaid: scan liste BillingEasy échoué', ['error' => $e->getMessage()]);
-            }
-        }
-
-        return $res + ['bill_id' => $billId];
-    }
-
-    /** Vérifie un seul e-bill BillingEasy par son id (source de vérité). */
-    private function ebillGetPaid(?string $billId, int $expectedAmount = 0): array
-    {
-        if (empty($billId)) {
-            return ['paid' => false, 'state' => null, 'amount_paid' => 0.0];
-        }
-        try {
-            $url = rtrim((string) config('services.ebilling.url'), '/') . '/' . $billId;
-            $r = Http::withHeaders(['Authorization' => (string) config('services.ebilling.auth')])
-                ->acceptJson()->timeout(12)->get($url);
-            if (!$r->successful()) {
-                return ['paid' => false, 'state' => null, 'amount_paid' => 0.0];
-            }
-            $j = $r->json();
-            $d = is_array($j) ? ($j['e_bill'] ?? $j['data'] ?? $j) : [];
-            $state      = strtolower((string) ($d['state'] ?? ''));
-            $amountPaid = (float) ($d['amount_paid'] ?? 0);
-            $paid = $state === 'paid' || ($expectedAmount > 0 && $amountPaid >= $expectedAmount);
-            return ['paid' => $paid, 'state' => $state ?: null, 'amount_paid' => $amountPaid];
-        } catch (\Throwable $e) {
-            Log::warning('ebillGetPaid: exception BillingEasy', ['error' => $e->getMessage()]);
-            return ['paid' => false, 'state' => null, 'amount_paid' => 0.0];
-        }
     }
 
     /**
@@ -518,7 +446,7 @@ class PaymentController extends Controller
             // portail, qui ne connaît pas la transaction si init.php n'a pas
             // tourné → « not found » alors que le client a bien payé.
             $billId = Payment::where('transaction_id', $externalRef)->value('external_transaction_id');
-            $ebill  = $this->ebillPaid($billId, (int) round((float) $order->total_amount), $externalRef);
+            $ebill  = app(\App\Services\EbillingService::class)->findPaidByReference($billId, (int) round((float) $order->total_amount), $externalRef);
             if ($ebill['paid']) {
                 $isCompleted = true;
                 $status = 'paid';
@@ -572,42 +500,8 @@ class PaymentController extends Controller
             // 3. Transaction courte : verrou + re-test du statut À L'INTÉRIEUR
             //    (C9 : la page verify polle en AJAX — deux réponses simultanées
             //    ne doivent produire qu'une seule finalisation/livraison).
-            $didFinalize = DB::transaction(function () use ($order, $externalRef) {
-                $fresh = Order::whereKey($order->id)->lockForUpdate()->first();
-                if ($fresh->payment_status === Order::PAYMENT_STATUS_COMPLETED) {
-                    return false; // une requête concurrente a déjà finalisé
-                }
-
-                $fresh->update([
-                    'payment_status' => Order::PAYMENT_STATUS_COMPLETED,
-                    'status'         => Order::STATUS_PROCESSING,
-                ]);
-
-                $payment = Payment::where('transaction_id', $externalRef)->lockForUpdate()->first();
-                if ($payment) {
-                    $payment->update([
-                        'order_id'     => $fresh->id,
-                        'status'       => Payment::STATUS_COMPLETED,
-                        'processed_at' => now(),
-                    ]);
-                } else {
-                    // Cas limite (commande legacy sans intention de paiement tracée)
-                    Payment::create([
-                        'transaction_id'          => $externalRef,
-                        'order_id'                => $fresh->id,
-                        'user_id'                 => $fresh->user_id,
-                        'payment_method'          => 'ebilling',
-                        'provider'                => 'futursowax',
-                        'amount'                  => $fresh->total_amount,
-                        'currency'                => $fresh->currency ?? 'XAF',
-                        'status'                  => Payment::STATUS_COMPLETED,
-                        'external_transaction_id' => $externalRef,
-                        'processed_at'            => now(),
-                    ]);
-                }
-
-                return true;
-            });
+            $didFinalize = app(\App\Services\OrderFulfillmentService::class)
+                ->markPaid($order, $externalRef);
 
             if (!$didFinalize) {
                 // Course perdue proprement : l'autre requête a livré, on renvoie l'état.
@@ -616,40 +510,8 @@ class PaymentController extends Controller
 
             $order = $order->fresh()->load('orderItems');
 
-            // 4a. Items marchand (Carte Gabon) : génération LOCALE synchrone pour
-            //     ne pas dépendre du queue worker. createPurchaseForOrderItem est
-            //     idempotent par order_item_id.
-            $merchantItems = $order->orderItems->filter(
-                fn ($i) => \App\Support\MerchantCardCode::isMerchantOrderItem($i)
-            );
-            foreach ($merchantItems as $item) {
-                try {
-                    \App\Support\MerchantCardCode::createPurchaseForOrderItem($order, $item);
-                } catch (\Throwable $e) {
-                    Log::error('PaymentController finalize: échec MerchantCardPurchase', [
-                        'order_id'      => $order->id,
-                        'order_item_id' => $item->id,
-                        'product_id'    => $item->product_id,
-                        'error'         => $e->getMessage(),
-                    ]);
-                }
-            }
-
-            // 4b. Items afrikard : dispatch du job async (une seule fois — garanti
-            //     par le flip payment_status sous verrou ci-dessus).
-            $afrikardItems = $order->orderItems->reject(
-                fn ($i) => \App\Support\MerchantCardCode::isMerchantOrderItem($i)
-            );
-            if ($afrikardItems->isNotEmpty()) {
-                ProcessCheckoutJob::dispatch($order);
-                Log::info('Checkout job dispatched (afrikard items present)', ['order_id' => $order->id]);
-            } else {
-                $order->update([
-                    'status'       => Order::STATUS_COMPLETED,
-                    'completed_at' => now(),
-                ]);
-                Log::info('Order 100% marchand complétée inline', ['order_id' => $order->id]);
-            }
+            // 4. Livraison : items marchand (local) + dispatch afrikard/daywatch.
+            app(\App\Services\OrderFulfillmentService::class)->deliver($order);
 
             // 5. Vider le panier serveur (le flux web start() ne le vide pas à
             //    l'init pour permettre de réessayer un paiement abandonné).
