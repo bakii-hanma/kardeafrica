@@ -3297,8 +3297,9 @@
         function isStandalone() {
             return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
         }
-        function dismissed() { try { return localStorage.getItem(DKEY) === '1'; } catch (e) { return false; } }
-        function setDismissed() { try { localStorage.setItem(DKEY, '1'); } catch (e) {} }
+        // Refus mémorisé 14 jours seulement → la proposition revient ensuite.
+        function dismissed() { try { var t = parseInt(localStorage.getItem(DKEY) || '0', 10); return t > 0 && (Date.now() - t) < 14 * 864e5; } catch (e) { return false; } }
+        function setDismissed() { try { localStorage.setItem(DKEY, String(Date.now())); } catch (e) {} }
         function show() { banner.style.display = 'block'; }
         function hide() { banner.style.display = 'none'; }
 
@@ -3330,5 +3331,37 @@
         }
     })();
     </script>
+
+    {{-- Bandeau « Compléter le compte » : l'utilisateur connecté n'a pas de
+         numéro WhatsApp → il ne peut pas recevoir ses cartes/codes. --}}
+    @auth
+        @if(empty(auth()->user()->phone) && !request()->routeIs('profile.*'))
+        <div id="kaCompleteBanner" style="display:none;"
+             class="fixed bottom-4 left-4 right-4 sm:right-auto sm:max-w-md z-[65]
+                    bg-[#1F2937] text-white rounded-2xl shadow-2xl border border-amber-400/30 p-4">
+            <div class="flex items-start gap-3">
+                <div class="w-10 h-10 rounded-xl shrink-0 flex items-center justify-center" style="background:#F59E0B22">
+                    <svg class="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p class="font-bold text-sm">Complète ton compte</p>
+                    <p class="text-xs text-slate-300 mt-0.5 leading-relaxed">Ajoute ton numéro WhatsApp pour <b>recevoir tes cartes et tes codes</b> directement sur WhatsApp.</p>
+                    <div class="flex items-center gap-2 mt-3">
+                        <a href="{{ route('profile.edit') }}" class="bg-[#44A08D] hover:bg-[#3b8e7c] text-white text-sm font-semibold px-4 py-2 rounded-xl transition">Compléter</a>
+                        <button type="button" onclick="try{localStorage.setItem('ka_complete_dismissed','1')}catch(e){};document.getElementById('kaCompleteBanner').style.display='none';" class="text-slate-400 hover:text-white text-sm font-medium px-2 py-2">Plus tard</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <script>
+            (function(){
+                var b = document.getElementById('kaCompleteBanner');
+                if (!b) return;
+                var d = false; try { d = localStorage.getItem('ka_complete_dismissed') === '1'; } catch(e){}
+                if (!d) b.style.display = 'block';
+            })();
+        </script>
+        @endif
+    @endauth
 </body>
 </html> 

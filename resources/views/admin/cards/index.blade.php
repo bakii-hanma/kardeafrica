@@ -217,6 +217,11 @@
                     $cardCode  = $card->card_code ?? '';
                     $cardPin   = $card->pin;
                     $brandColor= $brandColorFor($card->brand ?? $card->name ?? '');
+                    // Style de marque identique au site (fond spécifique + logo + glow)
+                    $brandLabel = $card->brand ?: explode(' ', (string) $card->name)[0];
+                    $_bk  = \App\Support\BrandStyle::detect($brandLabel);
+                    $bs   = $_bk ? \App\Support\BrandStyle::style($_bk) : \App\Support\BrandStyle::fallback($brandColor);
+                    $logoWm = $card->image_url ?? null;
                     $pricePaid = (float) ($card->orderItem?->unit_price ?? 0);
                     $statusBadge = match($card->status) {
                         'active'  => ['label' => 'Active',   'cls' => 'bg-emerald-500/30', 'dot' => true],
@@ -232,45 +237,52 @@
                          onmouseover="this.style.boxShadow='0 8px 20px rgba(15,23,42,0.08)';this.style.transform='translateY(-2px)';"
                          onmouseout="this.style.boxShadow='0 1px 2px rgba(15,23,42,0.04)';this.style.transform='none';">
 
-                    {{-- Visuel carte --}}
-                    <div style="background-color:{{ $brandColor }};padding:14px;position:relative;overflow:hidden;height:140px;">
-                        <svg style="position:absolute;inset:0;width:100%;height:100%;opacity:0.08;pointer-events:none;" aria-hidden="true">
+                    {{-- Visuel carte — style identique au site (BrandStyle : fond marque + logo + glow) --}}
+                    <div style="background:{{ $bs['background'] }};color:{{ $bs['text'] }};padding:16px;position:relative;overflow:hidden;height:158px;">
+                        @if(!empty($bs['glow']))
+                            <div style="position:absolute;top:-45px;right:-30px;width:170px;height:170px;border-radius:50%;background:{{ $bs['glow'] }};filter:blur(30px);pointer-events:none;"></div>
+                        @endif
+                        <svg style="position:absolute;inset:0;width:100%;height:100%;opacity:0.07;pointer-events:none;" aria-hidden="true">
                             <defs>
-                                <pattern id="ac-{{ $card->id }}" width="32" height="32" patternUnits="userSpaceOnUse">
-                                    <circle cx="16" cy="16" r="13" fill="none" stroke="white" stroke-width="1.2"/>
+                                <pattern id="ac-{{ $card->id }}" width="30" height="30" patternUnits="userSpaceOnUse">
+                                    <circle cx="15" cy="15" r="12" fill="none" stroke="currentColor" stroke-width="1.1"/>
                                 </pattern>
                             </defs>
                             <rect width="100%" height="100%" fill="url(#ac-{{ $card->id }})"/>
                         </svg>
-                        <div style="position:absolute;top:-30px;right:-30px;width:120px;height:120px;border-radius:50%;background:rgba(255,255,255,0.15);filter:blur(20px);"></div>
+                        @if($logoWm)
+                            <div style="position:absolute;right:-8px;top:50%;transform:translateY(-50%);width:120px;height:120px;background:url('{{ $logoWm }}') center/contain no-repeat;opacity:0.16;pointer-events:none;"></div>
+                        @endif
 
                         <div style="position:relative;z-index:1;display:flex;flex-direction:column;height:100%;justify-content:space-between;">
                             <div style="display:flex;align-items:flex-start;justify-content:space-between;">
-                                <div style="min-width:0;flex:1;">
-                                    <div style="color:rgba(255,255,255,0.75);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.18em;">Gift Card</div>
-                                    <div style="font-family:'Space Grotesk', 'Inter', sans-serif;color:var(--surface);font-size:22px;font-weight:700;line-height:1.05;letter-spacing:-0.02em;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
-                                        {{ $card->brand ?: explode(' ', $card->name)[0] }}
-                                    </div>
-                                </div>
-                                <div class="{{ $statusBadge['cls'] }}" style="padding:3px 8px;border-radius:9999px;font-size:10px;font-weight:700;color:var(--surface);display:inline-flex;align-items:center;gap:4px;backdrop-filter:blur(4px);margin-left:8px;flex-shrink:0;">
-                                    @if($statusBadge['dot'])
-                                        <span style="width:5px;height:5px;border-radius:50%;background:#86EFAC;"></span>
-                                    @endif
+                                <span style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.16em;opacity:.78;display:inline-flex;align-items:center;gap:5px;">
+                                    <span style="width:7px;height:7px;border-radius:2px;background:currentColor;opacity:.7;"></span> KardAfrica
+                                </span>
+                                <div class="{{ $statusBadge['cls'] }}" style="padding:3px 8px;border-radius:9999px;font-size:10px;font-weight:700;display:inline-flex;align-items:center;gap:4px;backdrop-filter:blur(4px);flex-shrink:0;">
+                                    @if($statusBadge['dot'])<span style="width:5px;height:5px;border-radius:50%;background:#86EFAC;"></span>@endif
                                     {{ $statusBadge['label'] }}
                                 </div>
                             </div>
 
+                            <div style="display:flex;align-items:center;gap:10px;min-width:0;">
+                                @if(!empty($bs['logo']))
+                                    <div style="width:30px;height:30px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">{!! $bs['logo'] !!}</div>
+                                @endif
+                                <div style="font-family:'Space Grotesk','Inter',sans-serif;font-size:24px;font-weight:800;line-height:1;letter-spacing:-0.02em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ $brandLabel }}</div>
+                            </div>
+
                             <div style="display:flex;align-items:flex-end;justify-content:space-between;">
                                 <div>
-                                    <div style="color:rgba(255,255,255,0.6);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;">Prix payé</div>
-                                    <div style="font-family:'Space Grotesk', 'Inter', sans-serif;color:var(--surface);font-size:18px;font-weight:700;font-variant-numeric:tabular-nums;margin-top:1px;">
-                                        {{ number_format($pricePaid, 0, ',', ' ') }} <span style="font-size:11px;font-weight:400;color:rgba(255,255,255,0.7);">FCFA</span>
+                                    <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;opacity:.65;">Prix payé</div>
+                                    <div style="font-family:'Space Grotesk','Inter',sans-serif;font-size:18px;font-weight:700;font-variant-numeric:tabular-nums;margin-top:1px;">
+                                        {{ number_format($pricePaid, 0, ',', ' ') }} <span style="font-size:11px;font-weight:400;opacity:.7;">FCFA</span>
+                                        @if($card->face_value && $card->currency !== 'XAF')<span style="font-size:11px;font-weight:500;opacity:.7;"> · {{ number_format($card->face_value, 0, ',', ' ') }} {{ $card->currency }}</span>@endif
                                     </div>
-                                    @if($card->face_value && $card->currency !== 'XAF')
-                                        <div style="color:rgba(255,255,255,0.6);font-size:10px;margin-top:2px;">{{ number_format($card->face_value, 0, ',', ' ') }} {{ $card->currency }} de crédit</div>
-                                    @endif
                                 </div>
-                                <div style="width:36px;height:24px;border-radius:4px;background:linear-gradient(135deg,rgba(254,240,138,0.9),rgba(250,204,21,0.7));border:1px solid rgba(255,255,255,0.3);"></div>
+                                <div style="width:42px;height:28px;border-radius:5px;background:linear-gradient(135deg,rgba(254,240,138,0.95),rgba(250,204,21,0.75));border:1px solid rgba(255,255,255,0.3);position:relative;flex-shrink:0;">
+                                    <div style="position:absolute;inset:4px;border:1px solid rgba(0,0,0,.12);border-radius:3px;"></div>
+                                </div>
                             </div>
                         </div>
                     </div>

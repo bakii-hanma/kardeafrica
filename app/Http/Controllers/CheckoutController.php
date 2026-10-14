@@ -60,8 +60,54 @@ class CheckoutController extends Controller
                 $item->price = $priceSvc->authoritativeUnitPrice($item->product_id, $item->price);
             }
         } catch (\RuntimeException $e) {
+            // Prix non résolvable (fail-closed C1) — message métier.
             return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        } catch (\Throwable $e) {
+            // Panne d'infra (ex. time-out afrikard → ConnectionException, qui
+            // n'est PAS une RuntimeException) : avant, ça remontait en 500
+            // « Server Error » et bloquait le paiement. On renvoie un message
+            // clair + réessayable au lieu d'une erreur serveur brute.
+            Log::warning('Checkout: résolution de prix indisponible', [
+                'error' => $e->getMessage(),
+                'class' => get_class($e),
+            ]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Service momentanément indisponible, réessaie dans quelques secondes.',
+            ], 503);
         }
+        // GARDE-FOU STOCK — ne jamais encaisser une carte en rupture (count<=0)
+        // côté fournisseur : c'est ce qui créait des commandes payées non
+        // livrables. Le catalogue est forcément joignable ici (la validation de
+        // prix ci-dessus l'exige). Fail-open si lecture stock impossible : la
+        // livraison re-vérifie (findOutOfStock) avant tout débit fournisseur.
+        try {
+            $catalog = collect($priceSvc->getAllProducts(0, 99999))->keyBy('id');
+            $rupture = [];
+            foreach ($cartItems as $item) {
+                $pid = (string) $item->product_id;
+                if (str_starts_with($pid, 'merchant_') || str_starts_with($pid, 'daywatch_')) {
+                    continue; // stock géré hors catalogue afrikard
+                }
+                $real = \App\Support\VirtualDenominations::parse($pid);
+                $key  = $real ? $real['real'] : $pid;
+                $product = $catalog->get($key) ?? $catalog->get((string) $key) ?? $catalog->get((int) $key);
+                if ($product && (int) ($product['count'] ?? 0) <= 0) {
+                    $rupture[] = $item->name;
+                }
+            }
+            if (! empty($rupture)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Rupture de stock : ' . implode(', ', $rupture)
+                        . '. Retire ' . (count($rupture) > 1 ? 'ces articles' : 'cet article')
+                        . ' du panier — le stock sera bientôt reconstitué.',
+                ], 422);
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Checkout: contrôle stock indisponible (fail-open)', ['error' => $e->getMessage()]);
+        }
+
         $subtotal    = $cartItems->sum(fn($i) => $i->price * $i->quantity);
         // C3 : référence non prédictible (rand(1000,9999) était énumérable)
         $externalRef = 'KARD_' . time() . '_' . strtoupper(bin2hex(random_bytes(6)));
@@ -557,7 +603,21 @@ class CheckoutController extends Controller
                 $item->price = $priceSvc->authoritativeUnitPrice($item->product_id, $item->price);
             }
         } catch (\RuntimeException $e) {
+            // Prix non résolvable (fail-closed C1) — message métier.
             return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        } catch (\Throwable $e) {
+            // Panne d'infra (ex. time-out afrikard → ConnectionException, qui
+            // n'est PAS une RuntimeException) : avant, ça remontait en 500
+            // « Server Error » et bloquait le paiement. On renvoie un message
+            // clair + réessayable au lieu d'une erreur serveur brute.
+            Log::warning('Checkout: résolution de prix indisponible', [
+                'error' => $e->getMessage(),
+                'class' => get_class($e),
+            ]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Service momentanément indisponible, réessaie dans quelques secondes.',
+            ], 503);
         }
         $subtotal = (float) $cartItems->sum(fn($i) => $i->price * $i->quantity);
         if ((float) $reseller->available_balance < $subtotal) {

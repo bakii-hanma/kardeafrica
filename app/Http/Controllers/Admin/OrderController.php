@@ -230,6 +230,9 @@ class OrderController extends Controller
                 'Catalogue fournisseur incomplet (produits ' . implode(', ', $result['missing']) . ' manquants). '
                 . 'Essai automatique programmé — patiente quelques minutes puis réessaie.'),
             'no_afrikard_items' => back()->with('error', 'Aucun item fournisseur à livrer sur cette commande.'),
+            'out_of_stock' => back()->with('error',
+                'Produit en rupture de stock chez le fournisseur (' . implode(', ', $result['products'] ?? []) . ') — '
+                . 'livraison impossible pour le moment. Rembourse le client, ou relance après réapprovisionnement.'),
             'orphan_debited' => back()->with('error', $result['message']),
             'pending' => back()->with('warning',
                 'Livraison demandée — les codes sont en cours de génération côté fournisseur (asynchrone). '

@@ -37,8 +37,17 @@ class PaymentRefundService
             return null;
         }
 
-        if (str_starts_with($digits, '241') && strlen($digits) === 11) {
-            return '0' . substr($digits, 3);
+        if (str_starts_with($digits, '241')) {
+            $rest = substr($digits, 3);
+            // 241 + 8 chiffres d'abonné (canonique) → 0XXXXXXXX
+            if (strlen($rest) === 8) {
+                return '0' . $rest;
+            }
+            // 241 + 9 chiffres commençant par 0 (le 0 de tête a été conservé à
+            // la saisie, ex. +241 077687737) → le local est déjà bon.
+            if (strlen($rest) === 9 && str_starts_with($rest, '0')) {
+                return $rest;
+            }
         }
 
         return $digits;
@@ -75,8 +84,18 @@ class PaymentRefundService
             ? self::toLocalGabonPhone($msisdn)
             : null;
 
+        // Majoration des frais : le PSP/opérateur prélève un % sur le payout, donc
+        // le client recevrait moins que $amountFcfa. On envoie le montant BRUT
+        // nécessaire pour qu'il reçoive le NET attendu. $extras['gross_up'] = false
+        // désactive (ex. un complément déjà calculé).
+        $feeRate     = (float) config('services.payment_backend.refund_fee_rate', 0.0);
+        $grossUp     = $extras['gross_up'] ?? true;
+        $grossAmount = ($grossUp && $feeRate > 0 && $feeRate < 0.5)
+            ? (int) ceil($amountFcfa / (1 - $feeRate))
+            : $amountFcfa;
+
         $payload = array_filter([
-            'amount'             => $amountFcfa,
+            'amount'             => $grossAmount,
             'phone_number'       => $phoneNumber,
             'payment_system'     => $paymentSystem,
             'description'        => substr('Remboursement : ' . $reason, 0, 120),
@@ -90,7 +109,8 @@ class PaymentRefundService
             'transfer_reference' => $transferRef,
             'phone_number'       => $phoneNumber,
             'payment_system'     => $paymentSystem,
-            'amount'             => $amountFcfa,
+            'amount_net'         => $amountFcfa,
+            'amount_gross'       => $grossAmount,
         ]);
 
         try {
@@ -104,25 +124,44 @@ class PaymentRefundService
                 'body'               => $response->json() ?? $response->body(),
             ]);
 
-            if (!$response->successful()) {
-                $body = $response->json();
+            $body = $response->json();
+
+            // transfer.php encapsule PARFOIS un SUCCÈS réel dans un wrapper
+            // d'erreur HTTP 400 : {success:false, error:"Réponse inattendue…",
+            // details:{success:"transaction_completed", response:{state:"success",
+            // payout_id, transaction_id, …}}}. Si on s'arrête au code HTTP, on
+            // croit l'opération échouée ALORS QUE L'ARGENT EST PARTI → risque de
+            // double remboursement au retry. On inspecte donc le vrai état.
+            $nestedState   = data_get($body, 'details.response.state');
+            $nestedSuccess = data_get($body, 'details.success');
+            $topState      = data_get($body, 'data.state') ?? ($body['status'] ?? null);
+
+            $ok = ($body['success'] ?? false) === true
+                || in_array($nestedState, ['success', 'completed', 'ok', 'pending'], true)
+                || $nestedSuccess === 'transaction_completed'
+                || in_array($topState, ['ok', 'success', 'completed', 'pending'], true);
+
+            // Vrai échec : ni succès réel, ni HTTP OK.
+            if (! $ok && ! $response->successful()) {
                 return [
                     'ok'                 => false,
                     'transfer_reference' => $transferRef,
-                    'message'            => $body['error'] ?? "HTTP {$response->status()} de l'API E-Billing",
+                    'message'            => data_get($body, 'error') ?? data_get($body, 'message') ?? "HTTP {$response->status()} de l'API E-Billing",
                     'raw'                => $body,
                 ];
             }
 
-            $body = $response->json();
-            $state = data_get($body, 'data.state') ?? $body['status'] ?? null;
-            $ok   = ($body['success'] ?? false)
-                || in_array($state, ['ok', 'success', 'completed', 'pending', true], true);
+            $ref = data_get($body, 'details.response.external_reference')
+                ?: (data_get($body, 'details.response.payout_id') ? 'payout_' . data_get($body, 'details.response.payout_id') : null)
+                ?: data_get($body, 'data.external_reference')
+                ?: $transferRef;
 
             return [
                 'ok'                 => $ok,
-                'transfer_reference' => data_get($body, 'data.external_reference') ?: $transferRef,
-                'message'            => $body['message'] ?? data_get($body, 'data.message') ?? ($ok ? 'Transfert initié' : 'Transfert refusé'),
+                'transfer_reference' => $ref,
+                'message'            => $ok
+                    ? ('Transfert effectué' . (data_get($body, 'details.response.transaction_id') ? ' (' . data_get($body, 'details.response.transaction_id') . ')' : ''))
+                    : (data_get($body, 'error') ?? data_get($body, 'message') ?? 'Transfert refusé'),
                 'raw'                => $body,
             ];
         } catch (\Throwable $e) {

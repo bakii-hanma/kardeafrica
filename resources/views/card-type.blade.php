@@ -226,17 +226,25 @@
                                     $isActive = ($v['id'] ?? null) == ($selectedVariantId ?? null);
                                     $faceLbl  = \App\Support\Money::formatOriginal($v['minFaceValue'] ?? ($v['price']['min'] ?? 0), $v['price']['currencyCode'] ?? 'XAF')
                                         ?? number_format((float) ($v['minFaceValue'] ?? 0), 0, ',', ' ');
+                                    $vOut = isset($v['count']) && (int) $v['count'] <= 0;
                                 @endphp
-                                <a href="{{ route('card-type.variant', [$ctIdForUrl, $faceToPath($v['minFaceValue'] ?? ($v['price']['min'] ?? 0))]) }}"
-                                   class="flex flex-col items-center rounded-xl border-2 px-4 py-2.5 transition
-                                          {{ $isActive
-                                              ? 'border-[#44A08D] bg-teal-50 text-[#44A08D]'
-                                              : 'border-slate-200 bg-white text-slate-700 hover:border-[#44A08D]/50' }}">
-                                    <span class="text-base font-black tabular-nums leading-none">{{ $faceLbl }}</span>
-                                    <span class="mt-1 text-[11px] font-semibold tabular-nums {{ $isActive ? 'text-[#44A08D]' : 'text-slate-400' }}">
-                                        {{ \App\Support\Money::formatFcfa($v['price']['min'], $v['price']['currencyCode'] ?? 'XAF') }}
-                                    </span>
-                                </a>
+                                @if($vOut)
+                                    <div class="flex flex-col items-center rounded-xl border-2 border-slate-200 bg-slate-50 px-4 py-2.5 opacity-70 cursor-not-allowed select-none" title="Rupture de stock">
+                                        <span class="text-base font-black tabular-nums leading-none text-slate-400 line-through">{{ $faceLbl }}</span>
+                                        <span class="mt-1 text-[10px] font-bold uppercase tracking-wide text-rose-400">Épuisé</span>
+                                    </div>
+                                @else
+                                    <a href="{{ route('card-type.variant', [$ctIdForUrl, $faceToPath($v['minFaceValue'] ?? ($v['price']['min'] ?? 0))]) }}"
+                                       class="flex flex-col items-center rounded-xl border-2 px-4 py-2.5 transition
+                                              {{ $isActive
+                                                  ? 'border-[#44A08D] bg-teal-50 text-[#44A08D]'
+                                                  : 'border-slate-200 bg-white text-slate-700 hover:border-[#44A08D]/50' }}">
+                                        <span class="text-base font-black tabular-nums leading-none">{{ $faceLbl }}</span>
+                                        <span class="mt-1 text-[11px] font-semibold tabular-nums {{ $isActive ? 'text-[#44A08D]' : 'text-slate-400' }}">
+                                            {{ \App\Support\Money::formatFcfa($v['price']['min'], $v['price']['currencyCode'] ?? 'XAF') }}
+                                        </span>
+                                    </a>
+                                @endif
                             @endforeach
                         </div>
                     </div>
@@ -407,7 +415,7 @@
 
             <div class="flex gap-2 sm:gap-3 flex-1 sm:max-w-md">
                 <button @click="addToCart()"
-                        :disabled="!selectedProduct"
+                        :disabled="!selectedProduct || isOut"
                         type="button"
                         class="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl border-2 border-slate-200 hover:border-slate-300 bg-white text-slate-900 font-semibold text-sm transition active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>
@@ -415,10 +423,10 @@
                     <span class="sm:hidden">Panier</span>
                 </button>
                 <button @click="buyNow()"
-                        :disabled="!selectedProduct"
+                        :disabled="!selectedProduct || isOut"
                         type="button"
                         class="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-[#44A08D] hover:bg-[#3d9180] text-white font-semibold text-sm shadow-lg shadow-[#44A08D]/30 transition active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed">
-                    <span>Acheter</span>
+                    <span x-text="isOut ? 'En rupture' : 'Acheter'">Acheter</span>
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
                 </button>
             </div>
@@ -485,12 +493,19 @@
                 return 'Montant sélectionné';
             },
 
+            // Variante sélectionnée en rupture de stock (count <= 0) ?
+            get isOut() {
+                return !!(this.selectedProduct && (this.selectedProduct.count ?? 0) <= 0);
+            },
+
             init() {
                 // P1 §1 — la variante vient de l'URL (résolue serveur) ; à défaut,
-                // la moins chère (« à partir de »), jamais products[0] arbitraire.
+                // la moins chère EN STOCK (« à partir de »), jamais products[0] arbitraire.
                 const selectedId = @json($selectedVariantId ?? null);
+                const inStock = this.products.filter(p => (p.count ?? 0) > 0);
+                const pool = inStock.length ? inStock : this.products;
                 this.selectedProduct = this.products.find(p => p.id == selectedId)
-                    || [...this.products].sort((a, b) => (a.price?.min ?? 1e15) - (b.price?.min ?? 1e15))[0]
+                    || [...pool].sort((a, b) => (a.price?.min ?? 1e15) - (b.price?.min ?? 1e15))[0]
                     || null;
             },
 

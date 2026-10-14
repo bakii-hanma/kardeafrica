@@ -56,17 +56,24 @@ class ProfileController extends Controller
         $user = Auth::user();
 
         $request->validate([
-            'first_name' => 'required|string|max:120',
-            'last_name'  => 'nullable|string|max:120',
-            'email'      => 'required|string|email|max:255|unique:users,email,' . $user->id,
+            'first_name'     => 'required|string|max:120',
+            'last_name'      => 'nullable|string|max:120',
+            'email'          => 'required|string|email|max:255|unique:users,email,' . $user->id,
+            'phone_country'  => 'nullable|string|size:2',
+            'phone_national' => 'nullable|string|max:30',
         ]);
 
         $fullName = trim($request->first_name . ' ' . (string) $request->last_name);
 
-        $user->update([
-            'name'  => $fullName,
-            'email' => $request->email,
-        ]);
+        $update = ['name' => $fullName, 'email' => $request->email];
+
+        // Numéro WhatsApp (pour recevoir les cartes/codes). Recomposé en E.164.
+        $phone = \App\Support\PhoneInput::accountKeyFromRequest($request, 'phone');
+        if ($phone !== null) {
+            $update['phone'] = $phone;
+        }
+
+        $user->update($update);
 
         // On garde aussi prénom/nom structurés dans le profil (source des champs).
         $user->profile()->updateOrCreate(

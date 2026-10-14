@@ -7,7 +7,7 @@
  *  - On ne met JAMAIS en cache les requêtes non-GET, cross-origin, l'admin,
  *    l'API, le panier/checkout/paiement (données sensibles/dynamiques).
  */
-const CACHE = 'kardafrica-v1';
+const CACHE = 'kardafrica-v2';
 const ASSET_RE = /\.(?:css|js|png|jpe?g|gif|svg|webp|ico|woff2?|ttf)$/i;
 const BYPASS_RE = /^\/(admin|api|proprietaire|vendor|cart|checkout|payment|logout|connexion-whatsapp)(\/|$)/i;
 

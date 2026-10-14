@@ -93,6 +93,19 @@
                             @error('email') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
                         </div>
 
+                        {{-- Numéro WhatsApp — indispensable pour recevoir les cartes/codes --}}
+                        <div class="rounded-xl p-4 {{ empty($user->phone) ? 'bg-amber-50 border border-amber-200' : 'bg-teal-50/50 border border-teal-100' }}">
+                            <div class="flex items-center gap-2 mb-2">
+                                <svg class="w-4 h-4 text-[#25D366]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+                                <span class="text-sm font-bold text-slate-800">Numéro WhatsApp</span>
+                                @if(empty($user->phone))
+                                    <span class="text-[10px] font-bold uppercase bg-amber-200 text-amber-800 px-2 py-0.5 rounded-full">à renseigner</span>
+                                @endif
+                            </div>
+                            <x-phone-input name="phone" :value="$user->phone" label=""
+                                           hint="C'est sur ce numéro que tu recevras tes cartes et tes codes de vérification par WhatsApp." />
+                        </div>
+
                         <div class="flex justify-end pt-1">
                             <button type="submit" class="inline-flex items-center gap-2 bg-[#44A08D] text-white px-6 py-2.5 rounded-xl font-semibold hover:bg-[#3b8e7c] transition shadow-lg shadow-[#44A08D]/30">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>

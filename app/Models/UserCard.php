@@ -11,6 +11,35 @@ class UserCard extends Model
 
     protected $table = 'user_cards';
 
+    /**
+     * À la création d'une carte livrée, envoi automatique au client sur WhatsApp
+     * (image custom + code/PIN). Déclenché APRÈS commit : la carte est bien
+     * persistée et la transaction de livraison n'est jamais bloquée par l'appel
+     * réseau. Best-effort — n'échoue jamais la livraison (voir le notifier).
+     */
+    protected static function booted(): void
+    {
+        static::created(function (self $card) {
+            try {
+                if (blank($card->card_code)) {
+                    return; // pas de code → rien à livrer
+                }
+                \Illuminate\Support\Facades\DB::afterCommit(function () use ($card) {
+                    \App\Support\WhatsAppCardNotifier::send($card);
+                });
+            } catch (\Throwable $e) {
+                // Pas de gestionnaire de transaction (contexte console) → envoi direct.
+                try {
+                    \App\Support\WhatsAppCardNotifier::send($card);
+                } catch (\Throwable $e2) {
+                    \Illuminate\Support\Facades\Log::warning('UserCard auto-notify: échec', [
+                        'card_id' => $card->id ?? null, 'error' => $e2->getMessage(),
+                    ]);
+                }
+            }
+        });
+    }
+
     protected $fillable = [
         'user_id',
         'order_id',

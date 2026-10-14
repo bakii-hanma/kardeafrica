@@ -20,7 +20,11 @@ class OtpService
     public const MAX_ATTEMPTS    = 5;
     public const RESEND_COOLDOWN = 60; // secondes
 
-    public function __construct(private WhapiService $whapi) {}
+    public function __construct(
+        private WahaService $waha,
+        private OtpImageService $otpImage,
+        private WhapiService $whapi,
+    ) {}
 
     /**
      * Génère un code, le persiste (haché) et l'envoie par WhatsApp.
@@ -55,10 +59,28 @@ class OtpService
             ]
         );
 
-        $message = "KardAfrica — votre code de vérification est : {$code}\n"
+        $caption = "KardAfrica — votre code de vérification est : *{$code}*\n"
             . "Il expire dans " . self::TTL_MINUTES . " minutes. Ne le partagez avec personne.";
 
-        $sent = $this->whapi->sendText($phoneE164, $message);
+        $sent = false;
+
+        // 1) WAHA (self-hébergé) : image personnalisée KardAfrica + légende.
+        if ($this->waha->isConfigured()) {
+            try {
+                $png  = $this->otpImage->render($code);
+                $sent = $this->waha->sendImage($phoneE164, $png, $caption, 'kardafrica-code.png');
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('OTP image échouée, repli texte WAHA', ['error' => $e->getMessage()]);
+            }
+            if (! $sent) {
+                $sent = $this->waha->sendText($phoneE164, $caption); // repli texte
+            }
+        }
+
+        // 2) Repli WHAPI si WAHA indisponible.
+        if (! $sent) {
+            $sent = $this->whapi->sendText($phoneE164, $caption);
+        }
 
         return ['sent' => $sent, 'cooldown' => false, 'seconds' => 0];
     }

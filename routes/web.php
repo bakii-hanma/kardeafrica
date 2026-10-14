@@ -397,6 +397,22 @@ Route::prefix('admin')->middleware(['auth', 'is_admin'])->group(function () {
     // Dashboard
     Route::get('/', [AdminDashboardController::class, 'index'])->name('admin.dashboard');
 
+    // WhatsApp (WAHA) — connexion du numéro par QR + envoi des OTP
+    Route::get('/whatsapp',           [\App\Http\Controllers\Admin\WahaController::class, 'index'])->name('admin.waha');
+    Route::get('/whatsapp/status',    [\App\Http\Controllers\Admin\WahaController::class, 'status'])->name('admin.waha.status');
+    Route::get('/whatsapp/qr',        [\App\Http\Controllers\Admin\WahaController::class, 'qr'])->name('admin.waha.qr');
+    Route::post('/whatsapp/start',    [\App\Http\Controllers\Admin\WahaController::class, 'start'])->name('admin.waha.start');
+    Route::post('/whatsapp/restart',  [\App\Http\Controllers\Admin\WahaController::class, 'restart'])->name('admin.waha.restart');
+    Route::post('/whatsapp/logout',   [\App\Http\Controllers\Admin\WahaController::class, 'logout'])->name('admin.waha.logout');
+    Route::post('/whatsapp/test',     [\App\Http\Controllers\Admin\WahaController::class, 'test'])->middleware('throttle:6,1')->name('admin.waha.test');
+    // Panneau de gestion (après connexion) : chat, envoi groupé, excuses
+    Route::get('/whatsapp/chats',     [\App\Http\Controllers\Admin\WahaController::class, 'chats'])->name('admin.waha.chats');
+    Route::get('/whatsapp/messages',  [\App\Http\Controllers\Admin\WahaController::class, 'messages'])->name('admin.waha.messages');
+    Route::post('/whatsapp/send',     [\App\Http\Controllers\Admin\WahaController::class, 'sendChat'])->middleware('throttle:60,1')->name('admin.waha.send');
+    Route::post('/whatsapp/broadcast',[\App\Http\Controllers\Admin\WahaController::class, 'broadcast'])->middleware('throttle:10,1')->name('admin.waha.broadcast');
+    Route::get('/whatsapp/pending',   [\App\Http\Controllers\Admin\WahaController::class, 'pendingContacts'])->name('admin.waha.pending');
+    Route::post('/whatsapp/apology',  [\App\Http\Controllers\Admin\WahaController::class, 'apology'])->middleware('throttle:4,1')->name('admin.waha.apology');
+
     // Commandes
     Route::get('/orders/pending-delivery', [AdminOrderController::class, 'pendingDelivery'])->name('admin.orders.pending-delivery');
     Route::post('/orders/retry-bulk',      [AdminOrderController::class, 'retryBulk'])->middleware('throttle:5,1')->name('admin.orders.retry-bulk');

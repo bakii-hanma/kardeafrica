@@ -67,6 +67,10 @@ return [
         // Endpoint de transfert/remboursement E-Billing (renvoie l'argent au payeur)
         'transfer_url' => env('PAYMENT_BACKEND_TRANSFER_URL', 'https://futursowax.com/paiement/transfer.php'),
         'callback_url' => env('PAYMENT_BACKEND_CALLBACK_URL'),
+        // Frais prélevés par le PSP/opérateur sur un virement de remboursement
+        // (payout). On majore le montant envoyé pour que le client reçoive le
+        // montant NET attendu (observé : ~1% sur Airtel Money). Ex. 0.01 = 1%.
+        'refund_fee_rate' => (float) env('PAYMENT_REFUND_FEE_RATE', 0.01),
     ],
 
     /*
@@ -108,6 +112,13 @@ return [
     | Le token reste UNIQUEMENT côté serveur (.env), jamais dans le frontend.
     | https://whapi.cloud — endpoint messages/text.
     */
+    'waha' => [
+        // WhatsApp HTTP API self-hébergé (VPS) — remplace WHAPI (limite d'essai).
+        'base_url' => env('WAHA_BASE_URL', 'http://srv1882929.hstgr.cloud:3000'),
+        'api_key'  => env('WAHA_API_KEY'),
+        'session'  => env('WAHA_SESSION', 'default'),
+    ],
+
     'whapi' => [
         'base_url' => env('WHAPI_BASE_URL', 'https://gate.whapi.cloud'),
         'token'    => env('WHAPI_TOKEN'),
